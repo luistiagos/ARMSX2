@@ -1,8 +1,8 @@
 # TASK-0019: trazer o mecanismo de atualização pelo nosso canal para o fork
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-26
-- **Concluída em:** —
+- **Concluída em:** 2026-08-26
 - **Feature:** [FEAT-0001](../features/FEAT-0001-sync-upstream-oficial.md)
 - **Bugs que resolve:** nenhum
 - **Commit:** — (o vínculo é o prefixo `TASK-0019:` no assunto)
@@ -15,7 +15,8 @@ Trazer o `AppUpdateManager` — o mecanismo que lê o nosso `version.json`, baix
 **verifica o SHA-256** e instala pelo `PackageInstaller` — para o fork, com o build e o manifesto
 ligados. Etapa 5 do [plano do fork](../plano-fork-sobre-upstream.md).
 
-> **Esta task entrega o MECANISMO, não a ligação com a UI.** O motivo está na seção
+> **Esta task entrega o MECANISMO, não a ligação com a UI** — que veio logo em seguida, na
+> [TASK-0020](TASK-0020-seam-do-updater.md). O motivo está na seção
 > "O que falta, e por que não foi decidido aqui". Isso é deliberado e segue o mesmo padrão da
 > TASK-0002, que trouxe o banco de drivers "desligado, só logando", até haver base para ligá-lo.
 

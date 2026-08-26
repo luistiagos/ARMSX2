@@ -1,7 +1,6 @@
 package com.armsx2.update
 
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,45 +32,47 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import com.armsx2.BuildConfig
 import com.armsx2.i18n.str
 import com.armsx2.runtime.MainActivityRuntime
 import com.armsx2.ui.common.GlassPanel
 import com.armsx2.ui.common.SettingSwitchRow
 import com.armsx2.ui.settings.controllerFocusable
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.Calendar
-import java.util.TimeZone
+import com.armsx2.updates.AppUpdateManager
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
- * In-app updater — GitHub sideload flavor ONLY. Renders a "Check for updates" panel in the About
- * screen: it hits the GitHub releases/latest API, compares the latest STABLE release tag against the
- * installed build, and offers to download + install the APK. The play flavor gets the no-op stub in
- * src/play, so this code (and REQUEST_INSTALL_PACKAGES / the FileProvider) never enters the AAB —
- * build-play-aab.sh also fails closed if the permission ever leaks in.
+ * Updater in-app — flavor de sideload (github) APENAS. Desenha o painel "procurar atualizacoes" na
+ * tela Sobre. O flavor play recebe o stub vazio em src/play, entao nem este codigo, nem
+ * REQUEST_INSTALL_PACKAGES, nem o FileProvider entram no AAB — e o build-play-aab.sh falha fechado
+ * se a permissao algum dia vazar para la.
  *
- * Nightly-safe: nightly builds use versionCode = Unix seconds (> 1e6), so their version is always
- * far ahead of any stable release. We short-circuit those to "up to date" and never prompt a nightly
- * user to a stable — comparison is by the numeric versionCode magnitude, not the version string.
+ * **A UI e deles; a fonte de dados e nossa.** O original consultava a API de releases do GitHub do
+ * ARMSX2 e escolhia o APK por marcadores no nome do arquivo. Este consulta o `version.json` do
+ * canal de distribuicao do RetroSystem PS2 e delega tudo ao AppUpdateManager, que verifica o
+ * SHA-256 antes de instalar — coisa que o original nao fazia.
+ *
+ * O conceito de "nightly" saiu junto: la era um pre-release diario do workflow `nightly.yml`, com
+ * versionCode = segundos Unix para ficar sempre a frente de qualquer estavel. Nao ha equivalente do
+ * nosso lado, e um toggle sem o que oferecer e pior que nenhum.
  */
-
-private const val LATEST_URL = "https://api.github.com/repos/ARMSX2/ARMSX2/releases/latest"
-private const val RELEASES_URL = "https://api.github.com/repos/ARMSX2/ARMSX2/releases?per_page=20"
-private const val NIGHTLY_VC_THRESHOLD = 1_000_000  // stable VCs are ~1300; nightly = Unix seconds.
 
 private sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
     data object UpToDate : UpdateState
-    data class Available(val version: String, val notes: String, val apkUrl: String) : UpdateState
+    /**
+     * `info` e o que o nosso AppUpdateManager devolveu: versionCode, apkUrl, sha256 e tamanho.
+     * A UI so mostra `version` e `notes`, mas o download precisa do resto -- sobretudo do sha256,
+     * sem o qual nao ha como recusar um APK errado.
+     */
+    data class Available(
+        val version: String,
+        val notes: String,
+        val info: AppUpdateManager.UpdateInfo,
+    ) : UpdateState
     data class Downloading(val pct: Int) : UpdateState
     data class Error(val msg: String) : UpdateState
 }
@@ -102,8 +103,7 @@ fun UpdaterEntry() {
                     Text(str("update.checking"), style = MaterialTheme.typography.bodySmall)
                 }
                 is UpdateState.UpToDate -> Text(
-                    if (BuildConfig.VERSION_CODE > NIGHTLY_VC_THRESHOLD) str("update.onNightly")
-                    else str("update.upToDate"),
+                    str("update.upToDate"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -128,10 +128,7 @@ fun UpdaterEntry() {
             val runCheck: () -> Unit = {
                 scope.launch {
                     state = UpdateState.Checking
-                    state = checkForUpdate(
-                        MainActivityRuntime.prefs.getBoolean("update.includeNightly", false),
-                        checkFailedPrefix,
-                    )
+                    state = checkForUpdate(context, checkFailedPrefix)
                 }
             }
             Button(
@@ -154,19 +151,13 @@ fun UpdaterEntry() {
                 },
             )
 
-            // Opt-in: also consider nightly (pre-release) builds when checking (default off).
-            var includeNightly by remember {
-                mutableStateOf(MainActivityRuntime.prefs.getBoolean("update.includeNightly", false))
-            }
-            SettingSwitchRow(
-                title = str("update.includeNightly"),
-                description = str("update.includeNightly.desc"),
-                checked = includeNightly,
-                onCheckedChange = {
-                    includeNightly = it
-                    MainActivityRuntime.prefs.edit().putBoolean("update.includeNightly", it).apply()
-                },
-            )
+            // O toggle "incluir builds nightly" foi removido junto com o updater do GitHub deles.
+            // Nightly, la, era um pre-release diario publicado pelo workflow nightly.yml, com
+            // versionCode = segundos Unix para ficar sempre a frente de qualquer estavel. O nosso
+            // canal de distribuicao publica UM version.json, com channel="default" e a serie
+            // 38, 39... Manter o switch seria manter um controle que nao tem o que oferecer -- o
+            // mesmo defeito que este projeto ja catalogou duas vezes (isNativeInitializationSucceeded
+            // sem consumidor, o toggle de gravar log que nao ligava log nenhum).
         }
     }
 
@@ -216,10 +207,7 @@ fun AutoUpdateGate() {
 
     LaunchedEffect(Unit) {
         if (MainActivityRuntime.prefs.getBoolean("update.checkOnLaunch", false)) {
-            val result = checkForUpdate(
-                MainActivityRuntime.prefs.getBoolean("update.includeNightly", false),
-                checkFailedPrefix,
-            )
+            val result = checkForUpdate(context, checkFailedPrefix)
             if (result is UpdateState.Available) state = result  // stay silent on up-to-date / errors
         }
     }
@@ -270,209 +258,70 @@ fun AutoUpdateGate() {
     }
 }
 
-private suspend fun checkForUpdate(includeNightly: Boolean, checkFailedPrefix: String): UpdateState = withContext(Dispatchers.IO) {
-    try {
-        if (!includeNightly) {
-            // Stable channel. A nightly build (VC = Unix seconds) is always ahead of any stable, so
-            // never prompt it — and never offer it a stable (that would be a versionCode downgrade).
-            if (BuildConfig.VERSION_CODE > NIGHTLY_VC_THRESHOLD) return@withContext UpdateState.UpToDate
-            val obj = JSONObject(httpGet(LATEST_URL))
-            val apkUrl = apkAssetForThisDevice(obj) ?: return@withContext UpdateState.UpToDate
-            val tag = obj.getString("tag_name")
-            return@withContext if (isNewer(tag, BuildConfig.VERSION_NAME))
-                UpdateState.Available(tag, obj.optString("body", ""), apkUrl)
-            else UpdateState.UpToDate
-        }
-
-        // Nightly channel: GitHub returns releases newest-first, so offer the first genuinely-newer
-        // one that has an APK. Nightlies are pre-releases tagged nightly-YYYYMMDD; stables are vX.Y.Z.
-        // Compare nightlies by day (the installed nightly's build day comes from its VC = Unix seconds);
-        // compare stables by version name. A nightly install is never offered a stable — that's a
-        // versionCode downgrade the system installer rejects anyway (reinstall stable manually).
-        val arr = JSONArray(httpGet(RELEASES_URL))
-        val installedIsNightly = BuildConfig.VERSION_CODE > NIGHTLY_VC_THRESHOLD
-        val installedDay = if (installedIsNightly) epochSecToYyyymmdd(BuildConfig.VERSION_CODE.toLong()) else 0
-        for (i in 0 until arr.length()) {
-            val rel = arr.getJSONObject(i)
-            if (rel.optBoolean("draft", false)) continue
-            val apkUrl = apkAssetForThisDevice(rel) ?: continue
-            val tag = rel.getString("tag_name")
-            val isNightlyRel = rel.optBoolean("prerelease", false) || tag.startsWith("nightly-", ignoreCase = true)
-            val newer = if (isNightlyRel) {
-                nightlyTagDay(tag) > installedDay  // stable install => installedDay 0 => any nightly is newer
-            } else {
-                !installedIsNightly && isNewer(tag, BuildConfig.VERSION_NAME)
+/**
+ * Consulta o NOSSO canal de distribuicao, nao a API de releases do GitHub deles.
+ *
+ * O que mudou, e por que: o updater original buscava
+ * `api.github.com/repos/ARMSX2/ARMSX2/releases` e escolhia o APK por marcadores no nome do
+ * arquivo (`-sdk26`, `-sdk30`, ...). O RetroSystem PS2 distribui de outro lugar e de outro jeito:
+ * um unico `version.json` no R2, com `versionCode`, `apkUrl`, `sha256` e `size`.
+ *
+ * A diferenca que mais importa nao e o endereco -- e o **sha256**. O updater deles nao verifica
+ * hash nenhum. O nosso verifica, e isso nao e zelo abstrato: a URL canonica do APK, atras do cache
+ * de borda, continua servindo os bytes da versao ANTERIOR por um tempo depois do upload, ignorando
+ * `Cache-Control`. Sem a verificacao, o app instala o APK errado sem perceber.
+ *
+ * Toda a mecanica (comparar versionCode, conferir o canal, baixar com resume, verificar o hash,
+ * instalar pelo PackageInstaller) ja vive no AppUpdateManager, que roda numa thread propria e
+ * responde por callback. Aqui so ha a ponte para corrotina, para a UI Compose deles continuar
+ * intacta.
+ */
+private suspend fun checkForUpdate(context: Context, checkFailedPrefix: String): UpdateState =
+    suspendCancellableCoroutine { cont ->
+        AppUpdateManager(context).checkForUpdate(object : AppUpdateManager.CheckCallback {
+            override fun onUpdateAvailable(info: AppUpdateManager.UpdateInfo) {
+                // O version.json nao carrega notas de versao hoje; a UI cai no
+                // "update.notesUnavailable" dela mesma. Acrescentar um campo `notes` no publicador
+                // e o caminho, se um dia quisermos mostrar o changelog.
+                if (cont.isActive) cont.resume(UpdateState.Available(info.versionName, "", info))
             }
-            if (newer) return@withContext UpdateState.Available(tag, rel.optString("body", ""), apkUrl)
-        }
-        UpdateState.UpToDate
-    } catch (e: Exception) {
-        UpdateState.Error("$checkFailedPrefix: ${e.message}")
-    }
-}
 
-// Release tier markers. A release carries four APKs and their names are the only thing
-// distinguishing them, so these are a contract with build-release-targets.sh:
-//   -sdk26   legacy — armv8.1-a.               The build every device can run.
-//   -sdk30   a11    — armv8.2-a+fp16+dotprod.
-//   -sdk33   a13    — same codegen.
-//   -sdk35   a15    — same codegen, newest NDK.
-// Keyed off the minSdk suffix alone because those four strings are mutually exclusive.
-// The previous scheme keyed off "-v82" and "-v82-sdk35", where one marker was a substring
-// of the other and only a carefully ordered `when` kept Android 15 devices off the wrong
-// build — a hazard that grows with every tier added. Nothing here can overlap.
-private const val LEGACY_MARKER = "-sdk26"
-private const val A11_MARKER = "-sdk30"
-private const val A13_MARKER = "-sdk33"
-private const val A15_MARKER = "-sdk35"
+            override fun onUpToDate() {
+                if (cont.isActive) cont.resume(UpdateState.UpToDate)
+            }
+
+            override fun onError(message: String?) {
+                if (cont.isActive) cont.resume(UpdateState.Error("$checkFailedPrefix: $message"))
+            }
+        })
+    }
 
 /**
- * Does this CPU implement the ARMv8.2 extensions the a11/a13/a15 builds are compiled against?
+ * Baixa, VERIFICA O SHA-256 e instala. Delega ao AppUpdateManager pela mesma razao acima.
  *
- * Read off `/proc/cpuinfo`'s Features line, which exposes the kernel's HWCAP names:
- * `asimdhp` = FEAT_FP16, `asimddp` = FEAT_DotProd. Both are OPTIONAL at ARMv8.2 — a core can
- * be v8.2 and have neither — so the architecture level is not a usable proxy and the flags
- * have to be read directly.
- *
- * **Fails closed.** Anything unexpected — unreadable file, unparseable Features line, a
- * feature missing — returns false and the device gets the baseline build. That asymmetry is
- * deliberate: handing the v8.2 APK to a CPU without these instructions is a SIGILL on the
- * first hot path, and a user whose emulator no longer launches cannot reach the updater to
- * get back off it. A device that merely misses out on the faster build is unharmed.
+ * `onInstallStarted` e o fim da nossa parte: dali em diante quem conduz e o PackageInstaller, e a
+ * tela "deseja instalar?" chega pelo UpdateInstallReceiver (registrado no manifesto do flavor
+ * github). Sem aquele receiver a atualizacao baixa, passa na verificacao e simplesmente nao
+ * acontece -- sem erro e sem tela.
  */
-private fun supportsV82Build(): Boolean = runCatching {
-    val features = File("/proc/cpuinfo").useLines { lines ->
-        lines.firstOrNull { it.startsWith("Features", ignoreCase = true) }
-    } ?: return@runCatching false
-    // Match whole tokens: a substring test would accept "asimddp" as evidence of "asimd".
-    val tokens = features.substringAfter(':', "").trim().split(Regex("\\s+")).toHashSet()
-    "asimdhp" in tokens && "asimddp" in tokens
-}.getOrDefault(false)
-
-/**
- * Download URL of the `.apk` asset this device should install, or null if the release has none.
- *
- * A release carries four APKs — one baseline and three ARMv8.2 tiers — so taking the first
- * asset GitHub happened to list would hand out an arbitrary one. Prefer the highest tier this
- * device satisfies on BOTH gates, and fall back down the list from there. If the only APKs
- * present are ones this device cannot run, offer nothing rather than an update that bricks
- * the install.
- *
- * An APK whose name carries no recognised marker counts as legacy. That is what makes older
- * releases — published before tiering, as a single `ARMSX2-<version>.apk` — still resolve.
- */
-private fun apkAssetForThisDevice(release: JSONObject): String? {
-    val assets = release.optJSONArray("assets") ?: return null
-    var legacy: String? = null
-    var a11: String? = null
-    var a13: String? = null
-    var a15: String? = null
-    for (i in 0 until assets.length()) {
-        val a = assets.getJSONObject(i)
-        val name = a.getString("name")
-        if (!name.endsWith(".apk", ignoreCase = true)) continue
-        val url = a.getString("browser_download_url")
-        when {
-            name.contains(A15_MARKER, ignoreCase = true) -> if (a15 == null) a15 = url
-            name.contains(A13_MARKER, ignoreCase = true) -> if (a13 == null) a13 = url
-            name.contains(A11_MARKER, ignoreCase = true) -> if (a11 == null) a11 = url
-            // -sdk26 and "no marker at all" are the same tier; see the KDoc above.
-            else -> if (legacy == null) legacy = url
+private suspend fun downloadAndInstall(
+    context: Context,
+    info: UpdateState.Available,
+    onProgress: (Int) -> Unit,
+) = suspendCancellableCoroutine { cont ->
+    AppUpdateManager(context).downloadAndInstall(info.info, object : AppUpdateManager.InstallCallback {
+        override fun onProgress(bytesDownloaded: Long, totalBytes: Long) {
+            if (totalBytes > 0) onProgress(((bytesDownloaded * 100) / totalBytes).toInt())
         }
-    }
 
-    // Walk DOWN from the best tier this device qualifies for, so a release that omits a tier
-    // degrades to the next one rather than offering nothing. Two independent gates: the CPU
-    // must have the instructions the v8.2 builds are compiled against, and the OS must be at
-    // least the build's minSdk — installing below it fails at the package manager with an
-    // error no user can act on, which is a worse outcome than staying on the current build.
-    val cpuOk = supportsV82Build()
-    val sdk = Build.VERSION.SDK_INT
-    return when {
-        cpuOk && sdk >= 35 -> a15 ?: a13 ?: a11 ?: legacy
-        cpuOk && sdk >= 33 -> a13 ?: a11 ?: legacy
-        cpuOk && sdk >= 30 -> a11 ?: legacy
-        else -> legacy
-    }
-}
-
-/** "nightly-YYYYMMDD" -> YYYYMMDD as an int (0 if the tag isn't a dated nightly). */
-private fun nightlyTagDay(tag: String): Int =
-    Regex("nightly-(\\d{8})", RegexOption.IGNORE_CASE).find(tag)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-
-/** Unix-epoch seconds (a nightly build's versionCode) -> UTC YYYYMMDD int, matching the nightly tag. */
-private fun epochSecToYyyymmdd(epochSec: Long): Int {
-    val c = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = epochSec * 1000L }
-    return c.get(Calendar.YEAR) * 10000 + (c.get(Calendar.MONTH) + 1) * 100 + c.get(Calendar.DAY_OF_MONTH)
-}
-
-/** Semantic-version compare of the release tag vs the installed versionName. Non-numeric suffixes
- *  (e.g. the "2.6.4.3.r" tag) are dropped — only the leading dotted integers matter. */
-private fun isNewer(remoteTag: String, installed: String): Boolean {
-    fun parts(v: String) = v.trim().removePrefix("v").split('.', '-')
-        .map { it.takeWhile(Char::isDigit) }.mapNotNull { it.toIntOrNull() }
-    val r = parts(remoteTag); val i = parts(installed)
-    for (k in 0 until maxOf(r.size, i.size)) {
-        val a = r.getOrElse(k) { 0 }; val b = i.getOrElse(k) { 0 }
-        if (a != b) return a > b
-    }
-    return false
-}
-
-private fun httpGet(url: String): String {
-    val conn = URL(url).openConnection() as HttpURLConnection
-    return try {
-        conn.connectTimeout = 10_000
-        conn.readTimeout = 15_000
-        conn.setRequestProperty("Accept", "application/vnd.github+json")
-        conn.setRequestProperty("User-Agent", "ARMSX2-Updater")
-        conn.inputStream.bufferedReader().use { it.readText() }
-    } finally {
-        conn.disconnect()
-    }
-}
-
-private suspend fun downloadAndInstall(context: Context, info: UpdateState.Available, onProgress: (Int) -> Unit) {
-    val apk = withContext(Dispatchers.IO) {
-        val dir = File(context.externalCacheDir, "updates").apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() }  // keep only the current download
-        val out = File(dir, "armsx2-update.apk")
-        val conn = URL(info.apkUrl).openConnection() as HttpURLConnection
-        try {
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 30_000
-            conn.setRequestProperty("User-Agent", "ARMSX2-Updater")
-            val total = conn.contentLengthLong
-            var read = 0L
-            var lastPct = -1
-            conn.inputStream.use { input ->
-                out.outputStream().use { sink ->
-                    val buf = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        sink.write(buf, 0, n)
-                        read += n
-                        if (total > 0) {
-                            val pct = ((read * 100) / total).toInt()
-                            if (pct != lastPct) {
-                                lastPct = pct
-                                withContext(Dispatchers.Main) { onProgress(pct) }
-                            }
-                        }
-                    }
-                }
-            }
-        } finally {
-            conn.disconnect()
+        override fun onInstallStarted() {
+            if (cont.isActive) cont.resume(Unit)
         }
-        out
-    }
-    // Hand the APK to the system package installer (user confirms the install).
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.updateprovider", apk)
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, "application/vnd.android.package-archive")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    context.startActivity(intent)
+
+        override fun onError(message: String?) {
+            // A UI deles espera excecao neste caminho (o `catch` que monta o
+            // "update.downloadFailed"), entao o erro tem de voltar como excecao, nao como estado.
+            if (cont.isActive) cont.cancel(IllegalStateException(message ?: "download failed"))
+        }
+    })
 }
