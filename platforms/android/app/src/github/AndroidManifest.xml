@@ -34,6 +34,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/update_paths" />
         </provider>
+
+        <!--
+            Resultado da sessao do PackageInstaller. Quando o Android decide que a instalacao
+            precisa de confirmacao do usuario (o caso normal fora de device owner), ele responde
+            STATUS_PENDING_USER_ACTION com um Intent pronto, e e esse Intent que abre a tela
+            "deseja instalar?". SEM ESTE RECEIVER a atualizacao baixa, verifica o SHA-256 e
+            simplesmente nao acontece: sem erro, sem tela, sem nada.
+
+            Nao exportado: quem envia o broadcast e o sistema, para o nosso proprio pacote.
+        -->
+        <receiver
+            android:name="com.armsx2.updates.UpdateInstallReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

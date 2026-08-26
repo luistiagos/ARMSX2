@@ -238,6 +238,24 @@ android {
             // Play distribution should carry. The NATIVE side is gated here rather than in
             // Kotlin so a play build never even fetches the library.
             buildConfigField("boolean", "LSFG", "true")
+            // Canal de atualizacao do RetroSystem PS2 (TASK-0019). Sobrescreviveis para testar sem
+            // mexer no arquivo que os clientes leem:
+            //   ./gradlew assembleGithubRelease -Parmsx2.updateEndpoint=<url>
+            //
+            // O canal e a outra metade de um par: o `channel` dentro do version.json tem de casar
+            // com este valor, senao o app recusa a atualizacao. Serve para publicar um build de
+            // teste no mesmo bucket sem que os clientes o recebam.
+            buildConfigField(
+                "String",
+                "APP_UPDATE_ENDPOINT",
+                "\"" + (providers.gradleProperty("armsx2.updateEndpoint").orNull
+                    ?: "https://versions.digitalstoregames.com/rgs/ps2/version.json") + "\"",
+            )
+            buildConfigField(
+                "String",
+                "APP_UPDATE_CHANNEL",
+                "\"" + (providers.gradleProperty("armsx2.updateChannel").orNull ?: "default") + "\"",
+            )
             externalNativeBuild { cmake { arguments += "-DARMSX2_ENABLE_LSFG=ON" } }
         }
         create("play") {
@@ -245,6 +263,11 @@ android {
             buildConfigField("boolean", "STORAGE_ALL_FILES", "false")
             buildConfigField("boolean", "IN_APP_UPDATER", "false")
             buildConfigField("boolean", "LSFG", "false")
+            // O flavor play nao tem updater -- nem o codigo, nem a permissao. Estes campos existem
+            // aqui so para que codigo compartilhado possa referencia-los sem quebrar o build do
+            // play; o valor vazio e inutilizavel de proposito.
+            buildConfigField("String", "APP_UPDATE_ENDPOINT", "\"\"")
+            buildConfigField("String", "APP_UPDATE_CHANNEL", "\"\"")
             externalNativeBuild { cmake { arguments += "-DARMSX2_ENABLE_LSFG=OFF" } }
         }
     }
