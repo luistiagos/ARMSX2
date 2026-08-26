@@ -83,10 +83,12 @@ Medido em 2026-08-26: configuração 120,7 s, build 825 s (13 min 45 s), 1.704 a
 
 | Item | Situação |
 |---|---|
-| Dependências do shaderc | **não são vendoradas nem submódulos.** Rodar `python platforms/android/app/src/main/cpp/3rdparty/shaderc/utils/git-sync-deps` antes do primeiro build. Já executado nesta máquina. |
+| Dependências do shaderc | **não são vendoradas nem submódulos, e são `gitignore`d.** Isso significa que elas **não acompanham um `git worktree` novo** — cada árvore precisa das suas. Rodar `python platforms/android/app/src/main/cpp/3rdparty/shaderc/utils/git-sync-deps`, ou copiar as sete pastas (264 MB) de uma árvore que já as tenha. Esquecer isto falha com `SPIRV-Tools was not found` só quando o CMake configura, ou seja, minutos depois. |
 | Rust / cargo | **não é preciso.** Sem cargo, o librashader se desliga sozinho (`RetroArch shader support DISABLED`) e o build segue. |
 | NDK `28.2.13676358` | instalado |
-| SDK platform 37 | **não instalado.** `platforms;android-37` não existe no repositório que o `cmdline-tools` desta máquina enxerga (ele entende SDK XML até v3; o repositório está em v4). **Atualizar o `cmdline-tools` é pré-requisito para o APK.** |
+| **JDK 21** | **obrigatório** para o Gradle 9.4.1 deles — o `gradle/gradle-daemon-jvm.properties` exige Java 21, e o JDK 17 nem inicia o daemon. Instalado em `D:/DevCaches/jdk-21`. O build nativo por CMake continua funcionando sem ele. |
+| SDK platform 37 | **`platforms;android-37` não existe.** O que existe, e só no canal de preview (`--channel=3`), é **`platforms;android-37.0`** — o Android passou a usar versões menores (37.0, 37.1, 37.2-beta*). Instalado. |
+| `cmdline-tools` | o `latest` (rev 20.0) entende SDK XML até v3 e o repositório está em v4. Instalado o `latest-2` (rev 23.0). ⚠️ **O `sdkmanager.bat` do 23.0 quebra o argumento no `;`** (`platforms;android-37.0` vira dois pacotes "não encontrados"). Contornar com `--package_file=<arquivo>`, uma linha por pacote. |
 
 ### APK
 
@@ -99,6 +101,22 @@ cd platforms/android
 
 Dois flavors: `github` (sideload, tem `MANAGE_EXTERNAL_STORAGE`) e `play` (scoped storage / SAF).
 O nosso canal é sideload → **`github`**.
+
+Com `armsx2.applicationId` / `armsx2.versionCode` / `armsx2.versionName` no `gradle.properties`
+(TASK-0017), as flags acima ficam desnecessárias e o default deixa de ser o perigoso.
+
+> 🔴 **O release deles assina com a keystore de DEBUG** quando `armsx2_keystore.properties` não
+> existe, e **não falha** ao fazê-lo — o comentário no `build.gradle.kts` diz *"NOT for
+> distribution"*. Um APK com assinatura diferente quebra a atualização de todos os instalados, e a
+> recuperação é desinstalar, perdendo saves. É o mesmo defeito que a linha anterior já tinha
+> registrado no `deploy_release.ps1`. **A etapa de publicação precisa de um guard que aborte se o
+> APK não estiver assinado com a chave oficial.**
+
+> ⚠️ **R8 está ligado no release deles** (`isMinifyEnabled = true`); o nosso app antigo tinha
+> `minifyEnabled false`. Tudo que o nativo alcança **por nome** precisa de regra em
+> `app/proguard-rules.pro`. A ponte JNI já está coberta por `-keep class kr.co.iefriends.pcsx2.**`,
+> mas qualquer classe nossa fora desse pacote resolvida por nome precisa da sua própria regra — e a
+> falha aparece só em runtime, num build de release.
 
 ## Rastreabilidade: nada é commitado sem uma task
 
