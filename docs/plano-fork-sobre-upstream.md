@@ -250,8 +250,25 @@ Renomear qualquer coisa desta seção quebra instalação existente.
 | `applicationId` | `come.nanodata.armsx2` | **É propriedade de linha de comando**: `-Parmsx2.applicationId` no `build.gradle.kts` deles (default `com.armsx2`). Não precisa tocar em fonte. ⚠️ O `come` é grafia herdada, **não é typo a corrigir** — corrigir quebra toda instalação. |
 | Nome do `.ini` | `PCSX2-Android.ini` | **idêntico nos dois lados**, verificado. Definições sobrevivem. |
 | Namespace JNI | `Java_kr_co_iefriends_pcsx2_*` | **preservado no upstream**, apesar do `applicationId` `com.armsx2` |
-| SharedPreferences | arquivo `armsx2`; também `controller_mode`, `hidapi` | migrar as chaves usadas pelos módulos da §4 |
+| SharedPreferences | arquivo `armsx2`; também `controller_mode`, `hidapi` | ⚠️ **o deles chama-se `ARMSX2`** — ver o aviso abaixo |
 | Caminhos de dados | via `DataDirectoryManager` | ⚠️ ver §6 — colisão de modelo |
+
+> 🔴 **O arquivo de SharedPreferences difere só na CAIXA, e isso não falha em lugar nenhum.**
+> Nós gravamos em `getSharedPreferences("armsx2", ...)`; eles, em `"ARMSX2"`
+> (`BootSplashActivity.kt:33`). Nomes de SharedPreferences são **nomes de arquivo** e portanto
+> case-sensitive no Android: `armsx2.xml` e `ARMSX2.xml` são dois arquivos distintos. Ao atualizar
+> da 1.0.23 para o fork, tudo que o usuário tinha lá fica invisível — não some do disco, o app novo
+> simplesmente olha para o outro arquivo e vê tudo vazio.
+>
+> Seis pontos do nosso app usavam esse arquivo. O mais grave é o `DataDirectoryManager`, que guarda
+> **a raiz de dados escolhida**: sem migração, o app novo procura jogos e saves no lugar padrão. Os
+> outros são o `versionCode` pulado do updater, o ícone alternativo, as decisões do monitor gráfico
+> e alguns toggles de UI.
+>
+> A boa notícia: a maior parte das configurações **não** está aqui. Vai por `NativeApp.setSetting()`
+> para o `PCSX2-Android.ini`, que tem o mesmo nome nos dois lados e sobrevive intacto.
+>
+> A migração pertence à etapa em que cada módulo for reimplementado, não à identidade.
 
 ### O que muda de propósito (identidade visual e textual)
 
