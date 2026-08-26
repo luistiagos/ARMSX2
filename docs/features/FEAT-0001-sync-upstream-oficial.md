@@ -45,6 +45,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0014](../task/TASK-0014-comparador-superficie-jni.md) | concluída | Comparador da superfície JNI contra o upstream, por nome **e** assinatura |
 | [TASK-0016](../task/TASK-0016-base-do-fork.md) | concluída | **Base do fork** — branch a partir da árvore deles, com a nossa infraestrutura de processo dentro |
 | [TASK-0017](../task/TASK-0017-identidade-do-produto.md) | concluída | **Identidade** — applicationId, versionCode, nome, ícone e o produto no i18n |
+| [TASK-0018](../task/TASK-0018-telemetria-no-fork.md) | concluída | **Telemetria** — envio ao `/logErr`, `ApplicationExitInfo` e decodificação de tombstone, sem tocar no core |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de

@@ -1861,6 +1861,21 @@ open class MainActivityRuntime : ComponentActivity() {
         runCatching {
             val gl = com.armsx2.GpuInfo.glStrings()
             kr.co.iefriends.pcsx2.NativeApp.setAutoRendererGpuStrings(gl.vendor, gl.renderer, gl.version)
+            // As mesmas strings anexadas a todo relato de crash. Um tombstone sem GPU e driver nao
+            // e diagnosticavel, e foi essa ausencia que fez quatro rodadas de correcao grafica
+            // serem feitas as cegas na linha anterior.
+            //
+            // Aqui e SO a identidade do GPU. O que o GS decidiu a partir dela -- perfil resolvido,
+            // regras do banco de drivers que casaram, framebuffer fetch e texture barrier -- e
+            // impresso pelo proprio core em GSDeviceOGL/GSDeviceVK, vai para o logcat (o
+            // `initialize` liga Log::SetConsoleOutputLevel(LOGLEVEL_DEBUG) e redireciona o stdout
+            // nativo), e o CrashReporter ja captura o logcat. Por isso NAO ha gancho nosso dentro
+            // de pcsx2/: o core do upstream ja e observavel, ao contrario do da linha anterior,
+            // onde todos os sinks nasciam em NONE.
+            com.armsx2.telemetry.TelemetryReporter.setGraphicsBootSummary(
+                "gl_vendor=\"${gl.vendor.orEmpty()}\" gl_renderer=\"${gl.renderer.orEmpty()}\" " +
+                    "gl_version=\"${gl.version.orEmpty()}\"",
+            )
         }
 
         // Default resources — shaders, GameIndex, fonts, fullscreenui,

@@ -32,6 +32,37 @@ class Pasx2Application : Application(), ImageLoaderFactory {
 	override fun onCreate() {
 		super.onCreate()
 		installCrashLogging()
+		installTelemetry()
+	}
+
+	/**
+	 * Telemetria de producao (`/logErr`) — a metade que o upstream nao tem.
+	 *
+	 * `installCrashLogging()` acima grava arquivos locais: uteis quando alguem tem o aparelho na
+	 * mao e sabe onde procurar. Isto e o outro caso, que e o comum: o usuario reporta "trava" e
+	 * ninguem nunca ve o aparelho. Os tres pedacos que faltam sao enviar o relato, recuperar o
+	 * crash NATIVO da sessao anterior via `ApplicationExitInfo`, e decodificar o tombstone
+	 * protobuf — sem o decoder o relato chega como um blob binario inutil.
+	 *
+	 * Ordem importa em dois pontos:
+	 *
+	 *  - `TelemetryReporter.init` vem primeiro porque le o kill-switch. Nenhum relato pode sair
+	 *    antes de sabermos se o usuario desligou o envio.
+	 *  - `CrashReporter.install` vem DEPOIS de `installCrashLogging()`, e isso e deliberado: os
+	 *    dois instalam um `UncaughtExceptionHandler` e cada um encadeia no anterior. Instalando
+	 *    nesta ordem, o nosso roda primeiro e chama o deles em seguida, entao o arquivo local
+	 *    continua sendo escrito. Inverter tambem funcionaria; o que NAO funciona e um dos dois
+	 *    esquecer de encadear.
+	 *
+	 * Tudo aqui e best-effort e nao pode derrubar o boot — daí o `runCatching`, no mesmo espirito
+	 * do metodo acima.
+	 */
+	private fun installTelemetry() {
+		runCatching { com.armsx2.telemetry.TelemetryReporter.init(this) }
+		runCatching { com.armsx2.telemetry.CrashReporter.install(this) }
+		runCatching { com.armsx2.telemetry.CrashReporter.installAnrWatchdog() }
+		runCatching { com.armsx2.telemetry.CrashReporter.uploadPendingAsync() }
+		runCatching { com.armsx2.telemetry.CrashReporter.reportNativeExitsAsync() }
 	}
 
 	override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
