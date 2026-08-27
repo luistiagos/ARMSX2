@@ -1,8 +1,6 @@
 package com.armsx2.ui.about
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,18 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,13 +29,9 @@ import com.armsx2.ui.common.ArmsTopBar
 import com.armsx2.ui.common.GlassPanel
 import com.armsx2.ui.common.RoundAction
 
-private const val RepositoryUrl = "https://github.com/ARMSX2/ARMSX2"
-private const val Pcsx2RepositoryUrl = "https://github.com/PCSX2/pcsx2"
-
 @Composable
 fun AboutScreen(onBack: () -> Unit, viewModel: AboutViewModel = viewModel()) {
     val state = viewModel.state.value
-    val uriHandler = LocalUriHandler.current
     LaunchedEffect(Unit) { viewModel.load() }
 
     ArmsBackdrop {
@@ -105,57 +95,6 @@ fun AboutScreen(onBack: () -> Unit, viewModel: AboutViewModel = viewModel()) {
                         }
                         hardware(Modifier.fillMaxWidth())
                     }
-                    if (compact) {
-                        ProjectCard(
-                            title = str("about.repository.title"),
-                            repository = "ARMSX2/ARMSX2",
-                            description = str("about.repository.description"),
-                            glyph = "⌘",
-                            onOpen = { uriHandler.openUri(RepositoryUrl) },
-                        )
-                        ProjectCard(
-                            title = str("about.pcsx2.title"),
-                            repository = "PCSX2/pcsx2",
-                            description = str("about.pcsx2.description"),
-                            glyph = "PS2",
-                            secondary = true,
-                            onOpen = { uriHandler.openUri(Pcsx2RepositoryUrl) },
-                        )
-                    } else {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            ProjectCard(
-                                title = str("about.repository.title"),
-                                repository = "ARMSX2/ARMSX2",
-                                description = str("about.repository.description"),
-                                glyph = "⌘",
-                                modifier = Modifier.weight(1f),
-                                onOpen = { uriHandler.openUri(RepositoryUrl) },
-                            )
-                            ProjectCard(
-                                title = str("about.pcsx2.title"),
-                                repository = "PCSX2/pcsx2",
-                                description = str("about.pcsx2.description"),
-                                glyph = "PS2",
-                                modifier = Modifier.weight(1f),
-                                secondary = true,
-                                onOpen = { uriHandler.openUri(Pcsx2RepositoryUrl) },
-                            )
-                        }
-                    }
-                    // Creditos da equipe. A tela Sobre da arvore anterior os mostrava e a deles
-                    // nao: ela lista compilacao, hardware e os repositorios, mas nunca as pessoas.
-                    // Nao e identidade nossa -- e a equipe do ARMSX2 e a cadeia de quem o app usa;
-                    // por isso o texto e o mesmo, palavra por palavra, e nao uma reescrita.
-                    GlassPanel(Modifier.fillMaxWidth()) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            PanelTitle(str("about.credits.title"))
-                            Text(
-                                str("about.credits.body"),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
                     // The library music is CC0, so no attribution is legally required — the
                     // author asks for credit and it costs nothing to give it.
                     Text(
@@ -173,58 +112,6 @@ fun AboutScreen(onBack: () -> Unit, viewModel: AboutViewModel = viewModel()) {
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun ProjectCard(
-    title: String,
-    repository: String,
-    description: String,
-    glyph: String,
-    modifier: Modifier = Modifier,
-    secondary: Boolean = false,
-    onOpen: () -> Unit,
-) {
-    val accent = if (secondary) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
-    Surface(
-        onClick = onOpen,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = accent.copy(alpha = 0.10f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.46f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = accent.copy(alpha = 0.14f),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(glyph, color = accent, fontSize = if (glyph.length > 2) 13.sp else 22.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            Spacer(Modifier.size(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    repository,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = accent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text("↗", color = accent, fontSize = 22.sp)
         }
     }
 }
