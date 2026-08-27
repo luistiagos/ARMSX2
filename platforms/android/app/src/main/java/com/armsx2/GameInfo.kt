@@ -252,7 +252,39 @@ data class GameInfo(
     /** GameDB `name-en` — the romanised title, present only where the original isn't
      *  English. Its presence is exactly how we know [title] is non-English. */
     val titleEn: String = "",
+    /**
+     * Nome do arquivo desta linha no manifesto do catalogo, **esteja ela baixada ou nao**.
+     *
+     * A biblioteca e uma grade so: os jogos varridos das pastas e as 12.628 entradas do catalogo
+     * convivem nela. Este campo e o vinculo com a entrada do manifesto -- e ele que da ao cartao o
+     * estado a mostrar na tarja (✓ para baixado, porcentagem enquanto baixa, ↓ para o resto).
+     * Nulo = arquivo que o usuario trouxe por conta propria, fora do catalogo; esse nao ganha tarja
+     * nenhuma, porque nao ha nada a dizer sobre ele.
+     *
+     * Quem separa o que da boot do que precisa baixar e [needsDownload], nao este campo: um jogo
+     * baixado tem os dois -- vinculo com o catalogo E arquivo no disco.
+     */
+    val catalogFileName: String? = null,
+    /**
+     * Esta linha nao tem arquivo: existe so no manifesto.
+     *
+     * Um toque nela abre o painel de download em vez de dar boot -- ver a intercepcao em
+     * `HomeViewModel.launch`, que e o funil por onde passam todos os pontos que iniciam um jogo.
+     */
+    val needsDownload: Boolean = false,
+    /**
+     * Capa vinda do manifesto (IGDB, hfsplay, ...), para as linhas que ainda nao tem serial.
+     *
+     * [coverUrl] so sabe montar URL a partir do serial, e serial so existe depois de sondar o
+     * disco -- coisa que uma linha de catalogo, por definicao, nao permite. Por isso e **fallback**
+     * e nao preferencia: assim que o jogo e baixado e sondado, a arte curada do repo de capas
+     * (que respeita 2D/3D e a regiao escolhida) volta a mandar.
+     */
+    val catalogCoverUrl: String? = null,
 ) {
+    /** Esta linha existe so no catalogo: nao ha arquivo, e portanto nao ha o que lancar. */
+    val isCatalogOnly: Boolean get() = needsDownload
+
     /** The title to show. Mirrors GameList.h's `GetTitle(force_en)`: the original unless
      *  English is asked for AND a separate English title exists. */
     /** A user override wins over both the parsed and the English title — it exists precisely
@@ -278,7 +310,7 @@ data class GameInfo(
         // region's artwork. Falls back to this disc's own serial whenever there's no counterpart,
         // so an unmatched game looks exactly as it does today.
         coverUrlFor(CoverRegionIndex.coverSerialFor(rawSerial) ?: rawSerial)
-    }
+    } ?: catalogCoverUrl?.takeIf { it.isNotBlank() }
 
     /** This disc's OWN cover, ignoring the Cover Region choice. The card falls back to it when the
      *  regional cover 404s — not every game has art for every region in the cover repo, and losing

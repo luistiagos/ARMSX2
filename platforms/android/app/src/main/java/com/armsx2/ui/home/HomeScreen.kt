@@ -180,6 +180,19 @@ fun HomeScreen(
         onDispose { HomeInputController.unbind(viewModel) }
     }
 
+    // O painel de download. Aberto por `viewModel.launch` quando a linha tocada e do catalogo --
+    // ver o comentario la: a intercepcao mora no funil, nao em cada cartao.
+    viewModel.pendingDownload.value?.let { entry ->
+        com.armsx2.ui.catalog.CatalogDownloadModal(
+            entry = entry,
+            onStart = viewModel::startDownload,
+            onPause = viewModel::pauseDownload,
+            onResume = viewModel::resumeDownload,
+            onCancel = viewModel::cancelDownload,
+            onClose = { viewModel.pendingDownload.value = null },
+        )
+    }
+
     CompositionLocalProvider(LocalCustomCoverMap provides customCoverMap) {
     ArmsBackdrop(
         // Full-bleed wallpaper: the library image + readability scrim, drawn edge-to-edge
@@ -391,7 +404,12 @@ fun HomeScreen(
                     subtitle = if (state.scanning) {
                         str("games.scanningRoms")
                     } else {
-                        "${str("games.library.totalGames")}: ${state.allGames.size}"
+                        // O que esta na tela, e nao o total da biblioteca. Com o catalogo fundido a
+                        // grade tem sempre 12.628 linhas: "Total de jogos: 12628" viraria uma
+                        // constante que nao informa nada, e mentiria assim que uma busca ou o
+                        // filtro "so os baixados" recortasse a lista. O total so aparece quando e
+                        // de fato o que se ve.
+                        "${str("games.library.totalGames")}: ${state.visibleGames.size}"
                     },
                     leading = {
                         RoundAction(
@@ -475,6 +493,7 @@ fun HomeScreen(
                                 customNames = com.armsx2.CustomNames.enabled.value,
                                 englishTitles = EnglishTitles.enabled.value,
                                 showHidden = com.armsx2.HiddenGames.showHidden.value,
+                                onlyDownloaded = state.onlyDownloaded,
                                 hasCustomBackground = LibraryBackground.uri.value != null,
                                 onDismiss = { overflowMenu = false },
                                 onOpenNavigation = onOpenMenu,
@@ -484,6 +503,7 @@ fun HomeScreen(
                                 onToggleCustomNames = { com.armsx2.CustomNames.set(!com.armsx2.CustomNames.enabled.value) },
                                 onToggleEnglishTitles = { EnglishTitles.set(!EnglishTitles.enabled.value) },
                                 onToggleShowHidden = { viewModel.setShowHidden(!com.armsx2.HiddenGames.showHidden.value) },
+                                onToggleOnlyDownloaded = { viewModel.setOnlyDownloaded(!state.onlyDownloaded) },
                                 onChooseBackground = { backgroundPicker.launch(arrayOf("image/*")) },
                                 onClearBackground = LibraryBackground::clear,
                                 onExitApp = { showExitConfirm = true },
@@ -963,6 +983,7 @@ private fun LibraryOverflowMenu(
     customNames: Boolean,
     englishTitles: Boolean,
     showHidden: Boolean,
+    onlyDownloaded: Boolean,
     hasCustomBackground: Boolean,
     onDismiss: () -> Unit,
     onOpenNavigation: () -> Unit,
@@ -972,6 +993,7 @@ private fun LibraryOverflowMenu(
     onToggleCustomNames: () -> Unit,
     onToggleEnglishTitles: () -> Unit,
     onToggleShowHidden: () -> Unit,
+    onToggleOnlyDownloaded: () -> Unit,
     onChooseBackground: () -> Unit,
     onClearBackground: () -> Unit,
     onExitApp: () -> Unit,
@@ -1077,6 +1099,15 @@ private fun LibraryOverflowMenu(
             trailing = if (showHidden) str("common.on") else str("common.off"),
         ) {
             closeThen(onToggleShowHidden)
+        }
+        // A grade mistura o catálogo inteiro com o que está no aparelho. Este é o caminho para
+        // quem quer só olhar o que já tem — sem virar uma segunda tela.
+        LibraryOverflowItem(
+            glyph = "✓",
+            label = str("games.overflow.onlyDownloaded"),
+            trailing = if (onlyDownloaded) str("common.on") else str("common.off"),
+        ) {
+            closeThen(onToggleOnlyDownloaded)
         }
         OverflowSeparator()
         LibraryOverflowItem("▧", str("games.background.choose")) {
@@ -1186,26 +1217,22 @@ private fun LibraryOverflowItem(
 }
 
 /**
- * O que a biblioteca mostra quando nao ha o que mostrar.
+ * O que a biblioteca mostra quando nao ha o que mostrar -- o que, aqui, quer dizer quase sempre
+ * "a busca nao achou nada".
  *
- * O parametro do upstream se chamava `noFolders`, mas o call-site passa `query.isBlank()` -- os dois
- * nao sao a mesma pergunta. O efeito era que "Nenhuma pasta de ROMs configurada" aparecia para
- * QUALQUER biblioteca vazia, inclusive a de quem tem pasta e ainda nao baixou nenhum jogo, e a acao
- * oferecida levava ao assistente de configuracao. Aqui a pasta e sempre semeada no arranque
- * ([MainActivityRuntime.seedOwnRomsFolder]), entao esse diagnostico nunca esta certo: biblioteca
- * vazia quer dizer "ainda nao ha jogos", e o caminho para o primeiro e o catalogo.
+ * O parametro do upstream se chamava `noFolders`, mas o call-site passa `query.isBlank()`: as duas
+ * perguntas nao sao a mesma, e o efeito era "Nenhuma pasta de ROMs configurada" aparecendo para
+ * qualquer biblioteca vazia, com um botao para o assistente de configuracao. Nesta arvore a grade
+ * carrega o catalogo inteiro, entao uma biblioteca vazia de verdade so acontece se o manifesto nao
+ * carregar -- e mandar o usuario configurar uma pasta seria o conselho errado nos dois casos.
  */
 private fun LazyGridScope.emptyLibrary(blankQuery: Boolean) {
     item(span = { GridItemSpan(maxLineSpan) }) {
         EmptyState(
             title = if (blankQuery) str("games.empty.noGames.title") else str("games.search.placeholder"),
             message = if (blankQuery) str("games.empty.noGames.body") else str("games.search.hint"),
-            actionLabel = if (blankQuery) str("catalog.title") else null,
-            onAction = if (blankQuery) {
-                { com.armsx2.navigation.UiNavigator.navigate(com.armsx2.navigation.AppRoute.Catalog) }
-            } else {
-                null
-            },
+            actionLabel = null,
+            onAction = null,
             modifier = Modifier.fillMaxWidth().height(260.dp),
         )
     }
@@ -1431,6 +1458,11 @@ private fun GameCover(
             .crossfade(false)
             .build()
     }
+    // O estado de catalogo desta linha, lido AQUI para que qualquer mudanca na fila redesenhe o
+    // cartao: `CatalogEntry` e um objeto Java mutado pelo downloader, e mutacao de objeto Java e
+    // invisivel para o Compose -- e o `version` que faz a inscricao.
+    com.armsx2.catalog.CatalogLibrary.version.intValue
+    val catalogEntry = com.armsx2.catalog.CatalogLibrary.entryFor(game)
     Box(modifier.clip(RoundedCornerShape(cornerRadius))) {
         if (model == null) {
             CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText)
@@ -1464,6 +1496,62 @@ private fun GameCover(
                 },
             )
         }
+        CoverStateBadge(catalogEntry, Modifier.align(Alignment.BottomStart).padding(4.dp))
+    }
+}
+
+/**
+ * A tarja que diz, sobre a capa, se aquele jogo está no aparelho.
+ *
+ * A grade é uma só e mistura as duas coisas — 12.628 entradas do catálogo e o que já foi baixado —
+ * então sem esta marca não haveria como distinguir um jogo que abre de um que precisa de 8 GB de
+ * download primeiro. Sai do caminho quando não há nada a dizer: um jogo local que não está no
+ * catálogo (a pasta do próprio usuário) não ganha tarja nenhuma.
+ *
+ * Fica sobre a capa e não abaixo dela de propósito: as três disposições da biblioteca (grade,
+ * lista, prateleira) desenham a capa em tamanhos diferentes e só uma delas tem espaço para um
+ * rótulo embaixo. Dentro do quadro da capa, a marca aparece igual nas três.
+ */
+@Composable
+private fun CoverStateBadge(entry: com.armsx2.catalog.CatalogEntry?, modifier: Modifier = Modifier) {
+    if (entry == null) return
+    val downloading = entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.DOWNLOADING
+    val label = when {
+        entry.isDownloaded -> "✓"
+        downloading -> "${(entry.downloadProgress * 100).toInt()}%"
+        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.QUEUED -> "⋯"
+        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.PAUSED -> "⏸"
+        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.ERROR -> "!"
+        else -> "↓"
+    }
+    val container = when {
+        entry.isDownloaded -> MaterialTheme.colorScheme.primary
+        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.ERROR ->
+            MaterialTheme.colorScheme.error
+        entry.queueState != null -> MaterialTheme.colorScheme.tertiary
+        // Ainda não baixado: discreto de propósito. É o estado da MAIORIA dos 12.628 cartões, e uma
+        // tarja chapada em cada um viraria ruído em vez de informação.
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.86f)
+    }
+    val content = when {
+        entry.isDownloaded -> MaterialTheme.colorScheme.onPrimary
+        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.ERROR ->
+            MaterialTheme.colorScheme.onError
+        entry.queueState != null -> MaterialTheme.colorScheme.onTertiary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        modifier = modifier,
+        color = container,
+        contentColor = content,
+        shape = RoundedCornerShape(7.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+        )
     }
 }
 

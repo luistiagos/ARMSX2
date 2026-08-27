@@ -14,8 +14,6 @@ sealed interface AppRoute {
     // opened from the drawer (falls back to the currently loaded game if any).
     data class BiosManager(val game: GameInfo? = null) : AppRoute
     data class MemoryCardManager(val game: GameInfo? = null) : AppRoute
-    /** Catalogo de ROMs -- funcionalidade do RetroSystem PS2, sem equivalente no upstream. */
-    data object Catalog : AppRoute
     data object SaveManager : AppRoute
     data object ControllerManager : AppRoute
     data object PatchManager : AppRoute
@@ -45,17 +43,15 @@ enum class SettingsCategory {
 
 object UiNavigator {
     /**
-     * A tela em que o app abre e o CATALOGO, nao a biblioteca.
+     * A tela inicial e a biblioteca -- e ela ja E o catalogo.
      *
-     * E o que o app anterior fazia: o `BottomNavigationView` de `HomeActivity` tinha `nav_catalog`
-     * como primeiro item, e um BottomNavigationView seleciona o primeiro item por padrao -- ou seja,
-     * a primeira grade que o usuario via era a dos 12.628 jogos, com os ja baixados marcados. A
-     * biblioteca era a segunda aba, e o app so ia para ela sozinho depois de um jogo rodar.
-     *
-     * Aqui o papel das duas abas fica com [AppRoute.Catalog] (esta, inicial) e [AppRoute.Home] (a
-     * biblioteca), que e o destino do "voltar" do catalogo.
+     * Houve uma versao com duas grades: a biblioteca (o que esta no aparelho) e uma tela separada
+     * de catalogo (os 12.628 do manifesto), abrindo nesta ultima para imitar a primeira aba do
+     * `BottomNavigationView` do app anterior. Duas grades para a mesma coisa nao se justificam: a
+     * biblioteca agora carrega o catalogo inteiro, com uma tarja dizendo o que ja esta baixado e um
+     * filtro "so os baixados" no menu de tres pontos para quem quiser so o seu.
      */
-    val route = mutableStateOf<AppRoute>(AppRoute.Catalog)
+    val route = mutableStateOf<AppRoute>(AppRoute.Home)
     val drawerOpen = mutableStateOf(false)
 
     fun navigate(destination: AppRoute) {

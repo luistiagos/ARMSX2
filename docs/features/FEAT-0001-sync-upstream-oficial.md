@@ -52,6 +52,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0022](../task/TASK-0022-primeira-impressao-do-app.md) | concluída | **Primeira impressão** — marca, tela de entrada, fundo escuro e o título do toolbar |
 | [TASK-0023](../task/TASK-0023-catalogo-de-roms.md) | concluída | **Catálogo de ROMs** — as 12.628 entradas, o download em primeiro plano e o ciclo baixar → jogar |
 | [TASK-0024](../task/TASK-0024-catalogo-como-tela-inicial.md) | concluída | **Catálogo como tela inicial** — a grade que o app abre, e pausar/retomar/cancelar um download |
+| [TASK-0025](../task/TASK-0025-grade-unica-catalogo-na-biblioteca.md) | concluída | **Grade única** — o catálogo fundido na biblioteca, com tarja de baixado e filtro |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de

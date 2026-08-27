@@ -13,6 +13,7 @@
  "games.empty.noGames.title": "Nenhum jogo ainda",
  "games.empty.noGames.body": "Abra o catálogo de ROMs para baixar o seu primeiro jogo.",
  "setup.recovery.notice": "Não consegui abrir a sua pasta de jogos salvos — isso pode acontecer depois de reinstalar ou restaurar um backup. Selecione-a de novo.",
+ "games.overflow.onlyDownloaded": "Só os baixados",
  "catalog.action.pause": "Pausar",
  "catalog.action.resume": "Retomar",
  "catalog.action.cancelDownload": "Cancelar download",

@@ -28,15 +28,39 @@ data class HomeUiState(
     val error: String? = null,
     val selectedIndex: Int = 0,
     val initialized: Boolean = false,
+    /** Ver so o que ja esta no aparelho, escondendo as linhas que so existem no catalogo. */
+    val onlyDownloaded: Boolean = false,
+    /**
+     * Republicacao. A fila de download muta o proprio [com.armsx2.catalog.CatalogEntry], e
+     * `mutableStateOf` compara por igualdade estrutural: sem um campo que mude de valor, um estado
+     * recem-construido sai `equals` ao anterior e o Compose descarta a atribuicao -- a barra de
+     * progresso ficaria parada com o arquivo crescendo no disco.
+     */
+    val tick: Int = 0,
 )
 
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
+class HomeViewModel(application: Application) :
+    AndroidViewModel(application),
+    com.armsx2.catalog.DownloadQueueManager.QueueListener {
+
     private val repository = GameLibraryRepository(application)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var scanJob: Job? = null
     private var loaded = false
     private var pendingInitialScan = false
     private var directories: List<String> = emptyList()
+
+    /**
+     * Os jogos que estao MESMO no aparelho, antes da fusao com o catalogo.
+     *
+     * Guardados a parte porque duas coisas so podem ver estes: o RetroAchievements, que precisa
+     * abrir o arquivo para calcular o hash, e a propria fusao, que usa a lista para saber o que ja
+     * foi baixado. `state.allGames` e a uniao dos dois mundos e serviria mal aos dois.
+     */
+    private var localGames: List<GameInfo> = emptyList()
+
+    /** Entrada do catalogo que o usuario tocou e ainda nao resolveu (o painel esta aberto). */
+    val pendingDownload = androidx.compose.runtime.mutableStateOf<com.armsx2.catalog.CatalogEntry?>(null)
 
     var state = androidx.compose.runtime.mutableStateOf(HomeUiState())
         private set
@@ -52,16 +76,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }.getOrDefault(LibraryLayout.Grid)
             pendingInitialScan = romDirectories.isNotEmpty() && cached.key != repository.cacheKey(romDirectories)
+            localGames = cached.games
             state.value = buildState(
                 base = state.value.copy(
-                    allGames = cached.games,
+                    allGames = mergeCatalog(cached.games),
                     layout = layout,
+                    onlyDownloaded = MainActivityRuntime.prefs.getBoolean(OnlyDownloadedPreference, false),
                     initialized = cached.games.isNotEmpty() || !pendingInitialScan,
                 ),
             )
+            loadCatalog()
             // Library-wide RetroAchievements progress. Hooked here because this is where the game
             // list lives, and the sync needs paths to hash. No-op unless a web API key is set.
-            if (nativeReady) com.armsx2.RaLibrary.onLibraryLoaded(state.value.allGames)
+            // Só os jogos locais: uma linha de catálogo não tem arquivo para hashear.
+            if (nativeReady) com.armsx2.RaLibrary.onLibraryLoaded(localGames)
             if (nativeReady && pendingInitialScan) refresh()
         } else if (nativeReady && pendingInitialScan) {
             refresh()
@@ -80,8 +108,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val result = runCatching { repository.scan(directories) }
             result.onSuccess { games ->
                 pendingInitialScan = false
+                localGames = games
+                com.armsx2.catalog.CatalogParser.markDownloaded(
+                    com.armsx2.catalog.CatalogLibrary.entries,
+                    romsDir(),
+                )
                 state.value = buildState(
-                    state.value.copy(allGames = games, scanning = false, initialized = true),
+                    state.value.copy(allGames = mergeCatalog(games), scanning = false, initialized = true),
                 )
                 com.armsx2.RaLibrary.onLibraryLoaded(games)
             }.onFailure { failure ->
@@ -124,6 +157,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun selectedGame(): GameInfo? = state.value.visibleGames.getOrNull(state.value.selectedIndex)
 
     fun launch(game: GameInfo) {
+        // Esta linha nao tem arquivo -- e uma entrada do catalogo. Dar boot nela abriria o emulador
+        // sobre um caminho inexistente. A intercepcao mora AQUI, e nao em cada cartao, porque
+        // `launch` e o funil por onde passam os sete pontos que iniciam um jogo (grade, lista,
+        // prateleira, recentes e o controle): cobrir o funil cobre todos.
+        if (game.isCatalogOnly) {
+            pendingDownload.value = com.armsx2.catalog.CatalogLibrary.entryFor(game)
+            return
+        }
         repository.markPlayed(game)
         state.value = buildState(state.value)
         val launchPath = if (game.uri.scheme == "file") game.uri.path ?: game.uri.toString() else game.uri.toString()
@@ -162,6 +203,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val query = base.query.trim()
             // Exclude games the user marked hidden (long-press → Hide), unless "Show hidden" is on.
             (com.armsx2.HiddenGames.showHidden.value || !com.armsx2.HiddenGames.isHidden(game)) &&
+                // "Só os baixados": esconde as linhas que existem apenas no catálogo.
+                (!base.onlyDownloaded || !game.isCatalogOnly) &&
                 (query.isBlank() ||
                     // Match BOTH names regardless of which is displayed: someone typing
                     // "Katakamuna" should find a game listed as 片神名, and vice versa.
@@ -192,12 +235,135 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    // ---------------------------------------------------------------- catálogo
+
+    /**
+     * Onde as ROMs baixadas são gravadas — e, por consequência, onde a biblioteca as encontra.
+     *
+     * `roms` dentro da raiz de dados do app: é onde o app anterior as punha, é o caminho que o core
+     * alcança sem permissão nenhuma, e é a pasta que `seedOwnRomsFolder` semeia em `romsDirs`.
+     * Deliberadamente NÃO é a pasta de ROMs que o usuário escolheu no assistente — aquela pode
+     * estar num cartão SD via SAF, onde um download de 10 GB com retomada não tem como escrever de
+     * forma confiável.
+     */
+    private fun romsDir(): java.io.File =
+        java.io.File(MainActivityRuntime.assetCopyRoot(getApplication()), "roms").apply { mkdirs() }
+
+    private fun loadCatalog() {
+        if (com.armsx2.catalog.CatalogLibrary.entries.isNotEmpty()) return
+        scope.launch {
+            val dir = romsDir()
+            val queue = com.armsx2.catalog.DownloadQueueManager.get()
+            queue.setRomsDir(dir)
+            queue.addListener(this@HomeViewModel)
+            // O parse lê um asset de 926 KB e monta 12.628 objetos: fora da thread principal, senão
+            // a biblioteca abre travada.
+            val entries = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                com.armsx2.catalog.CatalogParser.parse(getApplication())
+                    .also { com.armsx2.catalog.CatalogParser.markDownloaded(it, dir) }
+            }
+            com.armsx2.catalog.CatalogLibrary.install(entries)
+            state.value = buildState(state.value.copy(allGames = mergeCatalog(localGames), initialized = true))
+        }
+    }
+
+    /**
+     * A união que forma a grade: o que está no disco, mais o que só existe no catálogo.
+     *
+     * A chave é o nome do arquivo. Um jogo baixado aparece uma vez só, e aparece na sua forma
+     * **local** — com serial sondado do disco, capa curada e boot funcionando — em vez da linha
+     * sintética do manifesto. Ou seja: baixar um jogo não acrescenta um cartão à grade, converte o
+     * que já estava lá.
+     */
+    private fun mergeCatalog(local: List<GameInfo>): List<GameInfo> {
+        val entries = com.armsx2.catalog.CatalogLibrary.entries
+        if (entries.isEmpty()) return local
+        // O URI de um jogo local pode ser file:///.../x.chd ou content://...%2Fx.chd — os dois
+        // terminam no nome do arquivo, mas o segundo carrega o caminho inteiro no último segmento.
+        val byFileName = entries.associateBy { it.fileName }
+        // O jogo que ESTÁ no disco também aponta para a sua entrada — é o que lhe dá o ✓ na tarja.
+        // Sem isto, um jogo baixado ficava indistinguível de um arquivo que o usuário trouxe por
+        // conta própria: os dois sem marca nenhuma, que é justamente a distinção que a grade
+        // única precisa mostrar.
+        val stamped = local.map { game ->
+            val fileName = game.uri.lastPathSegment?.substringAfterLast('/')
+            if (fileName != null && fileName in byFileName) game.copy(catalogFileName = fileName) else game
+        }
+        val onDisk = stamped.mapNotNullTo(HashSet()) { it.catalogFileName }
+        val fromCatalog = entries.asSequence()
+            .filter { it.fileName !in onDisk }
+            .map { entry ->
+                GameInfo(
+                    // Esquema próprio: nunca colide com um arquivo real e deixa a linha
+                    // reconhecível em qualquer log. É opaco de propósito — não há caminho.
+                    uri = android.net.Uri.fromParts("catalog", entry.fileName, null),
+                    title = entry.title,
+                    serial = null,
+                    extension = entry.fileName.substringAfterLast('.', "").uppercase(),
+                    catalogFileName = entry.fileName,
+                    needsDownload = true,
+                    catalogCoverUrl = entry.coverUrl,
+                )
+            }
+        return stamped + fromCatalog
+    }
+
+    /** Ver só o que já está no aparelho. */
+    fun setOnlyDownloaded(value: Boolean) {
+        MainActivityRuntime.prefs.edit { putBoolean(OnlyDownloadedPreference, value) }
+        state.value = buildState(state.value.copy(onlyDownloaded = value, selectedIndex = 0))
+    }
+
+    // As quatro ações do painel de download. Uma por intenção: quem sabe o que o usuário escolheu é
+    // a tela, e um botão escrito "Cancelar download" não pode depender de o estado ainda ser o
+    // mesmo de quando foi desenhado.
+
+    fun startDownload(entry: com.armsx2.catalog.CatalogEntry) =
+        com.armsx2.catalog.DownloadQueueManager.get().enqueue(entry)
+
+    fun pauseDownload(entry: com.armsx2.catalog.CatalogEntry) =
+        com.armsx2.catalog.DownloadQueueManager.get().pause(entry)
+
+    fun resumeDownload(entry: com.armsx2.catalog.CatalogEntry) =
+        com.armsx2.catalog.DownloadQueueManager.get().resume(entry)
+
+    /** Para a transferência, tira da fila e apaga o `.part` — `remove` faz as três coisas. */
+    fun cancelDownload(entry: com.armsx2.catalog.CatalogEntry) =
+        com.armsx2.catalog.DownloadQueueManager.get().remove(entry)
+
+    // ------------------------------------------- DownloadQueueManager.QueueListener
+
+    override fun onQueueChanged() {
+        // Um download que TERMINA acrescenta um arquivo à pasta varrida, e é a varredura — não o
+        // catálogo — que transforma aquela linha sintética num jogo lançável. A varredura é
+        // guardada em cache por chave de diretório, e a chave não muda quando só o conteúdo da
+        // pasta muda: sem invalidá-la, o jogo baixado continuaria como "toque para baixar".
+        val finished = com.armsx2.catalog.CatalogLibrary.entries.any { entry ->
+            entry.isDownloaded &&
+                localGames.none { it.uri.lastPathSegment?.substringAfterLast('/') == entry.fileName }
+        }
+        republish()
+        if (finished) {
+            MainActivityRuntime.prefs.edit { remove("gamesCacheKey").remove("gamesCacheDir") }
+            refresh()
+        }
+    }
+
+    override fun onProgress(entry: com.armsx2.catalog.CatalogEntry?) = republish()
+
+    private fun republish() {
+        com.armsx2.catalog.CatalogLibrary.bump()
+        state.value = state.value.copy(tick = state.value.tick + 1)
+    }
+
     override fun onCleared() {
+        com.armsx2.catalog.DownloadQueueManager.get().removeListener(this)
         scope.cancel()
         super.onCleared()
     }
 
     private companion object {
+        const val OnlyDownloadedPreference = "library.onlyDownloaded"
         // String-valued now (Grid/List/Shelf). New key so the old boolean pref is
         // ignored and everyone starts at Grid rather than mis-parsing "true"/"false".
         const val LayoutPreference = "library.layout.mode"

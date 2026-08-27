@@ -685,6 +685,7 @@ private val BASE_EN: Map<String, String> = mapOf(
     "games.empty.noGames.title" to "No games yet",
     "games.empty.noGames.body" to "Browse the ROM catalog to download your first game.",
     "setup.recovery.notice" to "Couldn't open your saved game folder — this can happen after reinstalling or restoring a backup. Please re-select it.",
+    "games.overflow.onlyDownloaded" to "Downloaded only",
     "catalog.action.pause" to "Pause",
     "catalog.action.resume" to "Resume",
     "catalog.action.cancelDownload" to "Cancel download",
