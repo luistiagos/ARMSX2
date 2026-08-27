@@ -31,8 +31,27 @@ class Pasx2Application : Application(), ImageLoaderFactory {
 
 	override fun onCreate() {
 		super.onCreate()
+		instance = this
 		installCrashLogging()
 		installTelemetry()
+	}
+
+	companion object {
+		@Volatile private var instance: Pasx2Application? = null
+
+		/**
+		 * Contexto de aplicacao para codigo que sobrevive a Activity.
+		 *
+		 * O fork ja tem `MainActivityRuntime.instance?.applicationContext`, mas aquele `instance` e
+		 * a Activity: some quando ela e destruida. O download de ROM roda num Service em primeiro
+		 * plano justamente para continuar com o app fechado, entao precisa de um contexto que nao
+		 * dependa de haver tela.
+		 *
+		 * Atribuido no onCreate da Application, portanto valido antes de qualquer componente.
+		 */
+		@JvmStatic
+		fun appContext(): android.content.Context =
+			instance ?: error("Pasx2Application.appContext() antes de onCreate")
 	}
 
 	/**

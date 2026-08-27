@@ -69,6 +69,20 @@ class GameLibraryRepository(private val context: Context) {
     suspend fun scan(directories: List<String>): List<GameInfo> = withContext(Dispatchers.IO) {
         val collected = linkedMapOf<String, GameInfo>()
         directories.forEach { rawUri ->
+            // Uma entrada pode ser um caminho POSIX puro em vez de um tree URI do SAF: e o caso da
+            // pasta do proprio app ([MainActivityRuntime.seedOwnRomsFolder]), onde o catalogo grava
+            // as ROMs baixadas. Ela nao sobrevive ao caminho de baixo -- `resolveTreeUriToPosix`
+            // exige um tree document id e devolve null, e `DocumentFile.fromTreeUri` nao tem o que
+            // fazer com ela -- e tambem nao depende de MANAGE_EXTERNAL_STORAGE, porque e a pasta de
+            // arquivos externos do proprio pacote. Sem este ramo um jogo de 1,4 GB terminava de
+            // baixar e a biblioteca continuava dizendo "Total de jogos: 0".
+            val plainDir = rawUri.takeIf { it.startsWith("/") }
+                ?.let(::File)
+                ?.takeIf { it.isDirectory && it.canRead() }
+            if (plainDir != null) {
+                scanRawDirectory(plainDir, collected, 0)
+                return@forEach
+            }
             val uri = runCatching { rawUri.toUri() }.getOrNull() ?: return@forEach
             val rawRoot = if (canUseRawStorage()) MainActivityRuntime.resolveTreeUriToPosix(rawUri)?.let(::File) else null
             if (rawRoot?.isDirectory == true) {

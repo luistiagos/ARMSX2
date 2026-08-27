@@ -30,7 +30,19 @@
         the bundle, so a regression here cannot ship quietly.
     -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <!--
+        FOREGROUND_SERVICE era removida junto com as outras do SDK do Discord, porque o app nao
+        rodava servico nenhum em primeiro plano. Agora roda: o download de ROM do catalogo continua
+        com o app fechado, e sem esta permissao o Android mata o download ao sair da tela.
+
+        As de MICROPHONE e MEDIA_PLAYBACK seguem removidas: sao do SDK do Discord, para
+        funcionalidades que este app nao tem, e sao elas que colocariam "Microfone" na ficha da Play
+        Store. So o tipo DATA_SYNC entra, que e o que um download e.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Android 13+: sem isto a notificacao de progresso do download nao aparece. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" tools:node="remove" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" tools:node="remove" />
@@ -180,6 +192,19 @@
             android:name="com.armsx2.discord.DiscordService"
             android:process=":discord"
             android:exported="false" />
+
+        <!--
+            Download de ROM do catalogo. Servico em primeiro plano porque uma ROM de PS2 tem entre 1
+            e 10 GB: sem isto o Android para o download assim que o usuario sai da tela, e ele
+            recomecaria do zero na proxima vez.
+
+            dataSync e o tipo correto: transferencia de dados iniciada pelo usuario. Nao exportado,
+            quem o inicia e o proprio app.
+        -->
+        <service
+            android:name="com.armsx2.catalog.DownloadForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <activity
             android:name="com.armsx2.discord.DiscordAuthActivity"

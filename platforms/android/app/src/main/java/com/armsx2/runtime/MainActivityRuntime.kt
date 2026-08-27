@@ -2300,6 +2300,7 @@ open class MainActivityRuntime : ComponentActivity() {
                 if (legacy != null) listOf(legacy) else emptyList()
             }
         }
+        seedOwnRomsFolder()
         // Setup recovery. Auto Backup can restore our prefs (incl. setupComplete + the
         // ROMs URIs) on reinstall, but SAF/all-files PERMISSIONS are never backed up — so
         // a restored setup can point at a folder we can no longer read, which would strand
@@ -2863,6 +2864,32 @@ open class MainActivityRuntime : ComponentActivity() {
     // button flows through the normal keyCode capture/dispatch path — bind it once in the
     // remap menu and it sticks. Gated to 0x057E so no other controller is affected; the
     // 0x10000 base sits far above any real Android keycode so it can never collide.
+    /**
+     * Semeia a lista de pastas de ROM com a pasta do PROPRIO app, quando ela esta vazia.
+     *
+     * Duas coisas dependem disto, e as duas apareceram em aparelho:
+     *
+     *  1. O app anterior nao pedia pasta nenhuma: ele varria a sua propria `roms/` e pronto. No
+     *     fork, `romsDirs` nasce vazia e a biblioteca recebe o usuario com "nenhuma pasta de ROMs
+     *     configurada" -- uma exigencia que o produto nunca teve.
+     *  2. O catalogo baixa para essa mesma `roms/`. Sem semear, o usuario baixaria um jogo de 8 GB
+     *     e ele nao apareceria na biblioteca, porque a varredura so olha `romsDirs`.
+     *
+     * O caminho e o `assetCopyRoot` -- a raiz de dados que o core de fato usa -- e nao a pasta que
+     * o usuario escolhe no assistente. Essa continua podendo ser acrescentada pela engrenagem; a
+     * diferenca e que agora ela e uma opcao, nao um pre-requisito.
+     *
+     * So quando a lista esta VAZIA: quem ja escolheu as suas pastas nao tem uma entrada nova
+     * empurrada por cima, e quem remover esta daqui a tera de volta no proximo arranque -- o preco
+     * de a pasta do catalogo ser sempre alcancavel.
+     */
+    private fun seedOwnRomsFolder() {
+        if (romsDirs.value.isNotEmpty()) return
+        val own = java.io.File(assetCopyRoot(this), "roms")
+        runCatching { own.mkdirs() }
+        setRomsDirs(listOf(own.absolutePath))
+    }
+
     private fun effectiveKeyCode(event: KeyEvent): Int {
         if (event.keyCode == KeyEvent.KEYCODE_UNKNOWN && event.scanCode != 0 &&
             InputDevice.getDevice(event.deviceId)?.vendorId == 0x057E) {

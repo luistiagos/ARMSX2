@@ -1185,13 +1185,27 @@ private fun LibraryOverflowItem(
     )
 }
 
-private fun LazyGridScope.emptyLibrary(noFolders: Boolean) {
+/**
+ * O que a biblioteca mostra quando nao ha o que mostrar.
+ *
+ * O parametro do upstream se chamava `noFolders`, mas o call-site passa `query.isBlank()` -- os dois
+ * nao sao a mesma pergunta. O efeito era que "Nenhuma pasta de ROMs configurada" aparecia para
+ * QUALQUER biblioteca vazia, inclusive a de quem tem pasta e ainda nao baixou nenhum jogo, e a acao
+ * oferecida levava ao assistente de configuracao. Aqui a pasta e sempre semeada no arranque
+ * ([MainActivityRuntime.seedOwnRomsFolder]), entao esse diagnostico nunca esta certo: biblioteca
+ * vazia quer dizer "ainda nao ha jogos", e o caminho para o primeiro e o catalogo.
+ */
+private fun LazyGridScope.emptyLibrary(blankQuery: Boolean) {
     item(span = { GridItemSpan(maxLineSpan) }) {
         EmptyState(
-            title = if (noFolders) str("games.empty.noFolders.title") else str("games.search.placeholder"),
-            message = if (noFolders) str("games.empty.noFolders.body") else str("games.search.hint"),
-            actionLabel = if (noFolders) str("games.toolbar.setup") else null,
-            onAction = if (noFolders) MainActivityRuntime::reopenSetup else null,
+            title = if (blankQuery) str("games.empty.noGames.title") else str("games.search.placeholder"),
+            message = if (blankQuery) str("games.empty.noGames.body") else str("games.search.hint"),
+            actionLabel = if (blankQuery) str("catalog.title") else null,
+            onAction = if (blankQuery) {
+                { com.armsx2.navigation.UiNavigator.navigate(com.armsx2.navigation.AppRoute.Catalog) }
+            } else {
+                null
+            },
             modifier = Modifier.fillMaxWidth().height(260.dp),
         )
     }
@@ -1494,6 +1508,18 @@ enum class HomeZone { Toolbar, Search, Recents, Grid }
 
 object HomeInputController {
     private var owner: HomeViewModel? = null
+
+    /**
+     * Revarre a biblioteca de fora da tela.
+     *
+     * Existe para o catalogo: ele grava a ROM na pasta que a biblioteca varre, e sem um aviso o
+     * jogo recem-baixado so apareceria quando o usuario tocasse o botao de recarregar -- a
+     * varredura e guardada em cache por chave de diretorio, e a chave nao muda quando o conteudo
+     * da pasta muda. Silencioso se a biblioteca nao estiver montada.
+     */
+    fun refreshLibrary() {
+        owner?.refresh()
+    }
     private var openMenu: (() -> Unit)? = null
     private var columns = 3
     val scrollVelocity = mutableFloatStateOf(0f)

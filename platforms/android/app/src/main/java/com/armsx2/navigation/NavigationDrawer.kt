@@ -204,6 +204,7 @@ private fun DrawerContent(selected: AppRoute, onNavigate: (AppRoute) -> Unit, on
             onAction = { MainActivityRuntime.reopenSetup(); onDismiss() }),
         DrawerItem("setup.step.bios.title", "📀", AppRoute.BiosManager()),
         DrawerItem("memcard.title", "💾", AppRoute.MemoryCardManager()),
+        DrawerItem("catalog.title", "🗂️", AppRoute.Catalog),
         DrawerItem("savestate.title.loadManage", "📥", AppRoute.SaveManager),
         DrawerItem("tab.controls", "🕹️", AppRoute.ControllerManager),
         DrawerItem("patches.dialog.patchesAndCheats", "🪄", AppRoute.PatchManager),
@@ -347,6 +348,7 @@ private fun sameDestination(current: AppRoute, target: AppRoute): Boolean = when
     is AppRoute.Settings -> current is AppRoute.Settings
     is AppRoute.BiosManager -> current is AppRoute.BiosManager
     is AppRoute.MemoryCardManager -> current is AppRoute.MemoryCardManager
+    AppRoute.Catalog -> current is AppRoute.Catalog
     AppRoute.SaveManager -> current is AppRoute.SaveManager
     AppRoute.ControllerManager -> current is AppRoute.ControllerManager
     AppRoute.PatchManager -> current is AppRoute.PatchManager

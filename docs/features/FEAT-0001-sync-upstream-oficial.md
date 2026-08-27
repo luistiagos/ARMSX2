@@ -50,6 +50,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0020](../task/TASK-0020-seam-do-updater.md) | concluída | **Seam do updater** — aponta para o nosso `version.json`; fim do canal nightly |
 | [TASK-0021](../task/TASK-0021-assinatura-e-publicador.md) | concluída | **Assinatura + publicador** — chave de produção e trava `-Announce` |
 | [TASK-0022](../task/TASK-0022-primeira-impressao-do-app.md) | concluída | **Primeira impressão** — marca, tela de entrada, fundo escuro e o título do toolbar |
+| [TASK-0023](../task/TASK-0023-catalogo-de-roms.md) | concluída | **Catálogo de ROMs** — as 12.628 entradas, o download em primeiro plano e o ciclo baixar → jogar |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de
