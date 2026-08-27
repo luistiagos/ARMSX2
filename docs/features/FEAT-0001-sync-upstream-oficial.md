@@ -60,6 +60,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0030](../task/TASK-0030-adotar-pasta-de-dados-da-versao-anterior.md) | concluída | **Pasta de dados legada** — quem escolheu pasta própria não a perde ao atualizar |
 | [TASK-0031](../task/TASK-0031-detector-de-veneno-no-fork.md) | concluída | **Detector de veneno da DMA** — a instrumentação do crash de Shadow of the Colossus |
 | [TASK-0032](../task/TASK-0032-rotulo-na-grade.md) | concluída | **Título sob a capa** — variantes regionais deixam de parecer cartões repetidos |
+| [TASK-0033](../task/TASK-0033-enxugar-menu-lateral.md) | concluída | **Menu enxuto** — saem BIOS de inicialização, os três links do upstream, novidades e amigos |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de
