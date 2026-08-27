@@ -156,8 +156,10 @@ private fun DrawerContent(selected: AppRoute, onNavigate: (AppRoute) -> Unit, on
     val managers = listOf(
         // Moved off the library overflow menu, which was its only entry point. Sits first, beside
         // BIOS Location: both answer "where are my files".
-        DrawerItem("games.overflow.setup", "📂",
-            onAction = { MainActivityRuntime.reopenSetup(); onDismiss() }),
+        // Destino, e nao onAction: era `reopenSetup()`, que abre o assistente de primeira
+        // execucao -- cinco paginas com "Proximo"/"Voltar" para quem so queria acrescentar uma
+        // pasta. Agora e uma tela como as vizinhas, com seta de voltar.
+        DrawerItem("games.overflow.setup", "📂", AppRoute.RomFolders),
         DrawerItem("setup.step.bios.title", "📀", AppRoute.BiosManager()),
         DrawerItem("memcard.title", "💾", AppRoute.MemoryCardManager()),
         DrawerItem("savestate.title.loadManage", "📥", AppRoute.SaveManager),
@@ -282,6 +284,7 @@ private fun sameDestination(current: AppRoute, target: AppRoute): Boolean = when
     is AppRoute.Settings -> current is AppRoute.Settings
     is AppRoute.BiosManager -> current is AppRoute.BiosManager
     is AppRoute.MemoryCardManager -> current is AppRoute.MemoryCardManager
+    AppRoute.RomFolders -> current is AppRoute.RomFolders
     AppRoute.SaveManager -> current is AppRoute.SaveManager
     AppRoute.ControllerManager -> current is AppRoute.ControllerManager
     AppRoute.PatchManager -> current is AppRoute.PatchManager

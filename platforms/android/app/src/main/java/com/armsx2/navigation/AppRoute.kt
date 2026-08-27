@@ -14,6 +14,13 @@ sealed interface AppRoute {
     // opened from the drawer (falls back to the currently loaded game if any).
     data class BiosManager(val game: GameInfo? = null) : AppRoute
     data class MemoryCardManager(val game: GameInfo? = null) : AppRoute
+    /**
+     * Gerir as pastas de ROM como TELA, nao como assistente.
+     *
+     * A linha da gaveta abria o assistente de primeira execucao (cinco paginas com "Proximo" e
+     * "Voltar", pedindo local dos dados e BIOS antes de deixar sair) so para acrescentar uma pasta.
+     */
+    data object RomFolders : AppRoute
     data object SaveManager : AppRoute
     data object ControllerManager : AppRoute
     data object PatchManager : AppRoute
