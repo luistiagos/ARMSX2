@@ -2296,6 +2296,7 @@ open class MainActivityRuntime : ComponentActivity() {
         setupComplete.value = true
         prefs.edit { putBoolean("setupComplete", true) }
         systemDir.value = prefs.getString("systemDir", null)
+        adoptLegacyDataRoot()
         bios.value = prefs.getString("bios", null)
         biosDir.value = prefs.getString("biosDir", null)
         // Load roms folders. New format: JSON array under "romsDirs" pref.
@@ -2901,6 +2902,57 @@ open class MainActivityRuntime : ComponentActivity() {
      * empurrada por cima, e quem remover esta daqui a tera de volta no proximo arranque -- o preco
      * de a pasta do catalogo ser sempre alcancavel.
      */
+    /**
+     * Adota a pasta de dados que o usuario escolheu na versao ANTERIOR do app.
+     *
+     * As duas linhas guardam a mesma decisao em lugares que nao se enxergam:
+     *
+     * ```
+     * versao anterior   SharedPreferences "armsx2"   chave "data_dir_path"
+     * este fork         SharedPreferences "ARMSX2"   chave "systemDir"
+     * ```
+     *
+     * Nome de SharedPreferences e nome de ARQUIVO, portanto case-sensitive: sao dois arquivos
+     * distintos, e os dois sobrevivem a atualizacao. Sem esta adocao, quem tinha escolhido uma pasta
+     * propria atualiza e cai no `getExternalFilesDir` padrao -- biblioteca vazia, memory cards e
+     * savestates aparentemente sumidos. **Os dados continuam no disco**, no caminho antigo; e o app
+     * que deixa de olhar para la. E o pior tipo de perda: silenciosa e parecida com corrupcao.
+     *
+     * Quem NAO escolheu pasta nenhuma nao e afetado: as duas arvores caem no mesmo
+     * `getExternalFilesDir(null)`, e foi por isso que o `PCSX2-Android.ini` sobreviveu byte a byte
+     * na instalacao por cima da 1.0.23 (md5 ea9d3c2627ea9490e9c3256a7d0a4c9d, 12100 bytes).
+     *
+     * Tres condicoes, todas necessarias:
+     *
+     *  1. este fork ainda nao tem `systemDir` -- nunca sobrescrever uma escolha feita AQUI;
+     *  2. a chave antiga existe e nao esta vazia;
+     *  3. o caminho e de fato gravavel agora ([validateSystemDirWritable] escreve e apaga um
+     *     arquivo de prova) -- um cartao SD removido, ou uma permissao que nao sobreviveu a
+     *     reinstalacao, tornaria a adocao pior que o padrao.
+     *
+     * Roda a cada arranque, e nao uma vez so: e barata (uma leitura de pref) e a condicao 1 ja a
+     * torna idempotente. Uma marca de "ja migrei" so acrescentaria um estado a errar.
+     */
+    private fun adoptLegacyDataRoot() {
+        // Arquivo de SharedPreferences da versao anterior. Minusculo de proposito: e outro arquivo,
+        // nao o `ARMSX2` deste fork.
+        val LEGACY_PREFS = "armsx2"
+        val LEGACY_DATA_ROOT_KEY = "data_dir_path"
+        if (!systemDir.value.isNullOrBlank()) return
+        val legacy = applicationContext
+            .getSharedPreferences(LEGACY_PREFS, MODE_PRIVATE)
+            .getString(LEGACY_DATA_ROOT_KEY, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        if (!validateSystemDirWritable(legacy)) {
+            android.util.Log.w("ARMSX2", "pasta de dados da versao anterior nao e gravavel, ignorando: $legacy")
+            return
+        }
+        android.util.Log.i("ARMSX2", "adotando a pasta de dados da versao anterior: $legacy")
+        systemDir.value = legacy
+        prefs.edit { putString("systemDir", legacy) }
+    }
+
     private fun seedOwnRomsFolder() {
         if (romsDirs.value.isNotEmpty()) return
         val own = java.io.File(assetCopyRoot(this), "roms")
