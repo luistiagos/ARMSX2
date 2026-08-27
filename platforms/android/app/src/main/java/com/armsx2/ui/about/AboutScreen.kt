@@ -96,13 +96,17 @@ fun AboutScreen(onBack: () -> Unit, viewModel: AboutViewModel = viewModel()) {
                         hardware(Modifier.fillMaxWidth())
                     }
                     // The library music is CC0, so no attribution is legally required — the
-                    // author asks for credit and it costs nothing to give it.
-                    Text(
-                        str("app.credits.music"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    )
+                    // author asks for credit and it costs nothing to give it. Only shown while
+                    // the track can actually be heard (off by default, see LibraryMusic.kt) —
+                    // crediting a track that isn't playing just confuses whoever reads this.
+                    if (com.armsx2.LibraryMusic.enabled.value) {
+                        Text(
+                            str("app.credits.music"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        )
+                    }
                     // Bundled menu sound effects — also CC0, credited voluntarily.
                     Text(
                         str("app.credits.sfx"),
