@@ -61,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -125,6 +126,19 @@ import com.armsx2.ui.settings.controllerFocusable
 import kotlin.math.abs
 
 private val LocalCustomCoverMap = staticCompositionLocalOf<Map<String, java.io.File>> { emptyMap() }
+
+/**
+ * O estado da fila de download, por nome de arquivo, para a tarja de cada capa.
+ *
+ * `compositionLocalOf` e NAO `staticCompositionLocalOf`: o mapa e reescrito duas vezes por segundo
+ * enquanto um download corre, e a variante `static` recompoe a subarvore INTEIRA a cada troca --
+ * a grade toda, a cada meio segundo. A dinamica invalida so quem leu, que aqui e o punhado de
+ * cartoes visiveis.
+ *
+ * Isto existe para nao ter de acrescentar um parametro aos cinco chamadores de `GameCover`.
+ */
+private val LocalDownloadStates =
+    compositionLocalOf<Map<String, DownloadQueueItem>> { emptyMap() }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -193,7 +207,10 @@ fun HomeScreen(
         )
     }
 
-    CompositionLocalProvider(LocalCustomCoverMap provides customCoverMap) {
+    CompositionLocalProvider(
+        LocalCustomCoverMap provides customCoverMap,
+        LocalDownloadStates provides state.downloads,
+    ) {
     ArmsBackdrop(
         // Full-bleed wallpaper: the library image + readability scrim, drawn edge-to-edge
         // (behind the gesture bar) so it never leaves an exposed strip at the bottom —
@@ -563,6 +580,20 @@ fun HomeScreen(
                             placeholder = searchPlaceholder,
                             modifier = Modifier.fillMaxWidth(),
                             selected = HomeInputController.zone.value == HomeZone.Search,
+                        )
+                    }
+                }
+
+                // A fila de download, acima de tudo o que e biblioteca: e o que esta acontecendo
+                // AGORA, e some sozinha quando esvazia. Na versao anterior isto vivia na aba
+                // "Saved"; o fork nao tem abas desde que o catalogo foi fundido na grade.
+                if (state.queue.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "download-queue") {
+                        com.armsx2.ui.catalog.DownloadQueueSection(
+                            queue = state.queue,
+                            onPause = viewModel::pauseQueued,
+                            onResume = viewModel::resumeQueued,
+                            onCancel = viewModel::cancelQueued,
                         )
                     }
                 }
@@ -1473,11 +1504,17 @@ private fun GameCover(
             .crossfade(false)
             .build()
     }
-    // O estado de catalogo desta linha, lido AQUI para que qualquer mudanca na fila redesenhe o
-    // cartao: `CatalogEntry` e um objeto Java mutado pelo downloader, e mutacao de objeto Java e
-    // invisivel para o Compose -- e o `version` que faz a inscricao.
-    com.armsx2.catalog.CatalogLibrary.version.intValue
+    // O estado desta linha, em duas metades com fontes diferentes de proposito.
+    //
+    // `catalogEntry` diz se a linha pertence ao catalogo e se o arquivo ja esta no aparelho; isso
+    // so muda quando a varredura reconstroi a biblioteca, e ai o cartao recompoe pelos proprios
+    // parametros. `download` e o estado da FILA, que muda duas vezes por segundo: vem do
+    // CompositionLocal, carregando valores IMUTAVEIS, entao so os cartoes cujo item mudou sao
+    // invalidados. Aqui antes se lia um contador global (`CatalogLibrary.version`) na esperanca de
+    // que ele redesenhasse a tarja -- nao redesenhava, e o arquivo crescia no disco com `↓` na
+    // tela (TASK-0038).
     val catalogEntry = com.armsx2.catalog.CatalogLibrary.entryFor(game)
+    val download = game.catalogFileName?.let { LocalDownloadStates.current[it] }
     Box(modifier.clip(RoundedCornerShape(cornerRadius))) {
         if (model == null) {
             CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText)
@@ -1511,7 +1548,12 @@ private fun GameCover(
                 },
             )
         }
-        CoverStateBadge(catalogEntry, Modifier.align(Alignment.BottomStart).padding(4.dp))
+        CoverStateBadge(
+            inCatalog = catalogEntry != null,
+            isDownloaded = catalogEntry?.isDownloaded == true,
+            download = download,
+            modifier = Modifier.align(Alignment.BottomStart).padding(4.dp),
+        )
     }
 }
 
@@ -1528,31 +1570,37 @@ private fun GameCover(
  * rótulo embaixo. Dentro do quadro da capa, a marca aparece igual nas três.
  */
 @Composable
-private fun CoverStateBadge(entry: com.armsx2.catalog.CatalogEntry?, modifier: Modifier = Modifier) {
-    if (entry == null) return
-    val downloading = entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.DOWNLOADING
+private fun CoverStateBadge(
+    inCatalog: Boolean,
+    isDownloaded: Boolean,
+    download: DownloadQueueItem?,
+    modifier: Modifier = Modifier,
+) {
+    if (!inCatalog) return
+    val queued = download?.state
     val label = when {
-        entry.isDownloaded -> "✓"
-        downloading -> "${(entry.downloadProgress * 100).toInt()}%"
-        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.QUEUED -> "⋯"
-        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.PAUSED -> "⏸"
-        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.ERROR -> "!"
+        isDownloaded -> "✓"
+        queued == com.armsx2.catalog.DownloadQueueManager.State.DOWNLOADING ->
+            "${(download.progress * 100).toInt()}%"
+        queued == com.armsx2.catalog.DownloadQueueManager.State.QUEUED -> "⋯"
+        queued == com.armsx2.catalog.DownloadQueueManager.State.PAUSED -> "⏸"
+        queued == com.armsx2.catalog.DownloadQueueManager.State.ERROR -> "!"
         else -> "↓"
     }
     val container = when {
-        entry.isDownloaded -> MaterialTheme.colorScheme.primary
-        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.ERROR ->
+        isDownloaded -> MaterialTheme.colorScheme.primary
+        queued == com.armsx2.catalog.DownloadQueueManager.State.ERROR ->
             MaterialTheme.colorScheme.error
-        entry.queueState != null -> MaterialTheme.colorScheme.tertiary
+        queued != null -> MaterialTheme.colorScheme.tertiary
         // Ainda não baixado: discreto de propósito. É o estado da MAIORIA dos 12.628 cartões, e uma
         // tarja chapada em cada um viraria ruído em vez de informação.
         else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.86f)
     }
     val content = when {
-        entry.isDownloaded -> MaterialTheme.colorScheme.onPrimary
-        entry.queueState == com.armsx2.catalog.DownloadQueueManager.State.ERROR ->
+        isDownloaded -> MaterialTheme.colorScheme.onPrimary
+        queued == com.armsx2.catalog.DownloadQueueManager.State.ERROR ->
             MaterialTheme.colorScheme.onError
-        entry.queueState != null -> MaterialTheme.colorScheme.onTertiary
+        queued != null -> MaterialTheme.colorScheme.onTertiary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(

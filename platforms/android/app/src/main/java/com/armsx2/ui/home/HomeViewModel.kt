@@ -31,12 +31,38 @@ data class HomeUiState(
     /** Ver so o que ja esta no aparelho, escondendo as linhas que so existem no catalogo. */
     val onlyDownloaded: Boolean = false,
     /**
-     * Republicacao. A fila de download muta o proprio [com.armsx2.catalog.CatalogEntry], e
-     * `mutableStateOf` compara por igualdade estrutural: sem um campo que mude de valor, um estado
-     * recem-construido sai `equals` ao anterior e o Compose descarta a atribuicao -- a barra de
-     * progresso ficaria parada com o arquivo crescendo no disco.
+     * A fila de download, como valor.
+     *
+     * O downloader muta o proprio [com.armsx2.catalog.CatalogEntry] -- um objeto Java compartilhado
+     * -- e a primeira versao desta tela sinalizava isso com um contador global. Nao funcionava: os
+     * parametros que os cartoes recebem continuavam sendo o MESMO objeto a cada quadro, entao a
+     * unica coisa capaz de redesenhar a tarja era a invalidacao daquele contador, e ela nao chegava
+     * no build publicado (o arquivo crescia no disco com `↓` na tela).
+     *
+     * Aqui a fila vira uma lista de [DownloadQueueItem] imutaveis, remontada a cada callback. Um
+     * progresso diferente produz um item diferente, que produz um `HomeUiState` diferente: o
+     * redesenho passa a ser consequencia das regras normais do Compose, nao de efeito colateral.
      */
-    val tick: Int = 0,
+    val queue: List<DownloadQueueItem> = emptyList(),
+    /** A mesma fila indexada por nome de arquivo, para a tarja de cada capa. */
+    val downloads: Map<String, DownloadQueueItem> = emptyMap(),
+)
+
+/**
+ * Uma linha da fila de download, congelada no instante em que foi publicada.
+ *
+ * Imutavel de proposito -- ver [HomeUiState.queue]. Guarda `fileName` e nao a entrada do catalogo
+ * porque e o nome do arquivo que liga as tres pontas: o cartao da grade, o `.part` no disco e a
+ * acao de pausar/cancelar.
+ */
+data class DownloadQueueItem(
+    val fileName: String,
+    val title: String,
+    val coverUrl: String?,
+    val state: com.armsx2.catalog.DownloadQueueManager.State,
+    val progress: Float,
+    val downloadedBytes: Long,
+    val totalBytes: Long,
 )
 
 class HomeViewModel(application: Application) :
@@ -250,12 +276,21 @@ class HomeViewModel(application: Application) :
         java.io.File(MainActivityRuntime.assetCopyRoot(getApplication()), "roms").apply { mkdirs() }
 
     private fun loadCatalog() {
+        // Assinar a fila NÃO pode ficar atrás do atalho de cache abaixo.
+        //
+        // `CatalogLibrary` é um `object` de processo e `onCleared()` desassina. Enquanto estas duas
+        // linhas moravam dentro do `if`, o primeiro HomeViewModel assinava e qualquer um criado
+        // depois — o catálogo já carregado, portanto `return` na primeira linha — ficava mudo para
+        // sempre: o download rodava e a tela nunca sabia. Na versão anterior o `addListener` era
+        // incondicional no `onCreate`, pareado com o `onDestroy`; é esse contrato que volta aqui.
+        val queue = com.armsx2.catalog.DownloadQueueManager.get()
+        queue.setRomsDir(romsDir())
+        queue.addListener(this)
+        republish()
+
         if (com.armsx2.catalog.CatalogLibrary.entries.isNotEmpty()) return
         scope.launch {
             val dir = romsDir()
-            val queue = com.armsx2.catalog.DownloadQueueManager.get()
-            queue.setRomsDir(dir)
-            queue.addListener(this@HomeViewModel)
             // O parse lê um asset de 926 KB e monta 12.628 objetos: fora da thread principal, senão
             // a biblioteca abre travada.
             val entries = kotlinx.coroutines.withContext(Dispatchers.IO) {
@@ -331,6 +366,28 @@ class HomeViewModel(application: Application) :
     fun cancelDownload(entry: com.armsx2.catalog.CatalogEntry) =
         com.armsx2.catalog.DownloadQueueManager.get().remove(entry)
 
+    // As mesmas três ações, vindas da SEÇÃO DE FILA, que só conhece o nome do arquivo — o painel
+    // por jogo tem a entrada do catálogo em mãos, a seção não. Nomes distintos em vez de sobrecarga
+    // porque as duas telas passam as funções por referência (`viewModel::pauseDownload`), e aí uma
+    // sobrecarga vira ambiguidade resolvida por tipo esperado — legível hoje, armadilha amanhã.
+
+    /**
+     * A entrada por trás de uma linha da fila.
+     *
+     * Procurada na fila viva, e não no catálogo inteiro: as três ações só fazem sentido sobre o que
+     * está enfileirado, e um item que saiu da fila entre o desenho e o toque deve virar no-op em vez
+     * de agir sobre outra coisa.
+     */
+    private fun queued(fileName: String): com.armsx2.catalog.CatalogEntry? =
+        com.armsx2.catalog.DownloadQueueManager.get().getActiveQueue()
+            .firstOrNull { it.fileName == fileName }
+
+    fun pauseQueued(fileName: String) = queued(fileName)?.let { pauseDownload(it) } ?: Unit
+
+    fun resumeQueued(fileName: String) = queued(fileName)?.let { resumeDownload(it) } ?: Unit
+
+    fun cancelQueued(fileName: String) = queued(fileName)?.let { cancelDownload(it) } ?: Unit
+
     // ------------------------------------------- DownloadQueueManager.QueueListener
 
     override fun onQueueChanged() {
@@ -351,9 +408,29 @@ class HomeViewModel(application: Application) :
 
     override fun onProgress(entry: com.armsx2.catalog.CatalogEntry?) = republish()
 
+    /**
+     * Congela a fila num valor e publica.
+     *
+     * Roda na thread principal — `DownloadQueueManager` entrega todo callback por `mainHandler`, e
+     * é isso que torna seguro ler os campos mutáveis do `CatalogEntry` aqui: quem os escreveu foi a
+     * mesma thread, um instante antes, no callback de progresso.
+     */
     private fun republish() {
-        com.armsx2.catalog.CatalogLibrary.bump()
-        state.value = state.value.copy(tick = state.value.tick + 1)
+        val items = com.armsx2.catalog.DownloadQueueManager.get().getActiveQueue().map { entry ->
+            DownloadQueueItem(
+                fileName = entry.fileName,
+                title = entry.title,
+                coverUrl = entry.coverUrl?.takeIf { it.isNotBlank() },
+                // `queueState` só é nulo fora da fila, e `getActiveQueue()` devolve a fila; um item
+                // que perdeu o estado entre a leitura e aqui vale como QUEUED em vez de derrubar a
+                // lista inteira num `!!`.
+                state = entry.queueState ?: com.armsx2.catalog.DownloadQueueManager.State.QUEUED,
+                progress = entry.downloadProgress,
+                downloadedBytes = entry.downloadedBytes,
+                totalBytes = entry.totalBytes,
+            )
+        }
+        state.value = state.value.copy(queue = items, downloads = items.associateBy { it.fileName })
     }
 
     override fun onCleared() {

@@ -65,6 +65,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0035](../task/TASK-0035-remover-cards-github-pcsx2-creditos.md) | concluída | **Tela Sobre enxuta** — saem os cards GitHub, PCSX2 e Créditos |
 | [TASK-0036](../task/TASK-0036-musica-de-fundo-desligada-por-padrao.md) | concluída | **Música da biblioteca desligada por padrão** — o toggle continua em Configurações |
 | [TASK-0037](../task/TASK-0037-pastas-de-rom-como-tela.md) | concluída | **Pastas de ROM como tela** — sai o assistente de "Próximo/Voltar" do menu do dia a dia |
+| [TASK-0038](../task/TASK-0038-fila-de-download-visivel.md) | concluída | **Fila de download visível** — a seção da versão anterior volta, e o progresso passa a chegar na tela |
 | [TASK-0039](../task/TASK-0039-credito-da-musica-so-quando-toca.md) | concluída | **Crédito condicional** — a tela Sobre só cita a música quando o toggle está ligado |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
