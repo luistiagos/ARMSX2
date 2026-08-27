@@ -409,7 +409,18 @@ fun HomeScreen(
                         // constante que nao informa nada, e mentiria assim que uma busca ou o
                         // filtro "so os baixados" recortasse a lista. O total so aparece quando e
                         // de fato o que se ve.
-                        "${str("games.library.totalGames")}: ${state.visibleGames.size}"
+                        //
+                        // E o filtro se anuncia. Ele e global, persiste entre sessoes e esconde
+                        // 12.627 dos 12.628 cartoes: sem dizer nada aqui, quem o liga e volta
+                        // depois ve uma biblioteca quase vazia e conclui que o app perdeu o
+                        // catalogo -- foi exatamente o que aconteceu duas vezes em teste. O
+                        // desligamento continua no mesmo lugar, no menu de tres pontos.
+                        val total = "${str("games.library.totalGames")}: ${state.visibleGames.size}"
+                        if (state.onlyDownloaded) {
+                            "${str("games.overflow.onlyDownloaded")} · $total"
+                        } else {
+                            total
+                        }
                     },
                     leading = {
                         RoundAction(

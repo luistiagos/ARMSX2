@@ -43,11 +43,18 @@ i18n, não string literal.
 Compilado e instalado no Galaxy A12. A tela Sobre foi alcançada e mostra o nosso nome, a versão
 `1.0.24`, o core `197c72f23e` e os dados do aparelho.
 
-**O painel de créditos em si não foi conferido na tela.** O aparelho caiu do `adb` durante a
-rolagem até o rodapé. O que está provado é que a tela compõe e abre; que o painel aparece, não.
-Fica como pendência de verificação — o mesmo tipo de lacuna que esta sessão já mostrou custar caro
-(três defeitos do catálogo passaram por build verde sem aviso nenhum).
+O painel aparece, em português, com a lista completa:
+
+```
+Contribuidores principais:   • MoonPower — Desenvolvedor do app   ...
+Agradecimentos:              • pontos2024 (base do emulador)   • PCSX2 (núcleo do emulador)
+                             • SDL (SDL3)   • Fffathur   • vivimagic0
+```
+
+Conferido lendo a árvore de UI do rodapé da tela, logo acima dos créditos de música e efeitos que
+já estavam lá. (A primeira tentativa foi interrompida — o aparelho caiu do `adb` no meio da
+rolagem — e a task ficou registrada como pendente até esta verificação.)
 
 ## Resultado
 
-Entregue, com a verificação visual pendente.
+Entregue.

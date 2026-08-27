@@ -56,6 +56,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0026](../task/TASK-0026-bios-embarcada.md) | concluída | **BIOS embarcada** — o arquivo que o `copyAssetAll("bios")` do fork já esperava |
 | [TASK-0027](../task/TASK-0027-pasta-no-gerenciador-de-arquivos.md) | concluída | **Pasta no gerenciador de arquivos** — o `DocumentsProvider` da árvore anterior |
 | [TASK-0028](../task/TASK-0028-creditos-na-tela-sobre.md) | concluída | **Créditos** — a lista de pessoas que a tela Sobre do fork não mostrava |
+| [TASK-0029](../task/TASK-0029-filtro-visivel-na-barra.md) | concluída | **O filtro se anuncia** — um estado global que escondia 12.627 cartões sem dizer nada |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de
