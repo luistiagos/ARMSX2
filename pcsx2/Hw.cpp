@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
+#include "DebugTools/GuestPoisonWatch.h"
 #include "Gif_Unit.h"
 #include "Hardware.h"
 #include "SPU2/spu2.h"
@@ -23,6 +24,9 @@ std::deque<u8> ee_sio_tx_fifo;
 
 void hwReset()
 {
+	// Zera junto com o hardware, para que um reset da VM nao herde a deteccao anterior.
+	GuestPoisonWatch::Reset();
+
 	std::memset(eeHw, 0, sizeof(eeHw));
 
 	{
@@ -108,6 +112,10 @@ void hwIntcIrq(int n)
 
 void hwDmacIrq(int n)
 {
+	// Uma leitura de 32 bits alinhada por sinalizacao de canal. Silencioso ate a TRANSICAO para o
+	// valor vigiado, entao nao ha como inundar o log. Ver DebugTools/GuestPoisonWatch.h.
+	GuestPoisonWatch::OnDmacIrq(n);
+
 	psHu32(DMAC_STAT) |= 1<<n;
 	if(psHu16(DMAC_STAT+2) & (1<<n))cpuTestDMACInts();
 }

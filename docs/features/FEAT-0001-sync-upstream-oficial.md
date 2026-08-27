@@ -58,6 +58,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0028](../task/TASK-0028-creditos-na-tela-sobre.md) | concluída | **Créditos** — a lista de pessoas que a tela Sobre do fork não mostrava |
 | [TASK-0029](../task/TASK-0029-filtro-visivel-na-barra.md) | concluída | **O filtro se anuncia** — um estado global que escondia 12.627 cartões sem dizer nada |
 | [TASK-0030](../task/TASK-0030-adotar-pasta-de-dados-da-versao-anterior.md) | concluída | **Pasta de dados legada** — quem escolheu pasta própria não a perde ao atualizar |
+| [TASK-0031](../task/TASK-0031-detector-de-veneno-no-fork.md) | concluída | **Detector de veneno da DMA** — a instrumentação do crash de Shadow of the Colossus |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de

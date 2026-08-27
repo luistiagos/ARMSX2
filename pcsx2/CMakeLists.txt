@@ -916,6 +916,7 @@ endif()
 # DebugTools sources
 set(pcsx2DebugToolsSources
 	DebugTools/DebugInterface.cpp
+	DebugTools/GuestPoisonWatch.cpp
 	DebugTools/DisassemblyManager.cpp
 	DebugTools/ExpressionParser.cpp
 	DebugTools/MIPSAnalyst.cpp
@@ -934,6 +935,7 @@ set(pcsx2DebugToolsSources
 # DebugTools headers
 set(pcsx2DebugToolsHeaders
 	DebugTools/DebugInterface.h
+	DebugTools/GuestPoisonWatch.h
 	DebugTools/DisassemblyManager.h
 	DebugTools/ExpressionParser.h
 	DebugTools/MIPSAnalyst.h
