@@ -155,11 +155,13 @@ object LibraryKeyboard {
         else -> 1f
     }
 
+    // I18n.get e nao a `str` composable: esta funcao nao e @Composable. O teclado e montado a cada
+    // abertura, entao pega o idioma corrente; trocar de idioma com ele ABERTO nao e um caso real.
     private fun glyphOf(key: String): String = when (key) {
-        SPACE -> "Space"
+        SPACE -> com.armsx2.i18n.I18n.get("keyboard.space")
         BACKSPACE -> "⌫"
-        CLEAR -> "Clear"
-        DONE -> "Done"
+        CLEAR -> com.armsx2.i18n.I18n.get("keyboard.clear")
+        DONE -> com.armsx2.i18n.I18n.get("keyboard.done")
         SHIFT -> "⇧"
         else -> if (shifted.value) key.uppercase() else key
     }

@@ -53,8 +53,10 @@ Instalado no Galaxy A12 e conferido no disco do aparelho:
 /sdcard/Android/data/come.nanodata.armsx2/files/bios/SCPH-90001_BIOS_V18_USA_230.bin   4194304
 ```
 
-**Não validado:** o boot de um jogo até a tela do PS2. O aparelho de teste caiu do `adb` antes
-disso; a extração está provada, o uso pelo core não.
+**Validado depois, na [TASK-0034](TASK-0034-campo-de-busca-no-topo.md):** o jogo baixado do
+catálogo roda — BIOS, FMV de abertura e tela de título, com o menu de emulação identificando
+`SLUS-20265 · CRC 79646C72` lido do disco. O ciclo catálogo → download → biblioteca → jogar está
+provado ponta a ponta.
 
 ## Resultado
 

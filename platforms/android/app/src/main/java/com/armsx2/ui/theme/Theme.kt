@@ -134,14 +134,19 @@ object ToolbarPositionPreferences {
 }
 
 /** Visibility of optional library-home sections. Both default to visible so
- * existing users keep the current layout until they explicitly opt out. */
+ * existing users keep the current layout until they explicitly opt out.
+ *
+ * [showSearch] e a excecao, e nasce LIGADA nesta arvore: a grade daqui carrega o catalogo inteiro
+ * (12.628 entradas), e uma lista desse tamanho sem campo de busca so se percorre rolando. A versao
+ * anterior tinha o campo fixo no topo do catalogo (`activity_catalog.xml`, `et_catalog_search`) --
+ * era escondido so na aba de jogos ja baixados, que aqui nao existe como tela separada. */
 object LibraryChromePreferences {
     private const val SearchKey = "ui.library.showSearch"
     private const val RecentsKey = "ui.library.showRecents"
     private const val OpacityKey = "ui.library.opacity"
     private const val BarColorKey = "ui.library.barColor"
 
-    val showSearch = mutableStateOf(false)
+    val showSearch = mutableStateOf(true)
     val showRecents = mutableStateOf(true)
 
     /** Custom colour for the top BAR itself (the rounded pill every screen's header sits in).
@@ -169,7 +174,7 @@ object LibraryChromePreferences {
     val libraryOpacity = mutableStateOf(100)
 
     fun load() {
-        showSearch.value = MainActivityRuntime.prefs.getBoolean(SearchKey, false)
+        showSearch.value = MainActivityRuntime.prefs.getBoolean(SearchKey, true)
         showRecents.value = MainActivityRuntime.prefs.getBoolean(RecentsKey, true)
         libraryOpacity.value = MainActivityRuntime.prefs.getInt(OpacityKey, 100).coerceIn(20, 100)
         barColor.value = MainActivityRuntime.prefs.getInt(BarColorKey, 0)
