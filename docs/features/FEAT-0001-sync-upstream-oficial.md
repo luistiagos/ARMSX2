@@ -63,6 +63,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0033](../task/TASK-0033-enxugar-menu-lateral.md) | concluída | **Menu enxuto** — saem BIOS de inicialização, os três links do upstream, novidades e amigos |
 | [TASK-0034](../task/TASK-0034-campo-de-busca-no-topo.md) | concluída | **Busca no topo** — o campo que a versão anterior tinha, mais as teclas do teclado traduzidas |
 | [TASK-0035](../task/TASK-0035-remover-cards-github-pcsx2-creditos.md) | concluída | **Tela Sobre enxuta** — saem os cards GitHub, PCSX2 e Créditos |
+| [TASK-0036](../task/TASK-0036-musica-de-fundo-desligada-por-padrao.md) | concluída | **Música da biblioteca desligada por padrão** — o toggle continua em Configurações |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de
