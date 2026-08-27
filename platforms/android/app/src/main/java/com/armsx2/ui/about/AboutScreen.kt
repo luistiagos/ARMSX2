@@ -142,6 +142,20 @@ fun AboutScreen(onBack: () -> Unit, viewModel: AboutViewModel = viewModel()) {
                             )
                         }
                     }
+                    // Creditos da equipe. A tela Sobre da arvore anterior os mostrava e a deles
+                    // nao: ela lista compilacao, hardware e os repositorios, mas nunca as pessoas.
+                    // Nao e identidade nossa -- e a equipe do ARMSX2 e a cadeia de quem o app usa;
+                    // por isso o texto e o mesmo, palavra por palavra, e nao uma reescrita.
+                    GlassPanel(Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            PanelTitle(str("about.credits.title"))
+                            Text(
+                                str("about.credits.body"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     // The library music is CC0, so no attribution is legally required — the
                     // author asks for credit and it costs nothing to give it.
                     Text(

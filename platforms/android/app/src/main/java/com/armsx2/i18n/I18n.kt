@@ -274,6 +274,8 @@ private val BASE_EN: Map<String, String> = mapOf(
     "app.welcomeBack" to "Welcome Back!",
     "app.menuSfx.imported" to "Imported %d sound effect(s).",
     "app.menuSfx.importNone" to "No matching files. Name them select, back, menu, toggle_on, toggle_off, reset, or slider.",
+    "about.credits.title" to "Credits",
+    "about.credits.body" to "Core contributors:\n\u2022 MoonPower \u2014 App developer\n\u2022 jpolo \u2014 Management\n\u2022 Medievalshell \u2014 Web developer\n\u2022 set l \u2014 Web developer\n\u2022 Alex \u2014 QA tester\n\u2022 Yua \u2014 QA tester\n\nThanks to:\n\u2022 pontos2024 (emulator base)\n\u2022 PCSX2 (core emulator)\n\u2022 SDL (SDL3)\n\u2022 Fffathur (icon design)\n\u2022 vivimagic0 (icon design)",
     "app.credits.music" to "Music: \"Calm Ambient 1 (Synthwave 4k)\" — The Cynic Project / cynicmusic.com / pixelsphere.org (CC0)",
     "app.credits.sfx" to "Menu sounds: \"Interface SFX Pack 1\" — obsydianx.itch.io (CC0)",
     "app.language" to "Language",

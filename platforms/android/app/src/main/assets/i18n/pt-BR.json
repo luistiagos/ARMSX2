@@ -13,6 +13,8 @@
  "games.empty.noGames.title": "Nenhum jogo ainda",
  "games.empty.noGames.body": "Abra o catálogo de ROMs para baixar o seu primeiro jogo.",
  "setup.recovery.notice": "Não consegui abrir a sua pasta de jogos salvos — isso pode acontecer depois de reinstalar ou restaurar um backup. Selecione-a de novo.",
+ "about.credits.title": "Créditos",
+ "about.credits.body": "Contribuidores principais:\n• MoonPower — Desenvolvedor do app\n• jpolo — Gestão\n• Medievalshell — Desenvolvedor web\n• set l — Desenvolvedor web\n• Alex — Testes\n• Yua — Testes\n\nAgradecimentos:\n• pontos2024 (base do emulador)\n• PCSX2 (núcleo do emulador)\n• SDL (SDL3)\n• Fffathur (design do ícone)\n• vivimagic0 (design do ícone)",
  "games.overflow.onlyDownloaded": "Só os baixados",
  "catalog.action.pause": "Pausar",
  "catalog.action.resume": "Retomar",
