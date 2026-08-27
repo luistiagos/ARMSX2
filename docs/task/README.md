@@ -78,3 +78,11 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0013](TASK-0013-detector-valor-veneno-dma.md) — detector de valor-veneno no DMA (instrumenta o crash do SotC) | concluída | — | — (instrumenta, não corrige) | `a71a51e17d` |
 | [TASK-0014](TASK-0014-comparador-superficie-jni.md) — comparador da superfície JNI contra o upstream | concluída | FEAT-0001 | — | `353dae44f1` |
 | [TASK-0015](TASK-0015-manifesto-catalogo-curado.md) — manifesto de catálogo curado + `sort_manifest.py` que o preserva | concluída | — | — | `ee775b3015` |
+| [TASK-0038](TASK-0038-fila-de-download-visivel.md) — fila de download visível, e progresso que chega na tela | concluída | FEAT-0001 | fila-download-sem-tela-e-sem-progresso-ao-vivo | `7e4f9d41ce` |
+
+> **O índice está 24 linhas atrasado.** As tasks TASK-0016 a TASK-0037 e a TASK-0039 existem, estão
+> commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`
+> só preenche o hash de linhas **que já estão** na tabela e não insere as que faltam — o defeito
+> registrado em [`checktraceability-fix-nao-insere-task-ausente-do-indice`](../bugs/open/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md)
+> e endereçado pela [TASK-0010](TASK-0010-corrigir-validador-rastreabilidade.md), que segue aberta.
+> Enquanto ela não sai, a listagem confiável é `git log --grep='^TASK-'`.
