@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Liga o DocumentsProvider que expõe a pasta de dados do app no gerenciador de arquivos do
+        sistema (com.armsx2.provider.Armsx2DocumentsProvider).
+
+        Um recurso, e não uma constante de build, porque o manifesto o consome em `android:enabled`,
+        que só aceita @bool. A árvore anterior o gerava com `resValue` no Gradle; aqui isso não é
+        possível — esta árvore desliga `buildFeatures.resValues` — e um arquivo estático serve
+        igual, já que o valor é o mesmo em todas as variantes.
+    -->
+    <bool name="armsx2_documents_provider_enabled">true</bool>
+</resources>

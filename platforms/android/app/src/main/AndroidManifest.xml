@@ -201,6 +201,30 @@
             dataSync e o tipo correto: transferencia de dados iniciada pelo usuario. Nao exportado,
             quem o inicia e o proprio app.
         -->
+        <!--
+            Expoe a pasta de dados do app no gerenciador de arquivos do sistema.
+
+            Desde o scoped storage, `getExternalFilesDir` nao aparece na navegacao normal do
+            Android, e e onde vivem as ROMs baixadas, os memory cards e os savestates. Com este
+            provider o app vira uma origem no seletor de arquivos, e o usuario tira um save de la
+            ou poe uma ROM sem cabo e sem permissao de todos os arquivos.
+
+            MANAGE_DOCUMENTS e permissao de sistema: nenhum app de terceiros a tem, entao `exported`
+            aqui nao abre a pasta para outros apps: so para o seletor do proprio Android.
+        -->
+        <provider
+            android:name="com.armsx2.provider.Armsx2DocumentsProvider"
+            android:authorities="${applicationId}.documents"
+            android:enabled="@bool/armsx2_documents_provider_enabled"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS"
+            tools:ignore="ExportedContentProvider">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
         <service
             android:name="com.armsx2.catalog.DownloadForegroundService"
             android:exported="false"
