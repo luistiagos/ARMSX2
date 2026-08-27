@@ -42,7 +42,6 @@ import com.armsx2.i18n.str
 import com.armsx2.navigation.AppRoute
 import com.armsx2.navigation.UiNavigator
 import com.armsx2.runtime.MainActivityRuntime
-import com.armsx2.ui.theme.BootLogoPreferences
 import com.armsx2.ui.theme.ThemeMode
 import com.armsx2.ui.theme.ThemePreferences
 import com.armsx2.ui.theme.LauncherOrientationPreferences
@@ -440,13 +439,6 @@ fun AppTab() {
             }
             }
         }
-
-        ToggleRow(
-            label = str("app.bootLogo"),
-            value = BootLogoPreferences.enabled.value,
-            description = str("app.bootLogo.desc"),
-            onChange = { BootLogoPreferences.set(it) },
-        )
 
         BackupRestoreRows()
 

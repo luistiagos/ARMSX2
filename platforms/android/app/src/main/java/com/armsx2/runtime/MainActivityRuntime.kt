@@ -2230,7 +2230,6 @@ open class MainActivityRuntime : ComponentActivity() {
         com.armsx2.LibraryView.load()
         com.armsx2.ui.UiScale.load()
         com.armsx2.ui.theme.ThemePreferences.load()
-        com.armsx2.ui.theme.BootLogoPreferences.load()
         com.armsx2.ui.ScreenPinning.load()
         com.armsx2.ui.QuickMenuSide.load()
         com.armsx2.ui.theme.ToolbarPositionPreferences.load()
@@ -2270,7 +2269,17 @@ open class MainActivityRuntime : ComponentActivity() {
         // while the activity is paused.
         getSystemService(android.hardware.input.InputManager::class.java)
             ?.registerInputDeviceListener(inputDeviceListener, null)
-        setupComplete.value = prefs.getBoolean("setupComplete", false)
+        // O assistente de configuracao NAO roda no arranque. Decisao de produto: a unica
+        // configuracao do RetroSystem PS2 e a da engrenagem; ninguem e recebido por um
+        // questionario de tres paginas antes de ver a biblioteca.
+        //
+        // `setupComplete` fica sempre verdadeiro, e nao ha nada a migrar do app anterior por causa
+        // disso. A tela em si CONTINUA existindo e continua sendo o unico lugar que gere pastas de
+        // ROM e BIOS -- ela e alcancavel por `reopenSetup()`, da gaveta de navegacao e do proprio
+        // aviso de biblioteca vazia. Sem esses dois caminhos isto deixaria o usuario sem saida, e
+        // foi por isso que os dois foram conferidos antes.
+        setupComplete.value = true
+        prefs.edit { putBoolean("setupComplete", true) }
         systemDir.value = prefs.getString("systemDir", null)
         bios.value = prefs.getString("bios", null)
         biosDir.value = prefs.getString("biosDir", null)
@@ -2297,8 +2306,14 @@ open class MainActivityRuntime : ComponentActivity() {
         // the user in an empty library with the wizard skipped. If no configured ROMs
         // folder is actually reachable, drop setupComplete for this session so the wizard
         // re-runs (and re-requests the permission); finishSetup re-arms it.
-        if (setupComplete.value && !romsAccessible(this, romsDirs.value)) {
-            setupComplete.value = false
+        // A recuperacao original zerava `setupComplete` quando nenhuma pasta de ROM configurada
+        // estava alcancavel, para o assistente rodar de novo e repedir a permissao. Com o
+        // assistente fora do arranque isso viraria justamente a tela que nao queremos.
+        //
+        // O aviso nao se perde: a biblioteca vazia ja oferece a acao que abre a configuracao
+        // (HomeScreen, ramo `noFolders`), que e o mesmo destino por um caminho que o usuario
+        // escolhe. So a marca de diagnostico continua sendo levantada.
+        if (!romsAccessible(this, romsDirs.value)) {
             setupRecoveryNeeded.value = true
         }
         // Renderer + upscale now live in the Settings tier (global ∘ per-game);

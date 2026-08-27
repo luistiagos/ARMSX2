@@ -987,8 +987,6 @@
  "app.theme.oledBase": "OLED preto",
  "app.keyboard.systemIme": "Usar o teclado do sistema",
  "app.keyboard.systemIme.desc": "Digite com o teclado do seu telefone em vez do teclado integrado ao pesquisar ou renomear jogos. O teclado integrado é recomendado se você joga com um controlador, pois pode ser navegado com o D-pad.",
- "app.bootLogo": "Animação de inicialização",
- "app.bootLogo.desc": "Reproduza o vídeo de introdução do ARMSX2 quando o aplicativo for iniciado.",
  "app.toolbarPosition": "Barra de ferramentas da biblioteca",
  "app.toolbarPosition.top": "Superior",
  "app.toolbarPosition.bottom": "Inferior",

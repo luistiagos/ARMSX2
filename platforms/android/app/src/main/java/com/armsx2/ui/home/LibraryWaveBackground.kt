@@ -65,8 +65,10 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
     }
 }
 
-/** The built-in wave colour — matches XmbGlView.BG_BOT / LibraryBackgroundColorPreferences default. */
-private val DEFAULT_WAVE = Color(0xFF2E75F5)
+/** Cor embutida da onda. Casa com XmbGlView.BG_BOT e com
+ *  LibraryBackgroundColorPreferences.DefaultDisplayColor -- os tres tem de andar juntos, senao o
+ *  mesmo app mostra fundos diferentes conforme o aparelho tenha ou nao GLES3. */
+private val DEFAULT_WAVE = Color(0xFF16243D)
 
 private fun DrawScope.drawWaveScene(t: Float, base: Color) {
     val w = size.width

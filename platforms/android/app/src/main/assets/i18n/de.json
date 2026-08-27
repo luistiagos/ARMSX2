@@ -39,8 +39,6 @@
  "action.search": "Suchen",
  "action.settings": "Einstellungen",
  "action.yes": "Ja",
- "app.bootLogo": "Startanimation",
- "app.bootLogo.desc": "Beim App-Start das ARMSX2-Introvideo abspielen.",
  "app.language": "Sprache",
  "app.language.desc": "App-Sprache wählen. Wird sofort übernommen.",
  "app.language.machineNote": "Alle Übersetzungen außer Englisch sind maschinell erstellt. Fehler entdeckt? Einfach melden, wir beheben ihn.",

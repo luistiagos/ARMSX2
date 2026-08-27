@@ -60,8 +60,6 @@
  "app.theme.system": "سیستم",
  "app.theme.light": "نور",
  "app.theme.dark": "تاریک",
- "app.bootLogo": "پویانمایی بوت",
- "app.bootLogo.desc": "وقتی برنامه شروع به کار کرد، ویدیوی معرفی ARMSX2 را پخش کنید.",
  "app.toolbarPosition": "نوار ابزار کتابخانه",
  "app.toolbarPosition.top": "بالا",
  "app.toolbarPosition.bottom": "پایین",

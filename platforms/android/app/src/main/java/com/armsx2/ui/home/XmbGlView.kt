@@ -364,8 +364,25 @@ class XmbGlView(context: Context) : TextureView(context), TextureView.SurfaceTex
         // Gradient: a bold "eye-candy" PS3 blue. linkev's raw values (near-black -> #2559B3) read
         // as muted navy on-device, so the top is lifted to a deep blue and the bottom pushed to a
         // vivid bright royal blue. Tuned by eye against the reference on the RP6 panel.
-        private val BG_TOP = floatArrayOf(0.02f, 0.07f, 0.20f)
-        private val BG_BOT = floatArrayOf(0.18f, 0.46f, 0.96f)
+        // Gradiente neutro escuro. O padrao do upstream era azul-real
+        // (BG_BOT = 0.18, 0.46, 0.96), que domina a tela inteira da biblioteca.
+        // O RetroSystem PS2 usa fundo escuro, como a versao anterior do app.
+        //
+        // Continua sendo um GRADIENTE e nao um preto chapado: as ondas brancas do XMB precisam de
+        // alguma variacao de luminancia para aparecer. Trocar por preto puro apaga o movimento.
+        // O usuario que quiser cor de volta escolhe em Configuracoes -> App -> cor de fundo.
+        // Azul-marinho escuro. O padrao do upstream era azul-real (BG_BOT = 0.18, 0.46, 0.96),
+        // que domina a tela inteira da biblioteca; o RetroSystem PS2 usa fundo escuro.
+        //
+        // Continua sendo um gradiente com alguma luminancia, e nao preto chapado: as ondas do XMB
+        // sao desenhadas sobre este tom e somem num fundo sem contraste.
+        //
+        // ⚠️ Estes dois valores tem um par no caminho 2D (LibraryWaveBackground.DEFAULT_WAVE), que
+        // e o que roda em aparelhos onde o GLES3 nao sobe -- Mali antigo, por exemplo. Mudar um sem
+        // o outro faz o mesmo app ter dois fundos diferentes conforme o aparelho; foi o que
+        // aconteceu na primeira tentativa.
+        private val BG_TOP = floatArrayOf(0.020f, 0.032f, 0.055f)
+        private val BG_BOT = floatArrayOf(0.086f, 0.141f, 0.239f)
         // Continuous RGB hue-cycle ("RGB" background mode): full wheel in this many seconds, matching
         // the theme's 14s RGB cycle.
         private const val RGB_CYCLE_SEC = 14f

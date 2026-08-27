@@ -59,8 +59,6 @@
   "app.theme.system": "система",
   "app.theme.light": "світло",
   "app.theme.dark": "Темний",
-  "app.bootLogo": "Завантажувальна анімація",
-  "app.bootLogo.desc": "Відтворіть вступне відео ARMSX2 під час запуску програми.",
   "action.play": "грати",
   "action.resume": "Резюме",
   "action.settings": "Налаштування",

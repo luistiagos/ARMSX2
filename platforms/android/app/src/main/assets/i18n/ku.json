@@ -59,8 +59,6 @@
   "app.theme.system": "Sîstem",
   "app.theme.light": "Sivik",
   "app.theme.dark": "Tarî",
-  "app.bootLogo": "Boot animation",
-  "app.bootLogo.desc": "Dema ku serîlêdan dest pê dike, vîdyoya ARMSX2-ê lîstin.",
   "action.play": "Bazî",
   "action.resume": "Dîsa vekirin",
   "action.settings": "Settings",

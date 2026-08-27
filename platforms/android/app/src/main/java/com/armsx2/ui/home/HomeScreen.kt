@@ -406,18 +406,29 @@ fun HomeScreen(
                         )
                     },
                     actions = {
-                        // Clock + battery, ahead of the buttons so it reads as status rather than
-                        // as another control. Deliberately NOT controllerFocusable — it isn't
-                        // interactive, and registering it would put a dead stop in the pad's path
-                        // through the toolbar.
-                        com.armsx2.ui.common.LibraryStatusCluster(
-                            // align(): the title block makes the bar taller than this two-line
-                            // cluster, so without it the pair sits high relative to the buttons.
-                            Modifier.align(Alignment.CenterVertically).padding(end = 6.dp),
-                            // Portrait: single compact row so the narrow bar doesn't cram it.
-                            compact = LocalConfiguration.current.orientation ==
-                                android.content.res.Configuration.ORIENTATION_PORTRAIT,
-                        )
+                        // Relogio + bateria, antes dos botoes para ler como status e nao como mais
+                        // um controle. Deliberadamente NAO controllerFocusable -- nao e interativo,
+                        // e registra-lo poria uma parada morta no caminho do direcional pela barra.
+                        //
+                        // Escondido em RETRATO. A barra e uma linha so, e nela competem o botao de
+                        // menu, o titulo, este cluster e tres botoes redondos. Num telefone de
+                        // 384dp sobravam ~70dp para o titulo, e "Biblioteca" precisa de ~110dp --
+                        // aparecia como "Bi...". O cluster e o elemento mais largo que nao e
+                        // controle, entao e ele que cede.
+                        //
+                        // Em paisagem ele volta: e a orientacao dos handhelds, que e onde ele foi
+                        // pensado (tela larga e, muitas vezes, sem barra de status do sistema) e
+                        // onde ha espaco para os dois.
+                        if (LocalConfiguration.current.orientation !=
+                            android.content.res.Configuration.ORIENTATION_PORTRAIT
+                        ) {
+                            com.armsx2.ui.common.LibraryStatusCluster(
+                                // align(): o bloco do titulo deixa a barra mais alta que este
+                                // cluster de duas linhas; sem isto o par fica alto em relacao aos
+                                // botoes.
+                                Modifier.align(Alignment.CenterVertically).padding(end = 6.dp),
+                            )
+                        }
                         RoundAction(
                             "↻",
                             str("games.card.refresh"),

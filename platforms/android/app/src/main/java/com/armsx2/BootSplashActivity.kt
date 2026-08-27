@@ -1,74 +1,33 @@
 package com.armsx2
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.view.View
-import android.widget.VideoView
 import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 /**
- * Boot splash: plays the bundled ARMSX2 intro video (res/raw/boot_intro.mp4) once per
- * process, then hands off to Main. Tapping, the Back button, a hard timeout, and any
- * playback error all fall through to the app so a bad codec or slow decode never
- * strands the user on a black screen. The splash is opt-out via the "ui.bootLogo"
- * preference (App settings, default on) — when disabled it launches Main immediately.
+ * Portao de entrada do app: e esta a activity do LAUNCHER e a que recebe o "abrir com" de um
+ * arquivo de ROM (intent VIEW). Hoje ela so encaminha para a Main.
+ *
+ * O que havia aqui era a reproducao de `res/raw/boot_intro.mp4`, o video de abertura com a marca
+ * do ARMSX2. Ele foi removido junto com o arquivo e com o toggle "Boot animation" das
+ * Configuracoes: era identidade DELES numa tela em que o usuario ve o nome do nosso produto. Nao
+ * substituimos por outro video -- nao ha um, e uma abertura de 2 s que ninguem pediu custa 2 s a
+ * cada arranque.
+ *
+ * A activity fica porque nao da para apaga-la: e o ponto de entrada declarado no manifesto.
  */
 class BootSplashActivity : ComponentActivity() {
     private var launchedMain = false
-    private var rootView: View? = null
-    private val timeoutRunnable = Runnable { launchMainAndFinish() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // The manifest theme (Theme.ARMSX2.Boot) already paints the window black,
-        // matching the video's black FrameLayout — no per-theme override, so a
-        // light-mode device never flashes white before the first decoded frame.
+        // O tema do manifesto (Theme.ARMSX2.Boot) ja pinta a janela de preto, entao um aparelho em
+        // modo claro nao pisca branco entre o icone e a Main.
         super.onCreate(savedInstanceState)
         applyImmersiveUi()
-
-        val prefs = getSharedPreferences("ARMSX2", MODE_PRIVATE)
-        val bootLogoEnabled = prefs.getBoolean("ui.bootLogo", true)
-        if (!bootLogoEnabled || playedThisProcess) {
-            launchMainAndFinish()
-            return
-        }
-        playedThisProcess = true
-
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() = launchMainAndFinish()
-        })
-
-        setContentView(R.layout.activity_boot_splash)
-        rootView = findViewById(R.id.boot_splash_root)
-        val videoView = findViewById<VideoView?>(R.id.boot_splash_video)
-        rootView?.apply {
-            setOnClickListener { launchMainAndFinish() }
-            postDelayed(timeoutRunnable, HARD_TIMEOUT_MS)
-        }
-        if (videoView != null) {
-            videoView.setOnClickListener { launchMainAndFinish() }
-            videoView.setVideoURI(Uri.parse("android.resource://$packageName/${R.raw.boot_intro}"))
-            videoView.setOnPreparedListener { mp ->
-                mp.isLooping = false
-                videoView.start()
-            }
-            videoView.setOnCompletionListener { launchMainAndFinish() }
-            videoView.setOnErrorListener { _, _, _ ->
-                launchMainAndFinish()
-                true
-            }
-        } else {
-            launchMainAndFinish()
-        }
-    }
-
-    override fun onDestroy() {
-        rootView?.removeCallbacks(timeoutRunnable)
-        super.onDestroy()
+        launchMainAndFinish()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -87,7 +46,6 @@ class BootSplashActivity : ComponentActivity() {
     private fun launchMainAndFinish() {
         if (launchedMain) return
         launchedMain = true
-        rootView?.removeCallbacks(timeoutRunnable)
         val launch = Intent(this, Main::class.java)
         intent?.let { source ->
             launch.action = source.action
@@ -119,7 +77,5 @@ class BootSplashActivity : ComponentActivity() {
     }
 
     private companion object {
-        var playedThisProcess = false
-        const val HARD_TIMEOUT_MS = 6000L
     }
 }

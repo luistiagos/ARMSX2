@@ -56,13 +56,24 @@ object ThemeBridge {
 object ThemePreferences {
     private const val PreferenceKey = "ui.theme.mode"
 
-    val mode = mutableStateOf(ThemeMode.System)
+    /**
+     * Escuro por padrao, nao [ThemeMode.System].
+     *
+     * `System` segue o modo do aparelho, e num aparelho em modo claro o app inteiro nasce branco --
+     * foi o que apareceu no primeiro teste em aparelho. Um emulador que roda em tela cheia sobre
+     * conteudo escuro nao deveria ter a biblioteca branca por acidente de configuracao do sistema.
+     *
+     * [ThemeMode.Blue] resolve para o NightScheme (escuro com acento azul) e continua sendo uma das
+     * opcoes do seletor: quem quiser claro, ou quiser seguir o sistema, escolhe em
+     * Configuracoes -> App -> tema. So o DEFAULT mudou.
+     */
+    val mode = mutableStateOf(ThemeMode.Blue)
 
     fun load() {
         // Name-matched rather than hand-enumerated, so adding a colour needs no change here.
         // Anything unrecognised — including the legacy "Dark" — resolves to Blue, which is
         // exactly what "Dark" used to render as.
-        val stored = MainActivityRuntime.prefs.getString(PreferenceKey, ThemeMode.System.name)
+        val stored = MainActivityRuntime.prefs.getString(PreferenceKey, ThemeMode.Blue.name)
         mode.value = ThemeMode.entries.firstOrNull { it.name == stored } ?: ThemeMode.Blue
         loadCustomColor()
         loadOledBase()
@@ -105,21 +116,6 @@ object ThemePreferences {
  *  [com.armsx2.BootSplashActivity] straight from the "ARMSX2" prefs (key
  *  "ui.bootLogo") before Compose is up; this holder just backs the App-tab
  *  toggle and keeps that same key in sync. */
-object BootLogoPreferences {
-    private const val PreferenceKey = "ui.bootLogo"
-
-    val enabled = mutableStateOf(true)
-
-    fun load() {
-        enabled.value = MainActivityRuntime.prefs.getBoolean(PreferenceKey, true)
-    }
-
-    fun set(value: Boolean) {
-        enabled.value = value
-        MainActivityRuntime.prefs.edit { putBoolean(PreferenceKey, value) }
-    }
-}
-
 /** Whether the library view toolbar is pinned to the bottom of the screen (App
  *  setting). Default false = the toolbar sits at the top. */
 object ToolbarPositionPreferences {
@@ -209,13 +205,15 @@ object LibraryChromePreferences {
 object LibraryBackgroundColorPreferences {
     private const val Key = "ui.library.bgColor"
 
-    /** The built-in wave color (matches XmbGlView.BG_BOT), shown in the picker when unset. */
-    const val DefaultDisplayColor: Int = 0xFF2E75F5.toInt()
+    /** Cor embutida da onda (casa com XmbGlView.BG_BOT e LibraryWaveBackground.DEFAULT_WAVE),
+     *  mostrada no seletor quando nada foi escolhido. */
+    const val DefaultDisplayColor: Int = 0xFF16243D.toInt()
 
     /** Quick-pick palette for the settings swatches (XMB-flavored); the RGB sliders stay for custom
      *  colors. First entry is the built-in default. */
     val PRESETS: List<Int> = listOf(
-        0xFF2E75F5.toInt(), // royal blue (default)
+        0xFF16243D.toInt(), // azul-marinho escuro (padrao do RetroSystem PS2)
+        0xFF2E75F5.toInt(), // royal blue (o padrao do upstream, mantido como opcao)
         0xFF00B4D8.toInt(), // aqua
         0xFF19C37D.toInt(), // green
         0xFF16A085.toInt(), // teal

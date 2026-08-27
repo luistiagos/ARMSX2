@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -113,20 +114,29 @@ fun ArmsBackdrop(
     }
 }
 
+/**
+ * Marca do produto: aparece no onboarding, na gaveta de navegacao e na tela Sobre.
+ *
+ * Era o logo-torre do ARMSX2 (`R.drawable.savetowerforeground`) com o wordmark "ARMSX2" fixo em
+ * codigo. Os dois foram trocados pela nossa identidade -- e o wordmark vem de `R.string.app_name`,
+ * nao de uma literal, para que exista UM lugar que decide o nome do produto.
+ *
+ * Sem recorte circular, ao contrario do original: o logo deles era um quadrado escuro que precisava
+ * ser mascarado, enquanto o nosso ja tem a propria forma (quadrado arredondado com borda neon).
+ * Recortar em circulo cortaria justamente essa borda.
+ */
 @Composable
 fun ArmsLogo(modifier: Modifier = Modifier, showWordmark: Boolean = true, iconSize: Dp = 42.dp) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        // The ARMSX2 tower mark (bagas's logo), circle-cropped so its dark square
-        // corners don't show — matches the round hero render.
         Image(
-            painter = painterResource(id = R.drawable.savetowerforeground),
-            contentDescription = "ARMSX2",
-            modifier = Modifier.size(iconSize).clip(CircleShape),
+            painter = painterResource(id = R.mipmap.ic_launcher),
+            contentDescription = stringResource(R.string.app_name),
+            modifier = Modifier.size(iconSize),
         )
         if (showWordmark) {
             Spacer(Modifier.width(12.dp))
             Text(
-                text = "ARMSX2",
+                text = stringResource(R.string.app_name),
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
