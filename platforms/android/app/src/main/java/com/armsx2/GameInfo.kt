@@ -99,11 +99,20 @@ object CustomNames {
 }
 
 /** Show the game title under every cover in the main library grid (the old-UI behaviour),
- *  not only where a name is otherwise shown. Toggled from the library 3-dot overflow menu. */
+ *  not only where a name is otherwise shown. Toggled from the library 3-dot overflow menu.
+ *
+ *  **Ligado por padrao nesta arvore**, ao contrario do upstream. A grade aqui carrega o catalogo
+ *  inteiro, e o repositorio de capas tem UMA arte por jogo, nao por lancamento: "007 - Nightfire"
+ *  tem cinco entradas (USA, duas europeias, Japan, Korea) com a mesma imagem. Sem o rotulo, a
+ *  grade parece cheia de cartoes repetidos -- foi exatamente o que um usuario reportou. A versao
+ *  anterior mostrava o titulo sob toda capa do catalogo (`item_catalog.xml`,
+ *  `tv_catalog_title` com `maxLines="2"`), e por isso a duvida nunca aparecia la.
+ *
+ *  Quem ja tinha desligado a opcao continua com ela desligada: so o padrao muda. */
 object GridLabels {
     private const val KEY = "library.showGridNames"
-    val show = mutableStateOf(false)
-    fun load() { show.value = MainActivityRuntime.prefs.getBoolean(KEY, false) }
+    val show = mutableStateOf(true)
+    fun load() { show.value = MainActivityRuntime.prefs.getBoolean(KEY, true) }
     fun set(value: Boolean) {
         show.value = value
         MainActivityRuntime.prefs.edit().putBoolean(KEY, value).apply()

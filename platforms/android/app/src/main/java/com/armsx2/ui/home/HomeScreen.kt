@@ -1275,7 +1275,11 @@ private fun GameGridCard(
             Text(
                 game.displayTitle(EnglishTitles.enabled.value),
                 style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
+                // Duas linhas, e nao uma: o que distingue "007 - Nightfire (USA)" de
+                // "007 - Nightfire (Korea)" esta no FIM do nome, e numa linha so o "..." come
+                // justamente a regiao -- os cartoes voltariam a parecer iguais. E o mesmo limite
+                // do cartao da versao anterior (`item_catalog.xml`, maxLines="2").
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 2.dp),
             )
