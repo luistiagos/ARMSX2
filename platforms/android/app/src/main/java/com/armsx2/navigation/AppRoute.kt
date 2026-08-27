@@ -44,7 +44,18 @@ enum class SettingsCategory {
 }
 
 object UiNavigator {
-    val route = mutableStateOf<AppRoute>(AppRoute.Home)
+    /**
+     * A tela em que o app abre e o CATALOGO, nao a biblioteca.
+     *
+     * E o que o app anterior fazia: o `BottomNavigationView` de `HomeActivity` tinha `nav_catalog`
+     * como primeiro item, e um BottomNavigationView seleciona o primeiro item por padrao -- ou seja,
+     * a primeira grade que o usuario via era a dos 12.628 jogos, com os ja baixados marcados. A
+     * biblioteca era a segunda aba, e o app so ia para ela sozinho depois de um jogo rodar.
+     *
+     * Aqui o papel das duas abas fica com [AppRoute.Catalog] (esta, inicial) e [AppRoute.Home] (a
+     * biblioteca), que e o destino do "voltar" do catalogo.
+     */
+    val route = mutableStateOf<AppRoute>(AppRoute.Catalog)
     val drawerOpen = mutableStateOf(false)
 
     fun navigate(destination: AppRoute) {

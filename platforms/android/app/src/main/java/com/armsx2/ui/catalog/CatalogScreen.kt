@@ -1,5 +1,6 @@
 package com.armsx2.ui.catalog
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -40,8 +43,10 @@ import coil.compose.AsyncImage
 import com.armsx2.catalog.CatalogEntry
 import com.armsx2.catalog.DownloadQueueManager
 import com.armsx2.i18n.str
+import com.armsx2.navigation.UiNavigator
 import com.armsx2.ui.common.ArmsBackdrop
 import com.armsx2.ui.common.ArmsTopBar
+import com.armsx2.ui.common.PadModal
 import com.armsx2.ui.common.RoundAction
 import com.armsx2.ui.settings.controllerFocusable
 
@@ -65,19 +70,7 @@ fun CatalogScreen(onBack: () -> Unit, viewModel: CatalogViewModel = viewModel())
     // primeiro toque gastaria os dados do usuario por um encostar de dedo. A versao anterior
     // perguntava antes, e esta pergunta tambem.
     var pending by remember { mutableStateOf<CatalogEntry?>(null) }
-    pending?.let { entry ->
-        // ConfirmOverlay, e nao AlertDialog: um dialogo do Compose e uma janela Android propria e
-        // engole as teclas do controle antes de chegarem ao dispatchKeyEvent -- ficaria perfeito no
-        // toque e morto no gamepad. O proprio build recusa a compilar com um (`checkNoWindowModals`).
-        com.armsx2.ui.common.ConfirmOverlay(
-            title = entry.title,
-            message = str("catalog.confirm"),
-            confirmLabel = str("catalog.confirm.start"),
-            idPrefix = "catalog-download",
-            onConfirm = { viewModel.onCardAction(entry); pending = null },
-            onDismiss = { pending = null },
-        )
-    }
+    pending?.let { entry -> CatalogEntryModal(entry, viewModel) { pending = null } }
 
     ArmsBackdrop {
         Column(Modifier.fillMaxSize()) {
@@ -88,10 +81,26 @@ fun CatalogScreen(onBack: () -> Unit, viewModel: CatalogViewModel = viewModel())
                 } else {
                     "${str("catalog.available")}: ${state.visible.size}"
                 },
+                // A barra e a da tela INICIAL do app, nao a de uma subtela: por isso a gaveta a
+                // esquerda (como na biblioteca) e nao um "voltar", que aqui nao teria para onde ir.
+                // E a gaveta e onde mora a engrenagem de Configuracoes.
                 leading = {
                     RoundAction(
-                        "‹",
-                        str("action.back"),
+                        "☰",
+                        str("games.overflow.openNavigation"),
+                        { UiNavigator.drawerOpen.value = true },
+                        framed = true,
+                        buttonSize = 44.dp,
+                        buttonShape = RoundedCornerShape(14.dp),
+                        subtleFrame = true,
+                    )
+                },
+                // A biblioteca dos jogos ja baixados -- a segunda metade do par que no app anterior
+                // eram as duas abas do menu inferior (Catalogo / Meus jogos).
+                actions = {
+                    RoundAction(
+                        "▤",
+                        str("games.section.library"),
                         onBack,
                         framed = true,
                         buttonSize = 44.dp,
@@ -262,6 +271,128 @@ private fun CatalogCardStatus(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
+        }
+    }
+}
+
+/**
+ * O que um toque num cartao abre.
+ *
+ * Uma tela so, com as escolhas que fazem sentido para o estado daquele item -- e o papel que na
+ * versao anterior cabia ao `dialog_rom_download`, que tambem era um painel persistente com um botao
+ * primario que mudava de rotulo e um de cancelar.
+ *
+ * Comecar a baixar **pergunta antes**: uma ROM de PS2 tem entre 1 e 10 GB, e comecar no primeiro
+ * toque gastaria os dados do usuario por um encostar de dedo. E um download em andamento pode ser
+ * **cancelado**, nao so pausado: sem isso, um toque errado num jogo de 10 GB seria irreversivel --
+ * `remove()` para a transferencia e apaga o `.part`.
+ *
+ * `PadModal` e nao `AlertDialog`: um dialogo do Compose e uma janela Android propria e engole as
+ * teclas do controle antes de chegarem ao `dispatchKeyEvent`. Ficaria perfeito no toque e morto no
+ * gamepad -- e o build recusa a compilar com um (`checkNoWindowModals`).
+ */
+@Composable
+private fun CatalogEntryModal(
+    entry: CatalogEntry,
+    viewModel: CatalogViewModel,
+    onClose: () -> Unit,
+) {
+    val layer = "catalog-entry-modal"
+    val queueState = entry.queueState
+    val choices: List<Triple<String, () -> Unit, Boolean>> = when {
+        entry.isDownloaded -> emptyList()
+
+        queueState == DownloadQueueManager.State.PAUSED -> listOf(
+            Triple(str("catalog.action.resume"), { viewModel.resume(entry); onClose() }, false),
+            Triple(str("catalog.action.cancelDownload"), { viewModel.cancel(entry); onClose() }, true),
+        )
+
+        queueState == DownloadQueueManager.State.DOWNLOADING ||
+            queueState == DownloadQueueManager.State.QUEUED -> listOf(
+            Triple(str("catalog.action.pause"), { viewModel.pause(entry); onClose() }, false),
+            Triple(str("catalog.action.cancelDownload"), { viewModel.cancel(entry); onClose() }, true),
+        )
+
+        else -> listOf(
+            Triple(str("catalog.confirm.start"), { viewModel.start(entry); onClose() }, false),
+        )
+    }
+    val message = when {
+        entry.isDownloaded -> str("catalog.downloaded")
+        queueState == DownloadQueueManager.State.PAUSED -> str("catalog.paused")
+        queueState == DownloadQueueManager.State.QUEUED -> str("catalog.queued")
+        queueState == DownloadQueueManager.State.DOWNLOADING ->
+            "${(entry.downloadProgress * 100).toInt()}%"
+        else -> str("catalog.confirm")
+    }
+
+    PadModal(
+        key = layer,
+        onDismiss = onClose,
+        initialFocusId = "$layer.close",
+    ) {
+        Surface(
+            modifier = Modifier.padding(24.dp).widthIn(max = 420.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+            tonalElevation = 6.dp,
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Text(entry.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(18.dp))
+                // Em coluna e nao em linha: "Cancelar download" nao cabe ao lado de mais dois
+                // rotulos num aparelho de 384dp, e empilhado cada escolha vira um alvo largo --
+                // melhor para o dedo e para o direcional.
+                choices.forEach { (label, action, destructive) ->
+                    CatalogModalButton(
+                        label = label,
+                        id = "$layer.${label.hashCode()}",
+                        onClick = action,
+                        container = if (destructive) MaterialTheme.colorScheme.errorContainer
+                        else MaterialTheme.colorScheme.primaryContainer,
+                        content = if (destructive) MaterialTheme.colorScheme.onErrorContainer
+                        else MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                CatalogModalButton(
+                    label = str(if (choices.isEmpty()) "action.close" else "action.cancel"),
+                    id = "$layer.close",
+                    onClick = onClose,
+                    container = MaterialTheme.colorScheme.surfaceVariant,
+                    content = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogModalButton(
+    label: String,
+    id: String,
+    onClick: () -> Unit,
+    container: Color,
+    content: Color,
+) {
+    Surface(
+        color = container,
+        contentColor = content,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .controllerFocusable(id, RoundedCornerShape(12.dp), onConfirm = onClick),
+    ) {
+        Box(Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
     }
 }

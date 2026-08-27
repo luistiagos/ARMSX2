@@ -1653,8 +1653,23 @@ open class MainActivityRuntime : ComponentActivity() {
             // whole check after an Auto Backup restore (folder URI restored, permission not,
             // yet canRead said "fine" → no recovery → empty library). So on R+ trust the
             // all-files grant and never canRead; canRead is only meaningful on pre-R legacy.
+            // A pasta do PROPRIO app e uma excecao legitima a regra acima. O raciocinio
+            // "/storage so e de fato legivel com all-files" vale para caminho arbitrario; o
+            // diretorio de arquivos externos do pacote e legivel sem permissao nenhuma, sempre. E
+            // dele que se trata: e a pasta semeada por [seedOwnRomsFolder], onde o catalogo grava.
+            // Sem esta excecao o app abria acusando "nao consegui abrir sua pasta de jogos salvos"
+            // logo de cara -- sobre uma pasta que ele acabara de criar e estava lendo.
+            val ownRoot = runCatching { File(assetCopyRoot(context)).canonicalPath }.getOrNull()
+            fun isOwnFolder(path: String?): Boolean {
+                if (path == null || ownRoot == null) return false
+                // Canonico dos dois lados e separador explicito: comparar prefixo cru faria
+                // ".../files" casar com ".../files2".
+                val p = runCatching { File(path).canonicalPath }.getOrNull() ?: return false
+                return p == ownRoot || p.startsWith(ownRoot + File.separator)
+            }
             fun posixReadable(path: String?): Boolean {
                 if (path == null) return false
+                if (isOwnFolder(path)) return true
                 if (allFiles) return true
                 return Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
                     runCatching { File(path).canRead() }.getOrDefault(false)
@@ -2445,11 +2460,14 @@ open class MainActivityRuntime : ComponentActivity() {
             // One-time notice when setup was re-shown because a restored config
             // pointed at a folder we can no longer read (see the recovery check in
             // onCreate). Explains why the wizard reappeared.
+            // Hasteado para fora do LaunchedEffect: `str` e @Composable e nao pode ser chamada de
+            // dentro dele. Era texto literal em ingles, que aparecia assim num aparelho em pt-BR.
+            val recoveryNotice = com.armsx2.i18n.str("setup.recovery.notice")
             androidx.compose.runtime.LaunchedEffect(setupRecoveryNeeded.value) {
                 if (setupRecoveryNeeded.value) {
                     android.widget.Toast.makeText(
                         applicationContext,
-                        "Couldn't open your saved game folder — this can happen after reinstalling or restoring a backup. Please re-select it.",
+                        recoveryNotice,
                         android.widget.Toast.LENGTH_LONG,
                     ).show()
                     setupRecoveryNeeded.value = false

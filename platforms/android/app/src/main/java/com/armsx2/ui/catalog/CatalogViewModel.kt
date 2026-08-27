@@ -87,19 +87,28 @@ class CatalogViewModel(app: Application) : AndroidViewModel(app), DownloadQueueM
         )
     }
 
-    /**
-     * Um toque no cartão. Baixado não faz nada (o jogo já está na biblioteca); em fila ou baixando,
-     * alterna pausa; caso contrário, enfileira.
-     */
-    fun onCardAction(entry: CatalogEntry) {
-        val queue = DownloadQueueManager.get()
-        when {
-            entry.isDownloaded -> Unit
-            entry.queueState == DownloadQueueManager.State.PAUSED -> queue.resume(entry)
-            entry.queueState == DownloadQueueManager.State.DOWNLOADING ||
-                entry.queueState == DownloadQueueManager.State.QUEUED -> queue.pause(entry)
-            else -> queue.enqueue(entry)
-        }
+    // As quatro acoes que o modal do cartao oferece. Uma por intencao, em vez de um `onCardAction`
+    // que adivinha pelo estado: quem sabe o que o usuario escolheu e a tela, e um botao escrito
+    // "Cancelar download" nao pode depender de o estado ainda ser o mesmo de quando foi desenhado.
+
+    fun start(entry: CatalogEntry) {
+        DownloadQueueManager.get().enqueue(entry)
+        republish()
+    }
+
+    fun pause(entry: CatalogEntry) {
+        DownloadQueueManager.get().pause(entry)
+        republish()
+    }
+
+    fun resume(entry: CatalogEntry) {
+        DownloadQueueManager.get().resume(entry)
+        republish()
+    }
+
+    /** Para a transferencia, tira da fila e apaga o `.part` -- `remove` faz as tres coisas. */
+    fun cancel(entry: CatalogEntry) {
+        DownloadQueueManager.get().remove(entry)
         republish()
     }
 
