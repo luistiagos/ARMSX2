@@ -106,8 +106,7 @@ public class DownloadQueueManager {
         entry.totalBytes = 0;
 
         if (romsDir != null) {
-            File partFile = entry.getPartFile(romsDir);
-            if (partFile.exists()) partFile.delete();
+            RomDownloadManager.discardPart(entry.getPartFile(romsDir));
         }
 
         notifyQueueChanged();

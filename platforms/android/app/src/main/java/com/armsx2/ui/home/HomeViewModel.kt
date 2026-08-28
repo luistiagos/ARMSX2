@@ -337,14 +337,31 @@ class HomeViewModel(application: Application) :
         if (entries.isEmpty()) return local
         // O URI de um jogo local pode ser file:///.../x.chd ou content://...%2Fx.chd — os dois
         // terminam no nome do arquivo, mas o segundo carrega o caminho inteiro no último segmento.
-        val byFileName = entries.associateBy { it.fileName }
+        // A chave é o nome SEM extensão. Um download pode chegar num formato diferente do que a
+        // linha do manifesto pedia — a fonte só tinha `.chd` para uma linha `.iso` —, e é a
+        // extensão que decide o leitor do CDVD, então quem grava respeita o conteúdo recebido (ver
+        // `RomDownloadManager.localFileName`). Casando pelo nome cheio, esse jogo apareceria duas
+        // vezes na grade: o arquivo solto no disco e a linha de catálogo ainda dizendo "baixar".
+        val byBaseName = entries.associateBy { it.fileName.substringBeforeLast('.').lowercase() }
         // O jogo que ESTÁ no disco também aponta para a sua entrada — é o que lhe dá o ✓ na tarja.
         // Sem isto, um jogo baixado ficava indistinguível de um arquivo que o usuário trouxe por
         // conta própria: os dois sem marca nenhuma, que é justamente a distinção que a grade
         // única precisa mostrar.
         val stamped = local.map { game ->
             val fileName = game.uri.lastPathSegment?.substringAfterLast('/')
-            if (fileName != null && fileName in byFileName) game.copy(catalogFileName = fileName) else game
+            val entry = fileName?.let { byBaseName[it.substringBeforeLast('.').lowercase()] }
+            if (entry != null) {
+                game.copy(
+                    catalogFileName = entry.fileName,
+                    // A capa do manifesto vem junto, como rede de proteção: `GameInfo.coverUrl` só
+                    // sabe montar URL a partir do serial, e o serial vem de sondar o disco. Sem
+                    // isto, todo jogo cuja sonda não devolve serial perde, ao ser baixado, a capa
+                    // que a linha de catálogo já estava mostrando.
+                    catalogCoverUrl = entry.coverUrl?.takeIf { it.isNotBlank() },
+                )
+            } else {
+                game
+            }
         }
         val onDisk = stamped.mapNotNullTo(HashSet()) { it.catalogFileName }
         val fromCatalog = entries.asSequence()

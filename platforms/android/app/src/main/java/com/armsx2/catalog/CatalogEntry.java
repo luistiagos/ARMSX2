@@ -27,10 +27,18 @@ public class CatalogEntry {
         this.downloadUrl = downloadUrl;
     }
 
-    public File getLocalFile(File romsDir) {
-        return new File(romsDir, fileName);
-    }
-
+    /**
+     * O arquivo parcial do download em curso.
+     *
+     * <b>Não existe um {@code getLocalFile}.</b> O arquivo pronto pode ter extensão diferente da
+     * que esta entrada pede -- a fonte só tinha {@code .chd} para uma linha {@code .iso}, e é a
+     * extensão que decide o leitor do CDVD --, então o nome final sai de
+     * {@link RomDownloadManager#localFileName} e não daqui. Quem quer saber se já está no disco
+     * usa {@link CatalogParser#markDownloaded}, que casa pelo nome sem extensão.
+     *
+     * O {@code .part}, esse sim, conserva o nome do manifesto: é o que o resume procura e o que
+     * {@link DownloadQueueManager#remove} apaga.
+     */
     public File getPartFile(File romsDir) {
         return new File(romsDir, fileName + ".part");
     }

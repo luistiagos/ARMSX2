@@ -8,7 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class CatalogParser {
 
@@ -131,11 +133,34 @@ public final class CatalogParser {
                 || lower.contains("archive.org/download");
     }
 
-    /** Marca quais entradas já têm ROM baixada (arquivo existe e tamanho > 0). */
+    /**
+     * Marca quais entradas já têm ROM baixada (arquivo existe e tamanho &gt; 0).
+     *
+     * O casamento é pelo nome <b>sem extensão</b>, e não pelo nome inteiro: uma linha
+     * {@code .iso} do manifesto pode ter sido baixada como {@code .chd}, porque é o formato que a
+     * fonte tinha e é a extensão que decide o leitor do CDVD (ver
+     * {@link RomDownloadManager#localFileName}). Comparando o nome cheio, esse jogo ficaria
+     * eternamente "não baixado" — e apareceria duas vezes na grade, uma como arquivo solto e
+     * outra como linha de catálogo.
+     *
+     * Uma leitura de diretório em vez de um {@code exists()} por entrada: são 12.628 linhas no
+     * manifesto, e a varredura roda a cada abertura da biblioteca.
+     */
     public static void markDownloaded(List<CatalogEntry> entries, File romsDir) {
+        Map<String, Long> present = new HashMap<>();
+        File[] files = (romsDir == null) ? null : romsDir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                String name = f.getName();
+                // Um download em curso não conta como baixado — nem ele nem a anotação de
+                // origem que anda ao lado dele.
+                if (name.endsWith(".part") || name.endsWith(".part.src")) continue;
+                present.put(stripExtension(name).toLowerCase(), f.length());
+            }
+        }
         for (CatalogEntry entry : entries) {
-            File f = entry.getLocalFile(romsDir);
-            entry.isDownloaded = f.exists() && f.length() > 0;
+            Long size = present.get(stripExtension(entry.fileName).toLowerCase());
+            entry.isDownloaded = size != null && size > 0L;
         }
     }
 

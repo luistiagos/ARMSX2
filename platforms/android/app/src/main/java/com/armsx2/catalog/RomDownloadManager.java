@@ -18,6 +18,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import com.armsx2.Pasx2Application;
 
@@ -52,6 +55,27 @@ public class RomDownloadManager {
             "Mozilla/5.0 (Android) RetroSystemPS2/1.0";
 
     private static final long PROGRESS_THROTTLE_MS = 500; // max 2 UI updates/sec
+
+    /**
+     * Extensoes que o CDVD sabe abrir.
+     *
+     * A escolha do leitor e pela EXTENSAO do arquivo -- `GetFileReader`, em
+     * `pcsx2/CDVD/InputIsoFile.cpp`. Um CHD gravado como `.iso` cai no `FlatFileReader` e falha
+     * como se estivesse corrompido; um `.7z`, que nao e disco nenhum, idem. Daqui saem duas
+     * regras: nao aceitar fonte de formato fora desta lista, e gravar o arquivo com a extensao do
+     * conteudo que chegou.
+     */
+    private static final String[] PLAYABLE_EXTENSIONS =
+            { "chd", "iso", "cso", "zso", "gz", "bin", "img", "mdf", "nrg", "dump" };
+
+    /**
+     * Extensoes tentadas quando o nome exato do manifesto nao existe no repositorio.
+     *
+     * `.7z`, `.zip` e `.rar` sairam da lista: o app nao descompacta nada. Estavam ANTES de `.chd`,
+     * o que fazia preferir o formato que nao roda mesmo quando existia um `.chd` do mesmo jogo --
+     * ver o bug `catalogo-download-entrega-formato-nao-bootavel`.
+     */
+    private static final String[] VARIANT_EXTENSIONS = { ".chd", ".iso", ".cso", ".zso" };
 
     private volatile boolean isPaused    = false;
     private volatile boolean isCancelled = false;
@@ -121,51 +145,117 @@ public class RomDownloadManager {
         }
     }
 
+    /** Onde baixar, e com que nome gravar. As duas coisas saem juntas da resolucao. */
+    public static final class Source {
+        public final String url;
+        /** Nome do manifesto, com a extensao do que a URL entrega de verdade. */
+        public final String fileName;
+
+        Source(String url, String fileName) {
+            this.url = url;
+            this.fileName = fileName;
+        }
+    }
+
+    /** Extensao do arquivo apontado pela URL: minuscula, sem ponto, "" quando nao ha. */
+    static String extensionOf(String url) {
+        if (url == null) return "";
+        String path = url;
+        int cut = path.indexOf('?');
+        if (cut >= 0) path = path.substring(0, cut);
+        cut = path.indexOf('#');
+        if (cut >= 0) path = path.substring(0, cut);
+        int slash = path.lastIndexOf('/');
+        String name = (slash >= 0) ? path.substring(slash + 1) : path;
+        int dot = name.lastIndexOf('.');
+        if (dot < 0 || dot == name.length() - 1) return "";
+        String ext = name.substring(dot + 1).toLowerCase();
+        return ext.matches("[a-z0-9]{1,5}") ? ext : "";
+    }
+
+    /** true quando o CDVD abre um arquivo com essa extensao. Ver PLAYABLE_EXTENSIONS. */
+    static boolean isPlayable(String extension) {
+        for (String e : PLAYABLE_EXTENSIONS) {
+            if (e.equals(extension)) return true;
+        }
+        return false;
+    }
+
     /**
-     * Resolves download URL using the multi-source romsrepository architecture (same as retrobatnew):
-     * 1. GET /api/roms/download_sources?system=ps2&path=<fileName>
-     * 2. Variant extensions retry (.7z, .zip, .rar, .chd, .iso)
-     * 3. GET /api/roms/by_alias?system=ps2&path=<fileName>
-     * 4. Legacy find_by_file?source_id=1
-     * 5. HuggingFace direct dataset fallback
+     * O nome com que gravar o que a URL entrega: o do manifesto, com a extensao do conteudo.
+     *
+     * Uma linha `.iso` do manifesto resolvida para um CHD e gravada `.chd` -- so assim o emulador
+     * escolhe o leitor certo. Quando a URL nao tem extensao utilizavel, o nome do manifesto fica
+     * como esta: quem decide se aquilo presta e o chamador, com {@link #isPlayable}.
      */
-    public String resolveDownloadUrl(CatalogEntry entry) throws IOException {
-        // If manifest has explicit URL, use it directly
+    static String localFileName(String manifestName, String url) {
+        String ext = extensionOf(url);
+        if (!isPlayable(ext)) return manifestName;
+        int dot = manifestName.lastIndexOf('.');
+        String base = (dot > 0) ? manifestName.substring(0, dot) : manifestName;
+        return base + "." + ext;
+    }
+
+    private static Source firstPlayable(String manifestName, List<String> links) {
+        for (String link : links) {
+            if (isPlayable(extensionOf(link))) {
+                return new Source(link, localFileName(manifestName, link));
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolve onde baixar, na arquitetura multi-fonte do romsrepository (igual ao retrobatnew):
+     * 1. URL explicita do manifesto
+     * 2. GET /api/roms/download_sources?system=ps2&path=<fileName>
+     * 3. Variantes de extensao (.chd, .iso, .cso, .zso)
+     * 4. GET /api/roms/by_alias?system=ps2&path=<fileName>
+     * 5. Legado find_by_file?source_id=1
+     * 6. HuggingFace direto
+     *
+     * Em qualquer passo, link de formato que o emulador nao abre e descartado -- e por isso o
+     * resultado pode ser **null**: e melhor falhar aqui do que baixar 2 GB de um `.7z` que vai
+     * ficar no disco sem rodar.
+     */
+    public Source resolveSource(CatalogEntry entry) {
+        String fileName = entry.fileName;
+
         if (entry.downloadUrl != null && !entry.downloadUrl.isEmpty()) {
-            return entry.downloadUrl;
+            // URL curada a mao no manifesto: vale como esta. O formato, nao -- nem vindo do
+            // manifesto o app sabe abrir um arquivo comprimido.
+            String name = localFileName(fileName, entry.downloadUrl);
+            return isPlayable(extensionOf(name)) ? new Source(entry.downloadUrl, name) : null;
         }
 
         String system = "ps2";
-        String fileName = entry.fileName;
 
-        // 1. romsrepository download_sources (exact name)
-        String url = queryDownloadSources(system, fileName);
-        if (url != null) return url;
+        Source source = firstPlayable(fileName, queryDownloadSources(system, fileName));
+        if (source != null) return source;
 
-        // 2. romsrepository download_sources (variants: .7z, .zip, .rar, .chd, .iso)
         int dotIdx = fileName.lastIndexOf('.');
         String baseName = (dotIdx > 0) ? fileName.substring(0, dotIdx) : fileName;
-        String[] variants = new String[]{ ".7z", ".zip", ".rar", ".chd", ".iso" };
-        for (String ext : variants) {
+        for (String ext : VARIANT_EXTENSIONS) {
             String variantName = baseName + ext;
             if (variantName.equalsIgnoreCase(fileName)) continue;
-            url = queryDownloadSources(system, variantName);
-            if (url != null) return url;
+            source = firstPlayable(fileName, queryDownloadSources(system, variantName));
+            if (source != null) return source;
         }
 
-        // 3. romsrepository by_alias
-        url = queryByAlias(system, fileName);
-        if (url != null) return url;
+        source = firstPlayable(fileName, queryByAlias(system, fileName));
+        if (source != null) return source;
 
-        // 4. Legacy find_by_file (source_id=1)
-        url = queryLegacyFindByFile(system, fileName);
-        if (url != null) return url;
+        source = firstPlayable(fileName, queryLegacyFindByFile(system, fileName));
+        if (source != null) return source;
 
-        // 5. HuggingFace fallback
-        return HUGGINGFACE_BASE + "/ps2/" + urlEncode(entry.fileName);
+        // HuggingFace: o dataset guarda o arquivo com o nome do manifesto, entao o formato aqui e
+        // o da propria entrada -- uma linha `.7z` do catalogo nao tem o que tentar.
+        if (!isPlayable(extensionOf(fileName))) return null;
+        return new Source(HUGGINGFACE_BASE + "/ps2/" + urlEncode(fileName), fileName);
     }
 
-    private String queryDownloadSources(String system, String path) {
+    /** Todos os links da resposta, na ordem em que vieram. Lista vazia quando nao ha resposta. */
+    private List<String> queryDownloadSources(String system, String path) {
         String urlStr = DOWNLOAD_SOURCES_ENDPOINT
                 + "?system=" + urlEncode(system)
                 + "&path=" + urlEncode(path);
@@ -182,24 +272,33 @@ public class RomDownloadManager {
                     while ((line = reader.readLine()) != null) sb.append(line);
                     JSONObject json = new JSONObject(sb.toString());
                     JSONArray sources = json.optJSONArray("sources");
-                    if (sources != null && sources.length() > 0) {
+                    if (sources != null) {
+                        List<String> links = new ArrayList<>(sources.length());
                         for (int i = 0; i < sources.length(); i++) {
                             JSONObject s = sources.optJSONObject(i);
                             if (s != null) {
                                 String link = s.optString("link", "").trim();
-                                if (!link.isEmpty() && (link.startsWith("http://") || link.startsWith("https://"))) {
-                                    return link;
+                                if (link.startsWith("http://") || link.startsWith("https://")) {
+                                    links.add(link);
                                 }
                             }
                         }
+                        return links;
                     }
                 }
             }
         } catch (Exception ignored) {}
-        return null;
+        return Collections.emptyList();
     }
 
-    private String queryByAlias(String system, String path) {
+    /**
+     * Idem, para o /by_alias.
+     *
+     * Cuidado: ele resolve por TITULO. Os links podem ser de outra regiao e de outro formato que o
+     * pedido -- foi assim que uma linha `(Europe).iso` virou o CHD da versao USA gravado com o
+     * nome europeu. Quem decide o que serve e a filtragem por extensao de {@link #firstPlayable}.
+     */
+    private List<String> queryByAlias(String system, String path) {
         String urlStr = BY_ALIAS_ENDPOINT
                 + "?system=" + urlEncode(system)
                 + "&path=" + urlEncode(path);
@@ -216,24 +315,26 @@ public class RomDownloadManager {
                     while ((line = reader.readLine()) != null) sb.append(line);
                     JSONObject json = new JSONObject(sb.toString());
                     JSONArray roms = json.optJSONArray("roms");
-                    if (roms != null && roms.length() > 0) {
+                    if (roms != null) {
+                        List<String> links = new ArrayList<>(roms.length());
                         for (int i = 0; i < roms.length(); i++) {
                             JSONObject r = roms.optJSONObject(i);
                             if (r != null) {
                                 String link = r.optString("link", "").trim();
-                                if (!link.isEmpty() && (link.startsWith("http://") || link.startsWith("https://"))) {
-                                    return link;
+                                if (link.startsWith("http://") || link.startsWith("https://")) {
+                                    links.add(link);
                                 }
                             }
                         }
+                        return links;
                     }
                 }
             }
         } catch (Exception ignored) {}
-        return null;
+        return Collections.emptyList();
     }
 
-    private String queryLegacyFindByFile(String system, String path) {
+    private List<String> queryLegacyFindByFile(String system, String path) {
         String urlStr = FIND_BY_FILE_ENDPOINT
                 + "?path=" + urlEncode(path)
                 + "&source_id=1&system=" + urlEncode(system);
@@ -246,13 +347,52 @@ public class RomDownloadManager {
             if (conn.getResponseCode() == 200) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
                     String line = reader.readLine();
-                    if (line != null && !line.trim().isEmpty() && (line.startsWith("http://") || line.startsWith("https://"))) {
-                        return line.trim();
+                    if (line != null && (line.startsWith("http://") || line.startsWith("https://"))) {
+                        return Collections.singletonList(line.trim());
                     }
                 }
             }
         } catch (Exception ignored) {}
-        return null;
+        return Collections.emptyList();
+    }
+
+    /**
+     * A URL de onde os bytes do `.part` vieram, anotada ao lado dele.
+     *
+     * Sem isto o resume e cego: ele manda `Range: bytes=<tamanho do .part>-` para a fonte que a
+     * resolucao devolver AGORA, que pode ser outra -- e passou a ser outra para muita entrada, com
+     * a recusa dos formatos comprimidos. Colar a segunda metade de um arquivo na primeira metade
+     * de outro nao produz erro nenhum: produz um arquivo do tamanho certo que nao e nenhum dos
+     * dois.
+     */
+    private static File sourceMarker(File partFile) {
+        return new File(partFile.getParentFile(), partFile.getName() + ".src");
+    }
+
+    private static String readSourceMarker(File partFile) {
+        File marker = sourceMarker(partFile);
+        if (!marker.exists()) return null;
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new java.io.FileInputStream(marker), "UTF-8"))) {
+            String line = reader.readLine();
+            return (line == null) ? null : line.trim();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void writeSourceMarker(File partFile, String url) {
+        try (FileOutputStream out = new FileOutputStream(sourceMarker(partFile))) {
+            out.write(url.getBytes("UTF-8"));
+        } catch (Exception ignored) {}
+    }
+
+    /** Descarta um download pela metade: o `.part` e a anotacao de origem que anda com ele. */
+    public static void discardPart(File partFile) {
+        if (partFile == null) return;
+        if (partFile.exists()) partFile.delete();
+        File marker = sourceMarker(partFile);
+        if (marker.exists()) marker.delete();
     }
 
     private void doDownload(CatalogEntry entry, File destDir, DownloadCallback callback) {
@@ -267,22 +407,25 @@ public class RomDownloadManager {
     private void doDownloadLocked(CatalogEntry entry, File destDir, DownloadCallback callback) {
         if (!destDir.exists()) destDir.mkdirs();
 
-        File partFile  = entry.getPartFile(destDir);
-        File finalFile = entry.getLocalFile(destDir);
+        // O `.part` conserva o nome do manifesto mesmo quando o arquivo final muda de extensao:
+        // e ele que o resume procura e que `DownloadQueueManager.remove` apaga. A troca de nome
+        // acontece so no rename final.
+        File partFile = entry.getPartFile(destDir);
 
-        // Resolve actual download URL (endpoint lookup + HuggingFace fallback)
-        String downloadUrl;
-        try {
-            downloadUrl = resolveDownloadUrl(entry);
-        } catch (IOException e) {
-            notifyError(callback, "URL lookup failed: " + e.getMessage());
+        Source source = resolveSource(entry);
+        if (source == null) {
+            notifyError(callback, "Sem fonte compativel: o emulador nao abre o formato disponivel");
             return;
         }
 
-        if (downloadUrl == null || downloadUrl.isEmpty()) {
-            notifyError(callback, "No download URL available");
-            return;
+        File finalFile = new File(destDir, source.fileName);
+        String downloadUrl = source.url;
+
+        // So retoma o que veio da MESMA URL -- ver sourceMarker.
+        if (partFile.exists() && !downloadUrl.equals(readSourceMarker(partFile))) {
+            partFile.delete();
         }
+        writeSourceMarker(partFile, downloadUrl);
 
         int attempt = 0;
         while (attempt < MAX_RETRIES) {
@@ -362,6 +505,14 @@ public class RomDownloadManager {
                     if (partFile.exists()) partFile.delete();
                 } else {
                     conn.disconnect();
+                    // 404 e resposta definitiva: o arquivo nao existe naquela fonte, e insistir tres
+                    // vezes so faz o usuario esperar. E o caso comum das entradas que so existem em
+                    // formato comprimido -- recusadas na resolucao, elas caem no HuggingFace, que
+                    // nao as tem.
+                    if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
+                        notifyError(callback, "Sem fonte disponivel para este arquivo (404)");
+                        return;
+                    }
                     if (attempt >= MAX_RETRIES) {
                         notifyError(callback, "HTTP " + responseCode);
                         return;
@@ -406,12 +557,13 @@ public class RomDownloadManager {
 
                 conn.disconnect();
 
-                // Move .part → arquivo final
+                // Move .part → arquivo final, com a extensao do conteudo que chegou
                 if (finalFile.exists()) finalFile.delete();
                 if (!partFile.renameTo(finalFile)) {
                     // Fallback: copia manualmente se rename falhar (cross-device)
                     copyAndDelete(partFile, finalFile);
                 }
+                sourceMarker(partFile).delete();
 
                 notifyComplete(callback, finalFile);
                 return;
