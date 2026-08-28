@@ -2561,17 +2561,16 @@ void Host::BeginPresentFrame() {
 
 void Host::OnGameChanged(const std::string& title, const std::string& elf_override, const std::string& disc_path,
                          const std::string& disc_serial, u32 disc_crc, u32 current_crc) {
-    // Free-software / anti-resale notice on each game boot, rendered through PCSX2's own OSD (the
-    // same message system + renderer as the FPS/stats overlay) so it reads as a native emulator
-    // pop-up rather than an Android layer drawn on top. Keyed so a re-fire just refreshes the one
-    // message. Guarded on a real game loading — OnGameChanged also fires with everything empty on
-    // shutdown/eject.
-    if (current_crc != 0 || !disc_path.empty() || !title.empty()) {
-        Host::AddKeyedOSDMessage("armsx2_free_software_notice",
-            "You are using ARMSX2, and it should not be sold, or distributed as part of any other "
-            "app. If you paid for this app, you should get your money back.",
-            10.0f);
-    }
+    // Aqui havia o aviso anti-revenda do upstream ("You are using ARMSX2, and it should not be
+    // sold, or distributed as part of any other app. If you paid for this app, you should get your
+    // money back."), dez segundos no OSD a cada boot de jogo.
+    //
+    // Removido na TASK-0043, por decisao explicita de quem responde pelo produto, com a ressalva da
+    // GPLv3 7(b) -- preservacao de avisos legais razoaveis e de atribuicao de autoria -- posta na
+    // mesa antes da decisao. O registro esta na task; este comentario existe para que quem fizer o
+    // proximo sync com o upstream saiba que a ausencia e deliberada, e nao um merge malfeito.
+    //
+    // A funcao permanece: e callback obrigatorio de Host, chamado tambem no shutdown/eject.
 }
 
 void Host::PumpMessagesOnCPUThread() {

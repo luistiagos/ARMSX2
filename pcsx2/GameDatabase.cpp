@@ -1096,32 +1096,8 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(
 				if (quiet)
 					break;
 
-				if (!is_sw_renderer && value >= 0 && value <= static_cast<int>(AccBlendLevel::Maximum) && static_cast<int>(EmuConfig.GS.AccurateBlendingUnit) < value)
-				{
-					static constexpr std::array<const char*, static_cast<u8>(AccBlendLevel::MaxCount)> s_blending_option_names = {{
-						TRANSLATE_NOOP("GameDatabase", "Minimum"),
-						TRANSLATE_NOOP("GameDatabase", "Basic"),
-						TRANSLATE_NOOP("GameDatabase", "Medium"),
-						TRANSLATE_NOOP("GameDatabase", "High"),
-						TRANSLATE_NOOP("GameDatabase", "Full"),
-						TRANSLATE_NOOP("GameDatabase", "Maximum"),
-					}};
-
-					Host::AddKeyedOSDMessage("HWBlendingWarning",
-						fmt::format(TRANSLATE_FS("GameDatabase",
-										"{0} Current Blending Accuracy is {1}.\n"
-										"Recommended Blending Accuracy for this game is {2}.\n"
-										"You can adjust the blending level in Game Properties to improve\n"
-										"graphical quality, but this will increase system requirements."),
-							ICON_FA_PAINTBRUSH,
-							s_blending_option_names[static_cast<u8>(EmuConfig.GS.AccurateBlendingUnit)],
-							s_blending_option_names[static_cast<u8>(value)]),
-						Host::OSD_WARNING_DURATION);
-				}
-				else
-				{
-					Host::RemoveKeyedOSDMessage("HWBlendingWarning");
-				}
+				// Aviso removido na TASK-0043 -- ver a nota no fim deste bloco de `case`s.
+				Host::RemoveKeyedOSDMessage("HWBlendingWarning");
 			}
 			break;
 
@@ -1130,22 +1106,8 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(
 				if (quiet)
 					break;
 
-				if (!is_sw_renderer && value >= 0 && value <= 1 &&
-					static_cast<int>(config.HWAccurateAlphaTest) < value)
-				{
-					Host::AddKeyedOSDMessage("HWAlphaTestWarning",
-						fmt::format(TRANSLATE_FS("GameDatabase",
-										"{0} Accurate Alpha Test is currently disabled.\n"
-										"This game recommends enabling Accurate Alpha Test.\n"
-										"You can enable it in Game Properties to improve graphical\n"
-										"accuracy, but this may increase system requirements."),
-							ICON_FA_PAINTBRUSH),
-						Host::OSD_WARNING_DURATION);
-				}
-				else
-				{
-					Host::RemoveKeyedOSDMessage("HWAlphaTestWarning");
-				}
+				// Aviso removido na TASK-0043 -- ver a nota no fim deste bloco de `case`s.
+				Host::RemoveKeyedOSDMessage("HWAlphaTestWarning");
 			}
 			break;
 
@@ -1154,22 +1116,21 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(
 				if (quiet)
 					break;
 
-				if (!is_sw_renderer && value >= 0 && value <= 1 &&
-					static_cast<int>(config.HWAA1) < value)
-				{
-					Host::AddKeyedOSDMessage("HWAA1Warning",
-						fmt::format(TRANSLATE_FS("GameDatabase",
-										"{0} AA1 is currently disabled.\n"
-										"This game recommends enabling AA1.\n"
-										"You can enable it in Game Properties to improve graphical\n"
-										"accuracy, but this may increase system requirements."),
-							ICON_FA_PAINTBRUSH),
-						Host::OSD_WARNING_DURATION);
-				}
-				else
-				{
-					Host::RemoveKeyedOSDMessage("HWAA1Warning");
-				}
+				// Os tres avisos "Recommended*" acima foram removidos na TASK-0043.
+				//
+				// Eles disparam numa INSTALACAO LIMPA, sem acao nenhuma do usuario: o padrao movel e
+				// menor que o recomendado no GameDB, entao todo jogo afetado abria com uma faixa de
+				// texto sobreposta explicando uma configuracao que o usuario nao mexeu e, num
+				// aparelho de entrada, nao deveria mexer.
+				//
+				// `CoreFixesWarning` e `HWFixesWarning`, neste mesmo arquivo, CONTINUAM: aqueles so
+				// aparecem para quem desligou correcoes automaticas de proposito, e explicam por que
+				// um jogo pode estar quebrado. Apaga-los transformaria uma escolha do usuario num
+				// defeito sem explicacao.
+				//
+				// Sync com upstream: a ausencia e deliberada, nao merge malfeito. O `Remove` fica
+				// para limpar a mensagem caso ela ja esteja na tela vinda de outro caminho.
+				Host::RemoveKeyedOSDMessage("HWAA1Warning");
 			}
 			break;
 
