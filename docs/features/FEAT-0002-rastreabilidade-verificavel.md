@@ -51,6 +51,7 @@ sem lastro.
 |---|---|---|
 | [TASK-0010](../task/TASK-0010-corrigir-validador-rastreabilidade.md) | aberta | Corrigir o validador: assunto em vez de corpo, `--fix` que insere, conferência de status e de `Publicado em` |
 | [TASK-0011](../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) | aberta | Impor a regra mecanicamente: modo `--commits`, regra de caminho para `chore:`, gancho versionado e CI |
+| [TASK-0042](../task/TASK-0042-remover-regra-um-commit-por-task.md) | concluída | Sai a regra "uma task = um commit"; `--fix` passa a gravar todos os hashes de uma task |
 
 ## Bugs originados por esta feature
 

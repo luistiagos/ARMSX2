@@ -1,8 +1,12 @@
 # Tasks
 
-Uma task é **uma unidade de trabalho que cabe em um commit**. Se não couber, ela era grande demais:
-quebre em duas. Esse limite é intencional — é o que faz `git revert <commit>` desfazer exatamente
-uma decisão, sem arrastar outras junto.
+Uma task é **uma unidade de trabalho que cabe em um commit**. Se não couber, provavelmente era
+grande demais: quebre em duas. O limite é intencional — é o que faz `git revert <commit>` desfazer
+exatamente uma decisão, sem arrastar outras junto.
+
+É orientação, e não regra verificada: desde a
+[TASK-0042](TASK-0042-remover-regra-um-commit-por-task.md) uma task pode ter mais de um commit, e o
+índice registra todos. Voltar a uma task já commitada é melhor que emendar o commit que já existe.
 
 Ver [`docs/README.md`](../README.md) para a regra de commit e o desenho geral da rastreabilidade.
 
@@ -78,6 +82,8 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0013](TASK-0013-detector-valor-veneno-dma.md) — detector de valor-veneno no DMA (instrumenta o crash do SotC) | concluída | — | — (instrumenta, não corrige) | `a71a51e17d` |
 | [TASK-0014](TASK-0014-comparador-superficie-jni.md) — comparador da superfície JNI contra o upstream | concluída | FEAT-0001 | — | `353dae44f1` |
 | [TASK-0015](TASK-0015-manifesto-catalogo-curado.md) — manifesto de catálogo curado + `sort_manifest.py` que o preserva | concluída | — | — | `ee775b3015` |
+| [TASK-0016](TASK-0016-base-do-fork.md) — base do fork sobre a árvore Android do upstream | concluída | FEAT-0001 | — |  |
+| [TASK-0017](TASK-0017-identidade-do-produto.md) — identidade do RetroSystem PS2 no fork | concluída | FEAT-0001 | — |  |
 | [TASK-0038](TASK-0038-fila-de-download-visivel.md) — fila de download visível, e progresso que chega na tela | concluída | FEAT-0001 | fila-download-sem-tela-e-sem-progresso-ao-vivo | `7e4f9d41ce` |
 | [TASK-0040](TASK-0040-fila-de-download-em-tela-propria.md) — fila de download em tela própria | concluída | FEAT-0001 | fila-download-congela-tela-ao-pausar | `a3c7cccf51` |
 | [TASK-0041](TASK-0041-permissao-de-notificacao-do-download.md) — permissão de notificação do download | concluída | FEAT-0001 | notificacao-de-download-invisivel-sem-pedir-permissao | `f1d206eacf` |

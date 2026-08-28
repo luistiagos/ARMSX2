@@ -123,10 +123,16 @@ Com `armsx2.applicationId` / `armsx2.versionCode` / `armsx2.versionName` no `gra
 **Regra dura, e ela não muda por causa do fork.** Spec completa em [`docs/README.md`](docs/README.md).
 
 > **Nenhum commit em `platforms/android/app/src/`, `pcsx2/`, `common/`, `scripts/` ou arquivos de
-> build sem uma task em `docs/task/` que o descreva. Uma task = um commit. O agente é quem commita.**
+> build sem uma task em `docs/task/` que o descreva. O agente é quem commita.**
 
 Por que existe: 1.0.20, 1.0.21 e 1.0.22 foram construídas, assinadas e distribuídas a clientes a
 partir de 41 arquivos que nunca entraram em nenhum commit.
+
+Uma task **cabe**, de preferência, em um commit. Isso deixou de ser regra verificada na
+[TASK-0042](docs/task/TASK-0042-remover-regra-um-commit-por-task.md): voltar a uma task já commitada
+é normal, e obrigá-la a `--amend` só para não ganhar um segundo commit reescrevia o histórico — o
+mesmo estrago que o validador tem uma checagem inteira para detectar. O índice guarda todos os
+hashes da task.
 
 1. Escrever a task **antes** do código — número novo, escopo explícito (o que entra e o que
    deliberadamente **não** entra), e como será validada.

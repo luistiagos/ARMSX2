@@ -127,13 +127,13 @@ def main():
         # O vinculo task->commit e verificado no GIT, nao no texto: o assunto do commit tem
         # de comecar com "TASK-NNNN:". Isso evita o problema circular de gravar dentro de um
         # commit o hash que so existe depois dele.
+        # Uma task pode ter MAIS de um commit. Ja teve de ter exatamente um, e a regra cobrava caro:
+        # qualquer retorno a uma task ja commitada obrigava a `--amend`, que reescreve o historico --
+        # o mesmo estrago que `commit_is_reachable`, mais abaixo, existe para detectar. O que
+        # importa continua verificado: task concluida tem de ter ao menos um commit com o assunto.
         if status == "concluída":
-            found = commits_for_task(tid)
-            if not found:
+            if not commits_for_task(tid):
                 fail(path, "status 'concluída' mas nenhum commit alcancavel tem assunto '%s: ...'" % tid)
-            elif len(found) > 1:
-                fail(path, "uma task = um commit, mas ha %d commits com assunto '%s': %s"
-                           % (len(found), tid, ", ".join(found)))
 
         # Se o campo Commit tiver um hash escrito a mao, ele tem de bater com o git.
         commit = field(text, "Commit")
@@ -214,13 +214,19 @@ def fill_index(tasks):
     changed = 0
     for tid in sorted(tasks):
         found = commits_for_task(tid)
-        if len(found) != 1:
+        if not found:
             continue
+        # Todos os hashes, e nao so o primeiro: desde que "uma task = um commit" saiu (TASK-0042)
+        # uma task pode ter varios, e antes disto `len(found) != 1` fazia a linha ficar SEM hash
+        # nenhum, em silencio -- o pior dos resultados, porque parece indice preenchido.
+        # `git log` ja vem do mais novo para o mais antigo; invertido fica na ordem em que a
+        # historia aconteceu, que e como se le uma sequencia de commits.
+        shas = " ".join("`" + s + "`" for s in reversed(found))
         # substitui a celula de commit da linha do indice que cita esta task
         pattern = re.compile(r"^(\|\s*\[" + tid + r"\].*\|\s*)([^|]*)(\|\s*)$", re.MULTILINE)
 
-        def repl(m, sha=found[0]):
-            return m.group(1) + " `" + sha + "` " + m.group(3)
+        def repl(m, shas=shas):
+            return m.group(1) + " " + shas + " " + m.group(3)
 
         new_text, n = pattern.subn(repl, text)
         if n and new_text != text:

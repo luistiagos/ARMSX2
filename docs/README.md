@@ -6,7 +6,7 @@ documentação decorativa: a regra de commit do projeto depende dela.
 ## A regra principal
 
 > **Nenhum commit de código sem uma task em [`docs/task/`](task/README.md) que o descreva.**
-> **Uma task = um commit.** O agente é quem commita, sempre.
+> O agente é quem commita, sempre.
 
 Por que existe: as versões 1.0.20, 1.0.21 e 1.0.22 foram construídas, assinadas e distribuídas aos
 clientes a partir de 41 arquivos que nunca entraram em nenhum commit. Sem commit não há diff; sem
@@ -60,7 +60,10 @@ Os demais arquivos soltos em `docs/` são especificações e decisões de arquit
 
 1. **Escrever a task antes do código.** Número novo, escopo explícito (o que entra e o que **não**
    entra), critério de validação.
-2. Fazer o trabalho. Se não couber num commit, **a task era grande demais** — quebre em várias.
+2. Fazer o trabalho. Se não couber num commit, **provavelmente a task era grande demais** — quebre
+   em várias. Mas isto é orientação, não regra verificada: uma task pode ter mais de um commit
+   ([TASK-0042](task/TASK-0042-remover-regra-um-commit-por-task.md)), e voltar a ela depois é melhor
+   que emendar o commit já feito.
 3. Commitar com a task no assunto: **`TASK-0007: <resumo no imperativo>`**. Esse prefixo é o
    vínculo autoritativo entre task e commit — não o hash escrito à mão.
 4. Atualizar os links do outro lado (bug e feature) — no mesmo commit.
@@ -92,7 +95,6 @@ Rodar antes de todo push.
 - Campo obrigatório ausente (`Criada em`, `Feature`, `Bugs que resolve`, `Commit`).
 - Status fora do vocabulário, e `revertida` sem **Revertida por**.
 - Task `concluída` sem nenhum commit alcançável com o assunto `TASK-NNNN:`.
-- Mais de um commit com o mesmo prefixo `TASK-NNNN:` — a regra "uma task = um commit".
 - Hash escrito à mão que não é **ancestral de `HEAD`**. Existir no banco de objetos não basta: um
   commit órfão de `--amend` ainda responde a `git cat-file` e mentiria sobre o histórico.
 - Link feature↔task de mão única, nos dois sentidos; link task→bug de mão única.
@@ -112,6 +114,7 @@ confiança sem lastro. Fechar esta lista é a [FEAT-0002](features/FEAT-0002-ras
 | **Se `--fix` fez o que diz.** Ele só substitui linha existente. | O índice ficou com 1 linha para 9 tasks enquanto dois `chore:` anunciavam ter gravado hashes. |
 | **Status cruzado feature↔task.** | A FEAT-0001 listou a TASK-0009 como `aberta` depois de publicada. |
 | **O campo `Publicado em`.** Não é obrigatório nem conferido. | Cinco tasks que foram ao ar na 1.0.23 seguiram com `—`. |
+| **Quantos commits uma task tem.** Deixou de ser regra na [TASK-0042](task/TASK-0042-remover-regra-um-commit-por-task.md). | Uma task pode espalhar-se por vários commits sem ninguém notar. Trocado de propósito: exigir um só empurrava para `--amend`, que reescreve o histórico — o estrago que a checagem de hash órfão existe para pegar. |
 | **O sentido bug → task.** | Um bug que declara ser resolvido por uma task que não o lista passa. |
 | **Declaração vs. prosa.** O check de `done/` é a substring `"TASK-"`. | Um bug fechado cuja única menção é *"hipótese eliminada pela TASK-0008"* satisfaz a exigência. |
 
