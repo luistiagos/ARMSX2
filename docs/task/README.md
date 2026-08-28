@@ -97,6 +97,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0043](TASK-0043-aviso-anti-revenda-do-upstream.md) — boot sem faixas sobrepostas | concluída | FEAT-0001 | — | `0538bd2c94` |
 | [TASK-0044](TASK-0044-telemetria-de-boot-e-de-assets.md) — telemetria de boot e de assets | concluída | FEAT-0001 | — | `ea3c0bddf8` |
 | [TASK-0045](TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md) — baixar só formato que o emulador abre, e manter a capa | concluída | — | catalogo-download-entrega-formato-nao-bootavel, biblioteca-jogo-baixado-perde-a-capa | — |
+| [TASK-0046](TASK-0046-encerrar-thread-mtvu-no-shutdown.md) — encerrar a thread da MTVU no shutdown da VM | concluída | — | mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`

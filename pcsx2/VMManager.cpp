@@ -2910,6 +2910,21 @@ void VMManager::ShutdownCPUProviders()
 	if (!s_cpu_providers_initialized)
 		return;
 
+	// A MTVU era a unica thread do nucleo sem par de encerramento aqui -- MTGS::ShutdownThread()
+	// roda logo acima, em CPUThreadShutdown(). Sem isto, o laco de ExecuteRingBuffer() so sai por
+	// m_shutdown_flag, que so Close() levanta, e como vu1Thread e objeto global quem a encerrava
+	// era ~VU_Thread(), no fim do processo. Medido no Galaxy A12: com a VM ja encerrada e o app no
+	// menu, a thread continuava em estado R queimando ~100% de um nucleo, indefinidamente.
+	//
+	// Tem de vir ANTES dos releases abaixo: a thread executa dVifUnpack<1>() (via MTVU_Unpack) e
+	// CpuVU1->Execute(), entao soltar o recompilador de unpack do VIF1 ou o microVU1 com ela viva
+	// e use-after-free.
+	//
+	// Close() sozinho, sem WaitVU() antes: WaitVU() e uma espera bloqueante em WaitForEmpty(), e
+	// neste ponto o MTGS ja foi derrubado -- superficie de deadlock em troca de nada, porque a VM
+	// esta sendo destruida e nao ha o que drenar. Close() ja e no-op se a MTVU nunca foi aberta.
+	vu1Thread.Close();
+
 	if (newVifDynaRec)
 	{
 		dVifRelease(1);
