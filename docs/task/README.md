@@ -95,7 +95,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0041](TASK-0041-permissao-de-notificacao-do-download.md) — permissão de notificação do download | concluída | FEAT-0001 | notificacao-de-download-invisivel-sem-pedir-permissao | `f1d206eacf` |
 | [TASK-0042](TASK-0042-remover-regra-um-commit-por-task.md) — sai a regra "uma task = um commit" | concluída | FEAT-0002 | — | `d569063f37` `8395d24ab6` |
 | [TASK-0043](TASK-0043-aviso-anti-revenda-do-upstream.md) — boot sem faixas sobrepostas | concluída | FEAT-0001 | — | `0538bd2c94` |
-| [TASK-0044](TASK-0044-telemetria-de-boot-e-de-assets.md) — telemetria de boot e de assets | concluída | FEAT-0001 | — | |
+| [TASK-0044](TASK-0044-telemetria-de-boot-e-de-assets.md) — telemetria de boot e de assets | concluída | FEAT-0001 | — | `ea3c0bddf8` |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`
