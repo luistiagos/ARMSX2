@@ -88,6 +88,20 @@ class HomeViewModel(application: Application) :
     /** Entrada do catalogo que o usuario tocou e ainda nao resolveu (o painel esta aberto). */
     val pendingDownload = androidx.compose.runtime.mutableStateOf<com.armsx2.catalog.CatalogEntry?>(null)
 
+    /**
+     * Pedido de ir para a tela de downloads, consumido por um efeito da [HomeScreen].
+     *
+     * NAO navegue direto de dentro do painel. `PadModal` publica seu conteudo num registro global
+     * (`PadModals`) e so o retira no `onDispose` da tela que o hospeda; trocar de rota com o painel
+     * ainda aberto tira a HomeScreen de cena com a entrada do modal ainda no registro, e a UI trava
+     * -- a tela fica sob o veu escuro, surda a toque e a BACK, com o Compose recompondo sem parar
+     * (o logcat vira uma fila de GCs de 14 MB a cada 250 ms). Medido no aparelho.
+     *
+     * Adiando por um quadro, o painel se desfaz primeiro e a navegacao acontece com o registro ja
+     * limpo.
+     */
+    val pendingDownloadsNav = androidx.compose.runtime.mutableStateOf(false)
+
     var state = androidx.compose.runtime.mutableStateOf(HomeUiState())
         private set
 
@@ -188,6 +202,14 @@ class HomeViewModel(application: Application) :
         // `launch` e o funil por onde passam os sete pontos que iniciam um jogo (grade, lista,
         // prateleira, recentes e o controle): cobrir o funil cobre todos.
         if (game.isCatalogOnly) {
+            // Já na fila: não há o que perguntar, a decisão de baixar foi tomada no toque anterior.
+            // Vai direto para onde estão o progresso e os controles — é o que a versão anterior
+            // fazia em `onEntryClick`, trocando para a aba "Salvos" em vez de abrir diálogo.
+            val fileName = game.catalogFileName
+            if (fileName != null && state.value.downloads.containsKey(fileName)) {
+                pendingDownloadsNav.value = true
+                return
+            }
             pendingDownload.value = com.armsx2.catalog.CatalogLibrary.entryFor(game)
             return
         }
@@ -353,8 +375,18 @@ class HomeViewModel(application: Application) :
     // a tela, e um botão escrito "Cancelar download" não pode depender de o estado ainda ser o
     // mesmo de quando foi desenhado.
 
-    fun startDownload(entry: com.armsx2.catalog.CatalogEntry) =
+    /**
+     * Enfileira e **pede** a troca de tela — ver [pendingDownloadsNav] para o porquê do pedido em
+     * vez da navegação direta.
+     *
+     * A troca não é enfeite: sem ela o usuário confirma "Baixar", o painel fecha e a biblioteca fica
+     * igual — que foi exatamente o relato que abriu a TASK-0038. A versão anterior resolvia isso
+     * trocando para a aba "Salvos" no mesmo gesto (`bottomNav.setSelectedItemId(R.id.nav_saved)`).
+     */
+    fun startDownload(entry: com.armsx2.catalog.CatalogEntry) {
         com.armsx2.catalog.DownloadQueueManager.get().enqueue(entry)
+        pendingDownloadsNav.value = true
+    }
 
     fun pauseDownload(entry: com.armsx2.catalog.CatalogEntry) =
         com.armsx2.catalog.DownloadQueueManager.get().pause(entry)

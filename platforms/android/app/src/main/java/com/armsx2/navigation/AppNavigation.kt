@@ -97,6 +97,8 @@ fun AppNavigation() {
                     MemoryCardScreen(onBack = UiNavigator::home, game = destination.game)
                 AppRoute.RomFolders ->
                     com.armsx2.ui.folders.RomFoldersScreen(onBack = UiNavigator::home)
+                AppRoute.Downloads ->
+                    com.armsx2.ui.catalog.DownloadsScreen(onBack = UiNavigator::home)
                 AppRoute.SaveManager -> SaveManagerScreen(onBack = UiNavigator::home)
                 AppRoute.ControllerManager -> ControllerManagerScreen(onBack = UiNavigator::home)
                 AppRoute.PatchManager -> PatchManagerScreen(onBack = UiNavigator::home)

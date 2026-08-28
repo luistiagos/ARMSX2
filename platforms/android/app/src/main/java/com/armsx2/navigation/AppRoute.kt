@@ -21,6 +21,14 @@ sealed interface AppRoute {
      * "Voltar", pedindo local dos dados e BIOS antes de deixar sair) so para acrescentar uma pasta.
      */
     data object RomFolders : AppRoute
+    /**
+     * A fila de download, como TELA.
+     *
+     * Ela ja morou empilhada acima da grade da biblioteca (TASK-0038), onde empurrava 12.628
+     * cartoes para baixo. Na versao anterior a fila nunca dividiu tela com o catalogo: vivia na
+     * aba "Salvos" do `BottomNavigationView`, e tocar para baixar levava para la.
+     */
+    data object Downloads : AppRoute
     data object SaveManager : AppRoute
     data object ControllerManager : AppRoute
     data object PatchManager : AppRoute

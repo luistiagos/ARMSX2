@@ -24,7 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import coil.compose.AsyncImage
 import com.armsx2.catalog.DownloadQueueManager
 import com.armsx2.i18n.str
@@ -32,19 +31,16 @@ import com.armsx2.ui.common.RoundAction
 import com.armsx2.ui.home.DownloadQueueItem
 
 /**
- * A fila de download, na biblioteca — o painel que a versão anterior tinha e que o fork perdeu no
- * porte (TASK-0038).
+ * As linhas da fila de download — o conteúdo que a aba "Salvos" da versão anterior mostrava
+ * (TASK-0038, movido para tela própria na TASK-0040).
  *
  * É o mesmo cartão de `res/layout/item_download_queue.xml`: capa, título em duas linhas, uma linha
  * de status, barra de progresso, botão primário pausar↔retomar e um cancelar sempre disponível. As
  * regras de visibilidade também são as de lá — em `QUEUED` não há barra nem botão primário, porque
  * não há o que mostrar nem o que pausar.
  *
- * Mora no topo da grade, e não numa aba separada, porque no fork o catálogo foi fundido dentro da
- * biblioteca (TASK-0025): não existe mais a aba "Saved" que hospedava esta seção.
- *
- * Some sozinho quando a fila esvazia — quem decide isso é o chamador, que não emite o item da grade
- * quando `queue` está vazia.
+ * Sem cabeçalho de seção: o único chamador é a [DownloadsScreen], cuja barra de topo já diz
+ * "Downloads" — um "BAIXANDO" logo abaixo seria o mesmo rótulo duas vezes.
  */
 @Composable
 fun DownloadQueueSection(
@@ -55,14 +51,6 @@ fun DownloadQueueSection(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
-        Text(
-            str("catalog.queue.section").uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.08.em,
-            modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 6.dp),
-        )
         queue.forEach { item ->
             DownloadQueueRow(item, onPause, onResume, onCancel)
             Spacer(Modifier.height(8.dp))
@@ -140,26 +128,27 @@ private fun DownloadQueueRow(
             Spacer(Modifier.width(4.dp))
             // Botão primário: pausar quando baixa, retomar quando pausado, ausente quando só
             // espera. Mesma matriz do `btn_queue_action`.
-            when (item.state) {
-                DownloadQueueManager.State.DOWNLOADING -> RoundAction(
-                    glyph = "⏸",
-                    description = str("catalog.action.pause"),
-                    onClick = { onPause(item.fileName) },
+            //
+            // UM só `RoundAction`, com o rótulo trocando — e não dois ramos de `when`. Dois ramos
+            // são dois pontos de composição distintos com o MESMO `controllerId`: ao pausar, o
+            // ramo antigo é destruído (`unregister`) e o novo registrado, e as duas operações
+            // escrevem `selectedId`/`selectedIndex`, que a composição lê para desenhar o foco.
+            // Com o foco do controle pousado neste botão — o caso normal nesta tela, onde ele é um
+            // dos poucos controles — isso vira recomposição sem fim: a tela congela sob o véu
+            // escuro, surda a toque e a BACK, com GCs de 14 MB a cada 250 ms. Medido no aparelho.
+            // Um único ponto de composição mantém a identidade; só os parâmetros mudam.
+            val pausable = item.state == DownloadQueueManager.State.DOWNLOADING
+            val resumable = item.state == DownloadQueueManager.State.PAUSED ||
+                item.state == DownloadQueueManager.State.ERROR
+            if (pausable || resumable) {
+                RoundAction(
+                    glyph = if (pausable) "⏸" else "▶",
+                    description = if (pausable) str("catalog.action.pause") else str("catalog.action.resume"),
+                    onClick = { if (pausable) onPause(item.fileName) else onResume(item.fileName) },
                     buttonSize = 40.dp,
                     subtleFrame = true,
                     controllerId = "home.queue.${item.fileName}.action",
                 )
-
-                DownloadQueueManager.State.PAUSED, DownloadQueueManager.State.ERROR -> RoundAction(
-                    glyph = "▶",
-                    description = str("catalog.action.resume"),
-                    onClick = { onResume(item.fileName) },
-                    buttonSize = 40.dp,
-                    subtleFrame = true,
-                    controllerId = "home.queue.${item.fileName}.action",
-                )
-
-                else -> Unit
             }
             Spacer(Modifier.width(4.dp))
             RoundAction(

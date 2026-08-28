@@ -698,7 +698,10 @@ private val BASE_EN: Map<String, String> = mapOf(
     "catalog.confirm.start" to "Download",
     // A fila de download (TASK-0038). `catalog.paused.short` existe porque `catalog.paused` traz o
     // "— tap to resume", que na linha da fila é ruído: o botão de retomar está ali do lado.
-    "catalog.queue.section" to "Downloading",
+    "catalog.queue.title" to "Downloads",
+    "catalog.queue.count" to "%1\$d in progress",
+    "catalog.queue.empty.title" to "No downloads",
+    "catalog.queue.empty.body" to "Games you download from the library appear here, with progress and controls to pause or cancel.",
     "catalog.queue.waiting" to "Waiting…",
     "catalog.queue.resolving" to "Starting…",
     "catalog.queue.failed" to "Failed — tap to retry",

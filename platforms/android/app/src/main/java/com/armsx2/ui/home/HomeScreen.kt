@@ -194,6 +194,18 @@ fun HomeScreen(
         onDispose { HomeInputController.unbind(viewModel) }
     }
 
+    // Ir para a tela de downloads, um quadro DEPOIS de quem pediu.
+    //
+    // `LaunchedEffect` e nao uma chamada direta no clique: o pedido nasce dentro do painel, e
+    // trocar de rota com um `PadModal` ainda aberto trava a UI (ver `pendingDownloadsNav`). Aqui a
+    // navegacao roda depois que a composicao foi aplicada -- painel ja desfeito, registro limpo.
+    LaunchedEffect(viewModel.pendingDownloadsNav.value) {
+        if (viewModel.pendingDownloadsNav.value) {
+            viewModel.pendingDownloadsNav.value = false
+            com.armsx2.navigation.UiNavigator.navigate(com.armsx2.navigation.AppRoute.Downloads)
+        }
+    }
+
     // O painel de download. Aberto por `viewModel.launch` quando a linha tocada e do catalogo --
     // ver o comentario la: a intercepcao mora no funil, nao em cada cartao.
     viewModel.pendingDownload.value?.let { entry ->
@@ -584,19 +596,10 @@ fun HomeScreen(
                     }
                 }
 
-                // A fila de download, acima de tudo o que e biblioteca: e o que esta acontecendo
-                // AGORA, e some sozinha quando esvazia. Na versao anterior isto vivia na aba
-                // "Saved"; o fork nao tem abas desde que o catalogo foi fundido na grade.
-                if (state.queue.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "download-queue") {
-                        com.armsx2.ui.catalog.DownloadQueueSection(
-                            queue = state.queue,
-                            onPause = viewModel::pauseQueued,
-                            onResume = viewModel::resumeQueued,
-                            onCancel = viewModel::cancelQueued,
-                        )
-                    }
-                }
+                // A fila NAO mora aqui. Ela ja morou -- empilhada neste ponto, empurrando 12.628
+                // cartoes para baixo a cada download -- e virou tela propria na TASK-0040, como a
+                // aba "Salvos" da versao anterior. O que a grade continua mostrando e a tarja de
+                // progresso na capa, o equivalente ao `updateCatalogTileProgress` de la.
 
                 if (shownRecents.isNotEmpty()) {
                     val recentsSelected = HomeInputController.zone.value == HomeZone.Recents

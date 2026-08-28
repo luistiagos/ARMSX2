@@ -149,6 +149,9 @@ private fun DrawerContent(selected: AppRoute, onNavigate: (AppRoute) -> Unit, on
     // (the old box-drawing characters like ▦ ◉ ⌁ ✦ were unclear per tester feedback).
     val primary = listOf(
         DrawerItem("games.section.library", "🎮", AppRoute.Home),
+        // Logo abaixo da Biblioteca: é para onde se vai depois de tocar em "Baixar", e é onde se
+        // volta para ver como está. Na versão anterior era a segunda aba da barra inferior.
+        DrawerItem("catalog.queue.title", "⬇️", AppRoute.Downloads),
         DrawerItem("ra.title", "🏆", AppRoute.Achievements, iconRes = com.armsx2.R.drawable.ic_trophy,
             iconTint = TrophyGold),
         DrawerItem("action.settings", "⚙️", AppRoute.Settings()),
@@ -285,6 +288,7 @@ private fun sameDestination(current: AppRoute, target: AppRoute): Boolean = when
     is AppRoute.BiosManager -> current is AppRoute.BiosManager
     is AppRoute.MemoryCardManager -> current is AppRoute.MemoryCardManager
     AppRoute.RomFolders -> current is AppRoute.RomFolders
+    AppRoute.Downloads -> current is AppRoute.Downloads
     AppRoute.SaveManager -> current is AppRoute.SaveManager
     AppRoute.ControllerManager -> current is AppRoute.ControllerManager
     AppRoute.PatchManager -> current is AppRoute.PatchManager
