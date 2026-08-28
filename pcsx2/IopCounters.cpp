@@ -804,6 +804,28 @@ void psxRcntSetNewIntrMode(int index)
 	psxCounters[index].currentIrqMode.toggleInterrupt = psxCounters[index].mode.toggleIntr;
 }
 
+// DELETEME after 2026-12-01: transitional repair for old poisoned states.
+// Repair states poisoned by the old u32 psxRcntSync blowup (baseline one full
+// 2^32 epoch in the future): snap the baseline back to now, or the counter
+// stays dead until psxRegs.cycle crosses the bogus baseline (116.5 s). The
+// count is left alone — IOP counts are u64 and several counters legitimately
+// run wider than 16 bits. Same removal terms as the EE-side block in
+// rcntRepairPoisonedCounters: the trigger was fixed 2026-08-09, this only
+// heals states saved by older builds (0x9A54 files included, which is why the
+// 0x9A54 reader calls this too); delete it and both call sites once those have
+// aged out.
+void psxRcntRepairPoisonedCounters()
+{
+	for (int i = 0; i < NUM_COUNTERS; i++)
+	{
+		if ((s64)(psxRegs.cycle - psxCounters[i].startCycle) >= 0)
+			continue;
+		Console.Warning("psxRcnt: counter %d baseline %llu is ahead of cycle %llu; repairing poisoned state",
+			i, psxCounters[i].startCycle, psxRegs.cycle);
+		psxCounters[i].startCycle = psxRegs.cycle & ~((u64)psxCounters[i].rate - 1);
+	}
+}
+
 bool SaveStateBase::psxRcntFreeze()
 {
 	if (!FreezeTag("iopCounters"))
@@ -820,22 +842,7 @@ bool SaveStateBase::psxRcntFreeze()
 
 	if (IsLoading())
 	{
-		// DELETEME after 2026-12-01: transitional repair for old poisoned states.
-		// Repair states poisoned by the old u32 psxRcntSync blowup (baseline one full
-		// 2^32 epoch in the future): snap the baseline back to now, or the counter
-		// stays dead until psxRegs.cycle crosses the bogus baseline (116.5 s). The
-		// count is left alone — IOP counts are u64 and several counters legitimately
-		// run wider than 16 bits. Same removal terms as the EE-side block in
-		// rcntFreeze: the trigger was fixed 2026-08-09, this only heals states
-		// saved by older builds; delete the loop once those have aged out.
-		for (int i = 0; i < NUM_COUNTERS; i++)
-		{
-			if ((s64)(psxRegs.cycle - psxCounters[i].startCycle) >= 0)
-				continue;
-			Console.Warning("psxRcntFreeze: counter %d baseline %llu is ahead of cycle %llu; repairing poisoned state",
-				i, psxCounters[i].startCycle, psxRegs.cycle);
-			psxCounters[i].startCycle = psxRegs.cycle & ~((u64)psxCounters[i].rate - 1);
-		}
+		psxRcntRepairPoisonedCounters();
 		psxRcntUpdate();
 	}
 

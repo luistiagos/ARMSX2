@@ -51,19 +51,46 @@ TEST(SaveStateLegacyWidenCycle, IsUsableAtCompileTime)
 	SUCCEED();
 }
 
-TEST(SaveStateLegacyVersion, AcceptsOnlyTheTwoFormatsSeenInTheWild)
+TEST(SaveStateLegacyVersion, AcceptsOnlyTheFormatsSeenInTheWild)
 {
-	// 0x9A2C is the AetherSX2 v1.5-era format, 0x9A34 NetherSX2 v2.1's.
+	// 0x9A2C is the AetherSX2 v1.5-era format, 0x9A34 NetherSX2 v2.1's,
+	// 0x9A54 RetroSystem PS2's own up to 1.0.23.
 	EXPECT_TRUE(SaveStateLegacy::IsSupportedVersion(0x9A2C0000));
 	EXPECT_TRUE(SaveStateLegacy::IsSupportedVersion(0x9A340000));
+	EXPECT_TRUE(SaveStateLegacy::IsSupportedVersion(0x9A540000));
 
 	// Minor revisions within an accepted major share its blob layout.
 	EXPECT_TRUE(SaveStateLegacy::IsSupportedVersion(0x9A2C0001));
+	EXPECT_TRUE(SaveStateLegacy::IsSupportedVersion(0x9A540001));
 
 	// Neighbouring majors are different layouts we have never seen a file of,
 	// and the current major goes through the normal reader.
 	EXPECT_FALSE(SaveStateLegacy::IsSupportedVersion(0x9A2B0000));
 	EXPECT_FALSE(SaveStateLegacy::IsSupportedVersion(0x9A350000));
+	EXPECT_FALSE(SaveStateLegacy::IsSupportedVersion(0x9A530000));
+	EXPECT_FALSE(SaveStateLegacy::IsSupportedVersion(0x9A550000));
 	EXPECT_FALSE(SaveStateLegacy::IsSupportedVersion(0x9A590000));
 	EXPECT_FALSE(SaveStateLegacy::IsSupportedVersion(0));
+}
+
+// The two eras take different readers and different per-entry handling, so the
+// predicates that pick between them must partition the supported set — never
+// both true, never both false for something IsSupportedVersion accepted.
+TEST(SaveStateLegacyVersion, EraPredicatesPartitionTheSupportedSet)
+{
+	for (const u32 savever : {0x9A2C0000u, 0x9A340000u, 0x9A2C0001u})
+	{
+		EXPECT_TRUE(SaveStateLegacy::IsAetherEra(savever)) << std::hex << savever;
+		EXPECT_FALSE(SaveStateLegacy::Is9A54Era(savever)) << std::hex << savever;
+	}
+
+	for (const u32 savever : {0x9A540000u, 0x9A540001u})
+	{
+		EXPECT_FALSE(SaveStateLegacy::IsAetherEra(savever)) << std::hex << savever;
+		EXPECT_TRUE(SaveStateLegacy::Is9A54Era(savever)) << std::hex << savever;
+	}
+
+	// The current format is neither, and must stay on the normal reader.
+	EXPECT_FALSE(SaveStateLegacy::IsAetherEra(0x9A590000));
+	EXPECT_FALSE(SaveStateLegacy::Is9A54Era(0x9A590000));
 }

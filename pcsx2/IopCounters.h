@@ -49,6 +49,17 @@ struct psxCounter {
 
 extern psxCounter psxCounters[NUM_COUNTERS];
 
+// Blank-gate state, written by the counter update path and carried in the
+// savestate's iopCounters block. Declared here so the 0x9A54 legacy reader can
+// restore it too.
+extern bool hBlanking;
+extern bool vBlanking;
+
+// DELETEME after 2026-12-01 (see the definition): heals IOP counters poisoned by
+// the pre-2026-08-09 u32 psxRcntSync blowup. Called from psxRcntFreeze() and
+// from the 0x9A54 legacy reader, which reads the same counters off the wire.
+extern void psxRcntRepairPoisonedCounters();
+
 extern void psxRcntInit();
 extern void psxRcntUpdate();
 extern void psxRcntWcount16(int index, u16 value);

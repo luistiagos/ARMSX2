@@ -490,14 +490,17 @@ public:
 	virtual bool FreezeOut(SaveStateBase& writer) const = 0;
 	virtual bool IsRequired() const = 0;
 
-	// Whether this entry can be carried over from a legacy-format
-	// (AetherSX2-era) save state. When it cannot, the component keeps the
-	// state it booted with, and the entry is not required to be present.
-	virtual bool SupportsLegacy() const { return true; }
+	// Whether this entry can be carried over from a save state of the given
+	// legacy major. When it cannot, the component keeps the state it booted
+	// with, and the entry is not required to be present. This is per-version,
+	// not global: an 0x9A54 state's PAD/USB/Achievements entries were written
+	// by the same code that reads them here, while the AetherSX2 era's were
+	// not.
+	virtual bool SupportsLegacy(u32 savever) const { return true; }
 
 	// Loads the entry from a legacy-format state. `size` is the entry's actual
 	// size, which for components whose block changed size is not today's.
-	virtual bool FreezeInLegacy(zip_file_t* zf, u32 size) const { return FreezeIn(zf); }
+	virtual bool FreezeInLegacy(zip_file_t* zf, u32 size, u32 savever) const { return FreezeIn(zf); }
 };
 
 class MemorySavestateEntry : public BaseSavestateEntry
@@ -649,17 +652,23 @@ public:
 	bool FreezeOut(SaveStateBase& writer) const override { return SysState_ComponentFreezeOut(writer, SPU2_); }
 	bool IsRequired() const override { return true; }
 
-	// The block's self-version never moved while its tail was re-laid-out, so
-	// it cannot go through the normal reader; SPU2freezeLegacy maps that era's
-	// layout across instead. It is read whole, because the layout is a fixed
-	// size that the mapper checks for itself.
-	bool FreezeInLegacy(zip_file_t* zf, u32 /*size*/) const override
+	// The block's self-version never moved while its tail was re-laid-out —
+	// not for the AetherSX2 era and not for 0x9A54 either, whose V_Voice still
+	// had the pre-decode-FIFO fields and whose V_Core had a 32-bit LastClock
+	// and no KeyOff. So no legacy block can go through the normal reader: its
+	// self-version would match and ThawIt would read the wrong layout. Each
+	// era gets its own mapper, and both are read whole because each checks the
+	// size it expects for itself.
+	bool FreezeInLegacy(zip_file_t* zf, u32 /*size*/, u32 savever) const override
 	{
 		const std::optional<std::vector<u8>> data(ReadBinaryFileInZip(zf));
 		if (!data.has_value())
 			return false;
 
 		Console.WriteLn("  Loading SPU2 (legacy format, %zu bytes)", data->size());
+		if (SaveStateLegacy::Is9A54Era(savever))
+			return SPU2freeze9A54(data->data(), data->size()) == 0;
+
 		return SPU2freezeLegacy(data->data(), data->size()) == 0;
 	}
 };
@@ -674,8 +683,9 @@ public:
 	bool FreezeOut(SaveStateBase& writer) const override { return SysState_ComponentFreezeOutNew(writer, "USB", 16 * 1024, &USB::DoState); }
 	bool IsRequired() const override { return false; }
 
-	// Legacy states predate the StateWrapper stream this reads.
-	bool SupportsLegacy() const override { return false; }
+	// AetherSX2-era states predate the StateWrapper stream this reads; 0x9A54
+	// wrote the entry with this very code (USB::DoState is unchanged since).
+	bool SupportsLegacy(u32 savever) const override { return SaveStateLegacy::Is9A54Era(savever); }
 };
 
 class SavestateEntry_PAD final : public BaseSavestateEntry
@@ -688,9 +698,11 @@ public:
 	bool FreezeOut(SaveStateBase& writer) const override { return SysState_ComponentFreezeOutNew(writer, "PAD", 16 * 1024, &Pad::Freeze); }
 	bool IsRequired() const override { return true; }
 
-	// Legacy states hold a raw struct that predates the StateWrapper stream
-	// this reads; the pads keep the type and mode they booted with.
-	bool SupportsLegacy() const override { return false; }
+	// AetherSX2-era states hold a raw struct that predates the StateWrapper
+	// stream this reads, so there the pads keep the type and mode they booted
+	// with. 0x9A54 wrote the block through Pad::Freeze, unchanged since apart
+	// from one OSD message string.
+	bool SupportsLegacy(u32 savever) const override { return SaveStateLegacy::Is9A54Era(savever); }
 };
 
 class SavestateEntry_GS final : public BaseSavestateEntry
@@ -704,8 +716,9 @@ public:
 	bool IsRequired() const override { return true; }
 
 	// GS blocks carry their own version, which Defrost still understands back
-	// through the legacy eras; only the size has to come from the entry.
-	bool FreezeInLegacy(zip_file_t* zf, u32 size) const override { return SysState_ComponentFreezeIn(zf, GS, size); }
+	// through the legacy eras (0x9A54 is on the same STATE_VERSION 9 this
+	// build writes); only the size has to come from the entry.
+	bool FreezeInLegacy(zip_file_t* zf, u32 size, u32 /*savever*/) const override { return SysState_ComponentFreezeIn(zf, GS, size); }
 };
 
 class SaveStateEntry_Achievements final : public BaseSavestateEntry
@@ -741,8 +754,9 @@ class SaveStateEntry_Achievements final : public BaseSavestateEntry
 
 	bool IsRequired() const override { return false; }
 
-	// No legacy-era state file carries achievement data.
-	bool SupportsLegacy() const override { return false; }
+	// No AetherSX2-era state file carries achievement data; 0x9A54 writes the
+	// entry with this same code.
+	bool SupportsLegacy(u32 savever) const override { return SaveStateLegacy::Is9A54Era(savever); }
 };
 
 // (cpuRegs, iopRegs, VPU/GIF/DMAC structures should all remain as part of a larger unified
@@ -1274,9 +1288,14 @@ static bool LoadInternalStructuresState(zip_t* zf, s64 index, u32 savever, Error
 	if (!state.FreezeBios())
 		return false;
 
-	if (SaveStateLegacy::IsSupportedVersion(savever))
+	if (SaveStateLegacy::IsAetherEra(savever))
 	{
 		if (!state.FreezeInternalsLegacy(error))
+			return false;
+	}
+	else if (SaveStateLegacy::Is9A54Era(savever))
+	{
+		if (!state.FreezeInternals9A54(error))
 			return false;
 	}
 	else if (!state.FreezeInternals(error))
@@ -1352,7 +1371,7 @@ static bool SaveState_UnzipFromZip(zip_t* zf_raw, const std::string& filename, E
 	{
 		// An entry that cannot be carried over from a legacy state is not
 		// required to be there, since it would be discarded either way.
-		const bool skipped = legacy && !SavestateEntries[i]->SupportsLegacy();
+		const bool skipped = legacy && !SavestateEntries[i]->SupportsLegacy(savever);
 		const bool required = SavestateEntries[i]->IsRequired() && !skipped;
 		entryIndices[i] = CheckFileExistsInState(zf.get(), SavestateEntries[i]->GetFilename(), required);
 		if (entryIndices[i] < 0 && required)
@@ -1380,7 +1399,7 @@ static bool SaveState_UnzipFromZip(zip_t* zf_raw, const std::string& filename, E
 
 	for (u32 i = 0; i < std::size(SavestateEntries); ++i)
 	{
-		if (legacy && !SavestateEntries[i]->SupportsLegacy())
+		if (legacy && !SavestateEntries[i]->SupportsLegacy(savever))
 		{
 			Console.WriteLn(Color_Yellow, "  Skipping %s: not readable from a legacy save state, keeping the current state.",
 				SavestateEntries[i]->GetFilename());
@@ -1405,7 +1424,7 @@ static bool SaveState_UnzipFromZip(zip_t* zf_raw, const std::string& filename, E
 			// against the entry's own size rather than the component's.
 			zip_stat_t zst = {};
 			if (zip_stat_index(zf.get(), entryIndices[i], 0, &zst) == 0 && zst.size <= std::numeric_limits<u32>::max())
-				okay = SavestateEntries[i]->FreezeInLegacy(zff.get(), static_cast<u32>(zst.size));
+				okay = SavestateEntries[i]->FreezeInLegacy(zff.get(), static_cast<u32>(zst.size), savever);
 		}
 
 		if (!okay)

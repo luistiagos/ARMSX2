@@ -47,6 +47,7 @@
 #include "SIO/Sio2.h"
 #include "SaveState.h"
 #include "Sif.h"
+#include "StateWrapper.h"
 #include "VMManager.h"
 #include "VUmicro.h"
 #include "Vif_Dma.h"
@@ -59,11 +60,22 @@
 
 #include <cstring>
 #include <memory>
+#include <optional>
 
-bool SaveStateLegacy::IsSupportedVersion(u32 savever)
+bool SaveStateLegacy::IsAetherEra(u32 savever)
 {
 	const u32 major = savever >> 16;
 	return major == 0x9A2C || major == 0x9A34;
+}
+
+bool SaveStateLegacy::Is9A54Era(u32 savever)
+{
+	return (savever >> 16) == 0x9A54;
+}
+
+bool SaveStateLegacy::IsSupportedVersion(u32 savever)
+{
+	return IsAetherEra(savever) || Is9A54Era(savever);
 }
 
 namespace OldState
@@ -458,6 +470,74 @@ namespace OldState
 	static_assert(sizeof(cdr) == 39352, "cdrom block is era-invariant");
 	static_assert(sizeof(iopMem->Sif) == 256, "IOP-Subsystems SIF window is era-invariant");
 	static_assert(sizeof(gsVideoMode) == 4 && sizeof(gsIsInterlaced) == 1, "video mode fields are era-invariant");
+
+	// ---------------------------------------------------------------- 0x9A54
+	// RetroSystem PS2 up to 1.0.23. Not an older era: the block sequence is
+	// today's, and every one of the structures above that changed shape after
+	// the AetherSX2 era had already reached its current shape here. The whole
+	// delta is that the cycle counters had not been widened to 64 bits yet, so
+	// only the structures carrying one are redeclared.
+	//
+	// The EE register block reached today's field list at 0x9A31, so the era's
+	// layout is byte-for-byte the one the NetherSX2 reader already declares.
+	using cpuRegisters_9A54 = cpuRegisters_9A34;
+
+	// layout per RetroSystem PS2 1.0.23, pcsx2/R3000ADef.h: the NetherSX2 field
+	// list with iopCycleEECarry inserted behind iopCycleEE (a field today's
+	// psxRegisters still carries, so the mapping is 1:1).
+	struct psxRegisters_9A54
+	{
+		GPRRegs GPR;
+		CP0Regs CP0;
+		CP2Data CP2D;
+		CP2Ctrl CP2C;
+		u32 pc;
+		u32 code;
+		u32 cycle;
+		u32 interrupt;
+		u32 pcWriteback;
+		u32 iopNextEventCycle;
+		s32 iopBreak;
+		s32 iopCycleEE;
+		u32 iopCycleEECarry;
+		u32 sCycle[32];
+		s32 eCycle[32];
+	};
+	static_assert(sizeof(psxRegisters_9A54) == 812, "psxRegisters in RetroSystem PS2 1.0.23 is 812 bytes");
+	static_assert(sizeof(psxRegisters_9A54) == sizeof(psxRegisters_9A34) + sizeof(u32),
+		"the only field 0x9A54 adds to the NetherSX2 IOP layout is iopCycleEECarry");
+
+	// The "Cycles" block writes the same six scalars in the same order as the
+	// NetherSX2 era; three of them have widened since.
+	using CyclesBlock_9A54 = CyclesBlock_9A34;
+
+	// pcsx2/Counters.h at 1.0.23 — same field list as today, startCycle narrow.
+	using Counter_9A54 = Counter_9A2C;
+	using SyncCounter_9A54 = SyncCounter_9A2C;
+
+	// layout per RetroSystem PS2 1.0.23, pcsx2/IopCounters.h. Unlike the
+	// AetherSX2-era counter this is today's field list — the mode is already
+	// the psxCounterMode bitfield and currentIrqMode already exists — so only
+	// startCycle needs mapping. The order differs from psxCounter_9A2C, which
+	// is why it cannot be reused.
+	struct psxCounter_9A54
+	{
+		u64 count, target;
+		u32 rate, interrupt;
+		u32 startCycle;
+		s32 deltaCycles;
+		psxCounterMode mode;
+		CounterIRQBehaviour currentIrqMode;
+	};
+	static_assert(sizeof(psxCounter_9A54) == 40, "psxCounter in RetroSystem PS2 1.0.23 is 40 bytes");
+
+	// pcsx2/VUDef.h at 1.0.23: the pipelines reached today's field list long
+	// before the AetherSX2 era, and only sCycle has widened since, so the
+	// declarations the AetherSX2 reader already has are byte-exact here too.
+	using fmacPipe_9A54 = fmacPipe_9A2C;
+	using fdivPipe_9A54 = fdivPipe_9A2C;
+	using efuPipe_9A54 = efuPipe_9A2C;
+	using ialuPipe_9A54 = ialuPipe_9A2C;
 } // namespace OldState
 
 using SaveStateLegacy::WidenCycle;
@@ -521,6 +601,7 @@ static bool CheckLegacyIdentity(const StagedRegs& st, Error* error)
 bool SaveStateBase::FreezeInternalsLegacy(Error* error)
 {
 	pxAssert(IsLoading());
+	pxAssertMsg(SaveStateLegacy::IsAetherEra(m_version), "FreezeInternalsLegacy only reads the AetherSX2-era majors");
 	const u32 major = m_version >> 16;
 
 	// Legacy states are always 32MB-EE-RAM states; memFreeze (which carries
@@ -1161,6 +1242,379 @@ bool SaveStateBase::FreezeInternalsLegacy(Error* error)
 	{
 		Error::SetStringFmt(error, "Legacy save state has {} unexpected trailing bytes (version {:x}).",
 			static_cast<int>(m_memory.size()) - m_idx, m_version);
+		return false;
+	}
+
+	return IsOkay();
+}
+
+// ============================================================================
+//  0x9A54 — RetroSystem PS2 up to 1.0.23
+// ============================================================================
+// Not a parallel deserializer like the one above: the block sequence is exactly
+// the one FreezeInternals() reads, and every structure that changed shape after
+// the AetherSX2 era had already reached its current shape by 1.0.23. What this
+// reader does is read the narrow cycle fields the era wrote, widen each one
+// against its domain base (WidenCycle), and hand every block whose bytes did
+// not move straight to the freeze function the current format already uses.
+//
+// Which blocks moved was measured against the 1.0.23 tree function by function
+// and struct by struct. The blocks remapped below are the complete set that
+// differ; the residue check at the end fails the load loudly if that turns out
+// to be wrong on a real file, rather than resuming from a desynced blob.
+bool SaveStateBase::FreezeInternals9A54(Error* error)
+{
+	pxAssert(IsLoading());
+	pxAssertMsg(SaveStateLegacy::Is9A54Era(m_version), "FreezeInternals9A54 only reads the 0x9A54 major");
+
+	if (!vmFreeze())
+		return false;
+
+	// ------------------------------------------------ Second Block - cpuRegs
+	if (!FreezeTag("cpuRegs"))
+		return false;
+
+	OldState::cpuRegisters_9A54 cpu;
+	OldState::psxRegisters_9A54 psx;
+	fpuRegistersWire fpu;
+	Freeze(cpu);
+	Freeze(psx);
+	Freeze(fpu);
+	Freeze(tlb);        // era-invariant, and PostLoadPrep diffs it against the backup
+	Freeze(cachedTlbs); // era-invariant
+	Freeze(AllowParams1);
+	Freeze(AllowParams2);
+	if (!IsOkay())
+		return false;
+
+	// Domain bases for the widening: the era's own EE/IOP cycle, zero-extended.
+	// The absolute epoch is arbitrary — what has to survive is each field's
+	// signed delta to it, which is what a wrap-straddling deadline is made of.
+	const u32 ee_base = cpu.cycle;
+	const u64 ee_new = static_cast<u64>(cpu.cycle);
+	const u32 iop_base = psx.cycle;
+	const u64 iop_new = static_cast<u64>(psx.cycle);
+	const auto widen_ee = [&](u32 v) { return WidenCycle(v, ee_base, ee_new); };
+	const auto widen_iop = [&](u32 v) { return WidenCycle(v, iop_base, iop_new); };
+
+	cpuRegs.GPR = cpu.GPR;
+	cpuRegs.HI = cpu.HI;
+	cpuRegs.LO = cpu.LO;
+	cpuRegs.CP0 = cpu.CP0;
+	cpuRegs.sa = cpu.sa;
+	cpuRegs.IsDelaySlot = cpu.IsDelaySlot;
+	cpuRegs.pc = cpu.pc;
+	cpuRegs.code = cpu.code;
+	cpuRegs.PERF = cpu.PERF;
+	std::memcpy(cpuRegs.eCycle, cpu.eCycle, sizeof(cpuRegs.eCycle)); // deltas, not cycles
+	for (int i = 0; i < 32; i++)
+		cpuRegs.sCycle[i] = widen_ee(cpu.sCycle[i]);
+	cpuRegs.cycle = ee_new;
+	cpuRegs.interrupt = cpu.interrupt;
+	cpuRegs.branch = cpu.branch;
+	cpuRegs.opmode = cpu.opmode;
+	cpuRegs.tempcycles = cpu.tempcycles;
+	cpuRegs.dmastall = cpu.dmastall;
+	cpuRegs.pcWriteback = cpu.pcWriteback;
+	cpuRegs.nextEventCycle = widen_ee(cpu.nextEventCycle);
+	cpuRegs.lastEventCycle = widen_ee(cpu.lastEventCycle);
+	cpuRegs.lastCOP0Cycle = widen_ee(cpu.lastCOP0Cycle);
+	cpuRegs.lastPERFCycle[0] = widen_ee(cpu.lastPERFCycle[0]);
+	cpuRegs.lastPERFCycle[1] = widen_ee(cpu.lastPERFCycle[1]);
+
+	psxRegs.GPR = psx.GPR;
+	psxRegs.CP0 = psx.CP0;
+	psxRegs.CP2D = psx.CP2D;
+	psxRegs.CP2C = psx.CP2C;
+	psxRegs.pc = psx.pc;
+	psxRegs.code = psx.code;
+	psxRegs.cycle = iop_new;
+	psxRegs.interrupt = psx.interrupt;
+	psxRegs.pcWriteback = psx.pcWriteback;
+	psxRegs.iopNextEventCycle = widen_iop(psx.iopNextEventCycle);
+	psxRegs.iopBreak = psx.iopBreak;
+	psxRegs.iopCycleEE = psx.iopCycleEE;
+	psxRegs.iopCycleEECarry = psx.iopCycleEECarry;
+	for (int i = 0; i < 32; i++)
+		psxRegs.sCycle[i] = widen_iop(psx.sCycle[i]);
+	std::memcpy(psxRegs.eCycle, psx.eCycle, sizeof(psxRegs.eCycle)); // deltas, not cycles
+
+	fpuRegsFromWire(fpu);
+
+	// -------------------------------------------------- Third Block - Cycles
+	if (!FreezeTag("Cycles"))
+		return false;
+
+	{
+		OldState::CyclesBlock_9A54 cyc;
+		Freeze(cyc);
+		if (!IsOkay())
+			return false;
+
+		EEsCycle = cyc.EEsCycle;                              // delta
+		EEoCycle = widen_ee(cyc.EEoCycle);
+		nextDeltaCounter = cyc.nextCounter;                   // delta
+		nextStartCounter = widen_ee(cyc.nextsCounter);
+		psxNextStartCounter = widen_iop(cyc.psxNextsCounter);
+		psxNextDeltaCounter = cyc.psxNextCounter;             // delta
+	}
+
+	// ------------------------------------------- Fourth Block - EE-Subsystems
+	if (!FreezeTag("EE-Subsystems"))
+		return false;
+
+	// rcnt (untagged). vSyncInfo is skipped rather than read: it is file-local
+	// to Counters.cpp, and PostLoadPrep's UpdateVSyncRate(true) rebuilds it —
+	// and calls cpuRcntSet(), which is what the current rcntFreeze does inline.
+	{
+		OldState::Counter_9A54 oc[4];
+		OldState::SyncCounter_9A54 oh, ov;
+		s32 nc;
+		u32 nsc;
+		Freeze(oc);
+		Freeze(oh);
+		Freeze(ov);
+		Freeze(nc);
+		Freeze(nsc);
+		FreezeSkip(40); // vSyncTimingInfo: a double plus nine u32, unchanged since 1.0.23
+		Freeze(gsVideoMode);
+		Freeze(gsIsInterlaced);
+		if (!IsOkay())
+			return false;
+
+		for (int i = 0; i < 4; i++)
+		{
+			counters[i].count = oc[i].count;
+			counters[i].modeval = oc[i].modeval;
+			counters[i].target = oc[i].target;
+			counters[i].hold = oc[i].hold;
+			counters[i].rate = oc[i].rate;
+			counters[i].interrupt = oc[i].interrupt;
+			counters[i].startCycle = widen_ee(oc[i].sCycleT);
+		}
+		hsyncCounter.Mode = oh.Mode;
+		hsyncCounter.startCycle = widen_ee(oh.sCycle);
+		hsyncCounter.deltaCycles = oh.CycleT;
+		vsyncCounter.Mode = ov.Mode;
+		vsyncCounter.startCycle = widen_ee(ov.sCycle);
+		vsyncCounter.deltaCycles = ov.CycleT;
+		nextDeltaCounter = nc;
+		nextStartCounter = widen_ee(nsc);
+
+		// 1.0.23's rcntSyncCounter had no underflow guard, so a baseline that
+		// transiently sat ahead of the EE clock turned into startCycle += 2^32
+		// and count += 0xFFFFFFFF, and every state taken afterwards carried it.
+		// This is exactly the population that repair exists for.
+		rcntRepairPoisonedCounters();
+	}
+
+	if (!memFreeze(error) || !gsFreeze())
+		return false;
+
+	// vuMicro (tagged): today's field order — only the cycle fields are narrow.
+	// nextBlockCycles is a *delta* (s32 -> s64), so it sign-extends instead.
+	if (!FreezeTag("vuMicroRegs"))
+		return false;
+	{
+		const auto vuPipes = [&](VURegs& vu) {
+			OldState::fmacPipe_9A54 fmac[4];
+			OldState::fdivPipe_9A54 fdiv;
+			OldState::efuPipe_9A54 efu;
+			OldState::ialuPipe_9A54 ialu[4];
+			Freeze(fmac);
+			Freeze(vu.fmacreadpos);
+			Freeze(vu.fmacwritepos);
+			Freeze(vu.fmaccount);
+			Freeze(fdiv);
+			Freeze(efu);
+			Freeze(ialu);
+			Freeze(vu.ialureadpos);
+			Freeze(vu.ialuwritepos);
+			Freeze(vu.ialucount);
+
+			for (int i = 0; i < 4; i++)
+			{
+				vu.fmac[i].regupper = fmac[i].regupper;
+				vu.fmac[i].reglower = fmac[i].reglower;
+				vu.fmac[i].flagreg = fmac[i].flagreg;
+				vu.fmac[i].xyzwupper = fmac[i].xyzwupper;
+				vu.fmac[i].xyzwlower = fmac[i].xyzwlower;
+				vu.fmac[i].sCycle = widen_ee(fmac[i].sCycle);
+				vu.fmac[i].Cycle = fmac[i].Cycle;
+				vu.fmac[i].macflag = fmac[i].macflag;
+				vu.fmac[i].statusflag = fmac[i].statusflag;
+				vu.fmac[i].clipflag = fmac[i].clipflag;
+
+				vu.ialu[i].reg = ialu[i].reg;
+				vu.ialu[i].sCycle = widen_ee(ialu[i].sCycle);
+				vu.ialu[i].Cycle = ialu[i].Cycle;
+			}
+			vu.fdiv.enable = fdiv.enable;
+			vu.fdiv.reg = fdiv.reg;
+			vu.fdiv.sCycle = widen_ee(fdiv.sCycle);
+			vu.fdiv.Cycle = fdiv.Cycle;
+			vu.fdiv.statusflag = fdiv.statusflag;
+			vu.efu.enable = efu.enable;
+			vu.efu.reg = efu.reg;
+			vu.efu.sCycle = widen_ee(efu.sCycle);
+			vu.efu.Cycle = efu.Cycle;
+		};
+
+		const auto vuMid = [&](VURegs& vu) {
+			u32 cycle;
+			Freeze(cycle);
+			Freeze(vu.flags);
+			Freeze(vu.code);
+			Freeze(vu.start_pc);
+			Freeze(vu.branch);
+			Freeze(vu.branchpc);
+			Freeze(vu.delaybranchpc);
+			Freeze(vu.takedelaybranch);
+			Freeze(vu.ebit);
+			Freeze(vu.pending_q);
+			Freeze(vu.pending_p);
+			Freeze(vu.micro_macflags);
+			Freeze(vu.micro_clipflags);
+			Freeze(vu.micro_statusflags);
+			Freeze(vu.macflag);
+			Freeze(vu.statusflag);
+			Freeze(vu.clipflag);
+			s32 nextBlockCycles;
+			Freeze(nextBlockCycles);
+			vu.cycle = widen_ee(cycle);
+			vu.nextBlockCycles = nextBlockCycles;
+		};
+
+		const auto vuTail = [&](VURegs& vu) {
+			Freeze(vu.VIBackupCycles);
+			Freeze(vu.VIOldValue);
+			Freeze(vu.VIRegNumber);
+			vuPipes(vu);
+		};
+
+		Freeze(VU0.ACC);
+		Freeze(VU0.VF);
+		Freeze(VU0.VI);
+		Freeze(VU0.q);
+		vuMid(VU0);
+		vuTail(VU0);
+
+		Freeze(VU1.ACC);
+		Freeze(VU1.VF);
+		Freeze(VU1.VI);
+		Freeze(VU1.q);
+		Freeze(VU1.p);
+		vuMid(VU1);
+		{
+			u32 xgkicklastcycle;
+			Freeze(VU1.xgkickaddr);
+			Freeze(VU1.xgkickdiff);
+			Freeze(VU1.xgkicksizeremaining);
+			Freeze(xgkicklastcycle);
+			Freeze(VU1.xgkickcyclecount);
+			Freeze(VU1.xgkickenable);
+			Freeze(VU1.xgkickendpacket);
+			VU1.xgkicklastcycle = widen_ee(xgkicklastcycle);
+		}
+		vuTail(VU1);
+		if (!IsOkay())
+			return false;
+	}
+
+	// vuJIT: two microRegInfo structures, and that is 96 bytes both in 1.0.23
+	// (a fixed std::array<u8,96> written by the arm64 stub) and here, on both
+	// backends — so the current function reads it as-is.
+	bool okay = vuJITFreeze();
+	okay = okay && vif0Freeze();
+	okay = okay && vif1Freeze();
+	okay = okay && sifFreeze();
+	okay = okay && ipuFreeze();
+	okay = okay && ipuDmaFreeze();
+	okay = okay && gifFreeze();
+	okay = okay && gifDmaFreeze();
+	okay = okay && sprFreeze();
+	okay = okay && mtvuFreeze();
+	if (!okay)
+		return false;
+
+	// ------------------------------------------- Fifth Block - IOP-Subsystems
+	if (!FreezeTag("IOP-Subsystems"))
+		return false;
+
+	FreezeMem(iopMem->Sif, sizeof(iopMem->Sif));
+
+	// iopCounters (tagged): today's psxCounter field list with a narrow
+	// startCycle. The field order differs from the AetherSX2-era struct, which
+	// is why that one cannot be reused here.
+	if (!FreezeTag("iopCounters"))
+		return false;
+	{
+		OldState::psxCounter_9A54 oc[NUM_COUNTERS];
+		s32 pnc;
+		u32 pnsc;
+		Freeze(oc);
+		Freeze(pnc);
+		Freeze(pnsc);
+		Freeze(hBlanking);
+		Freeze(vBlanking);
+		if (!IsOkay())
+			return false;
+
+		for (int i = 0; i < NUM_COUNTERS; i++)
+		{
+			psxCounters[i].count = oc[i].count;
+			psxCounters[i].target = oc[i].target;
+			psxCounters[i].rate = oc[i].rate;
+			psxCounters[i].interrupt = oc[i].interrupt;
+			psxCounters[i].startCycle = widen_iop(oc[i].startCycle);
+			psxCounters[i].deltaCycles = oc[i].deltaCycles;
+			psxCounters[i].mode = oc[i].mode;
+			psxCounters[i].currentIrqMode = oc[i].currentIrqMode;
+		}
+		psxNextDeltaCounter = pnc;
+		psxNextStartCounter = widen_iop(pnsc);
+
+		psxRcntRepairPoisonedCounters();
+		psxRcntUpdate();
+	}
+
+	// SIO: the same StateWrapper stream as today. 1.0.23 already wrote this
+	// block through Sio0/Sio2/Multitap DoState, and the only change since is
+	// the rename of Sio2's register members — same types, same order.
+	{
+		StateWrapper::ReadOnlyMemoryStream load_stream(&m_memory[m_idx], static_cast<int>(m_memory.size()) - m_idx);
+		StateWrapper sw(&load_stream, StateWrapper::Mode::Read, g_SaveVersion);
+
+		okay = g_Sio0.DoState(sw);
+		okay = okay && g_Sio2.DoState(sw);
+		okay = okay && g_MultitapArr.at(0).DoState(sw);
+		okay = okay && g_MultitapArr.at(1).DoState(sw);
+
+		if (!okay || !sw.IsGood())
+			return false;
+
+		const int new_idx = m_idx + static_cast<int>(load_stream.GetPosition());
+		if (static_cast<size_t>(new_idx) >= m_memory.size())
+			return false;
+
+		m_idx = new_idx;
+	}
+
+	okay = cdrFreeze();
+	okay = okay && cdvdFreeze();
+	okay = okay && deci2Freeze();
+	okay = okay && InputRecordingFreeze();
+	okay = okay && handleFreeze();
+	if (!okay)
+		return false;
+
+	// The layout is fully accounted for; any residue means a block moved after
+	// all, and the half-applied load is unwound by the caller (VMManager::Reset).
+	// This is what keeps a wrong assumption from resuming a desynced state.
+	if (m_idx != static_cast<int>(m_memory.size()))
+	{
+		Error::SetStringFmt(error, "0x9A54 save state has {} unexpected trailing bytes.",
+			static_cast<int>(m_memory.size()) - m_idx);
 		return false;
 	}
 

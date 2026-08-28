@@ -12,10 +12,12 @@
 #include "IopHw.h"
 #include "IopMem.h"
 #include "R3000A.h"
+#include "SaveStateLegacy.h"
 
 #include "common/Console.h"
 
 #include <cstring>
+#include <memory>
 
 // The core and voice structures as AetherSX2-era builds wrote them. Layout per
 // upstream PCSX2 7e939b75 (pcsx2/SPU2/defs.h); the 0x9A2C era at 0312e902 has
@@ -486,6 +488,310 @@ s32 SPU2freezeLegacy(const void* data, size_t size)
 	std::memset(pcm_cache_data, 0, pcm_BlockCount * sizeof(PcmCacheEntry));
 
 	lClocks = psxRegs.cycle;
+
+	return 0;
+}
+
+// ============================================================================
+//  0x9A54 — RetroSystem PS2 up to 1.0.23
+// ============================================================================
+// A far smaller delta than the AetherSX2 one above: by 1.0.23 the mixer had
+// already reached today's V_VolumeSlide / V_ADSR / V_Reverb / V_CoreRegs /
+// V_SPDIF / gate shapes, so those are reused verbatim here and none of the
+// volume or envelope remapping above applies. What did move afterwards is
+// three things, and only those are redeclared:
+//
+//   * V_Voice traded the pre-decode-FIFO fields (PlayCycle, LoopCycle, the
+//     pending-loop pair, SPc, PV4..PV1, NextCrest, SCurrent) for DecodeFifo
+//     plus its two positions;
+//   * V_Core widened LastClock to 64 bits and gained KeyOff;
+//   * the block tail widened lClocks to 64 bits.
+//
+// None of that moved SPU2Savestate::SAVE_VERSION, which is 0x000e on both
+// sides — so ThawIt would accept an 0x9A54 block and read it at the wrong
+// offsets, down to the DMA pointer fix-up. Hence a mapper, as for the older
+// eras.
+namespace State9A54SPU2
+{
+	// Both host DMA pointers are stored as byte offsets into IOP memory (or the
+	// all-ones sentinel for null), exactly as they are today: 1.0.23 ran the
+	// same FIX_POINTER pass on the way out. So they carry across, unlike the
+	// AetherSX2 era's raw host pointers.
+	static constexpr u64 NULL_POINTER = ~static_cast<u64>(0);
+	static constexpr u64 IOP_MEM_MASK = 0x1FFFFF;
+
+	struct Voice
+	{
+		u32 PlayCycle;
+		u32 LoopCycle;
+		u32 PendingLoopStartA;
+		bool PendingLoopStart;
+		V_VolumeSlideLR Volume;
+		V_ADSR ADSR;
+		u16 Pitch;
+		u32 LoopStartA;
+		u32 StartA;
+		u32 NextA;
+		s32 Prev1;
+		s32 Prev2;
+		bool Modulated;
+		bool Noise;
+		s8 LoopMode;
+		s8 LoopFlags;
+		s32 SP;
+		s32 SPc;
+		s32 PV4, PV3, PV2, PV1;
+		s32 OutX;
+		s32 NextCrest;
+		u64 SBuffer; // s16* in the original — a host pointer, never dereferenced
+		s32 SCurrent;
+	};
+
+	struct Core
+	{
+		u32 Index;
+		V_VoiceGates VoiceGates[V_Core::NumVoices];
+		V_CoreGates DryGate;
+		V_CoreGates WetGate;
+		V_VolumeSlideLR MasterVol;
+		V_VolumeLR ExtVol;
+		V_VolumeLR InpVol;
+		V_VolumeLR FxVol;
+		Voice Voices[V_Core::NumVoices];
+		u32 IRQA;
+		u32 TSA;
+		u32 ActiveTSA;
+		bool IRQEnable;
+		bool FxEnable;
+		bool Mute;
+		bool AdmaInProgress;
+		s8 DMABits;
+		u8 NoiseClk;
+		u32 NoiseCnt;
+		u32 NoiseOut;
+		u16 AutoDMACtrl;
+		s32 DMAICounter;
+		u32 LastClock;
+		u32 InputDataLeft;
+		u32 InputDataTransferred;
+		u32 InputPosWrite;
+		u32 InputDataProgress;
+		V_Reverb Revb;
+		s16 RevbDownBuf[2][64 * 2];
+		s16 RevbUpBuf[2][64 * 2];
+		u32 RevbSampleBufPos;
+		u32 EffectsStartA;
+		u32 EffectsEndA;
+		V_CoreRegs Regs;
+		StereoOut32 LastEffect;
+		u8 CoreEnabled;
+		u8 AttrBit0;
+		u8 DmaMode;
+		bool DmaStarted;
+		u32 AutoDmaFree;
+		u64 DMAPtr;  // u16* in the original
+		u64 DMARPtr; // ditto
+		u32 ReadSize;
+		bool IsDMARead;
+		u32 KeyOn;
+		u16 psxSoundDataTransferControl;
+		u16 psxSPUSTAT;
+	};
+
+	// The head of the block and the scalars behind the cores are the same in
+	// every era: id, 64KB of raw register memory, 2MB of sample memory, then
+	// the self-version, the cores, and a 32-byte tail that 0x9A54 shares
+	// byte-for-byte with the AetherSX2 one (lClocks was still 32 bits in both).
+	using Tail = LegacySPU2::Tail;
+	static constexpr size_t UNKREGS_OFFSET = 4;
+	static constexpr size_t MEM_OFFSET = 0x10004;
+	static constexpr size_t VERSION_OFFSET = 0x210004;
+	static constexpr size_t CORES_OFFSET = 0x210008;
+	static constexpr size_t BLOCK_SIZE = CORES_OFFSET + 2 * sizeof(Core) + sizeof(Tail);
+
+	// Proven against the 1.0.23 headers themselves: compiling that tree's
+	// SPU2/defs.h with this NDK gives sizeof(V_Voice) == 176, sizeof(V_Core) ==
+	// 6000, and its DataBlock == 2174728 bytes — the three numbers below. The
+	// entry size is checked against BLOCK_SIZE again at load time, so a real
+	// file that disagrees is refused rather than read at the wrong offsets.
+	static_assert(sizeof(Voice) == 176, "V_Voice in RetroSystem PS2 1.0.23 is 176 bytes");
+	static_assert(sizeof(Core) == 6000, "V_Core in RetroSystem PS2 1.0.23 is 6000 bytes");
+	static_assert(BLOCK_SIZE == 2174728, "the 0x9A54 SPU2 block is 2174728 bytes");
+
+	static constexpr u32 SAVE_ID = 0x1227521;
+	static constexpr u32 SAVE_VERSION = 0x000e;
+
+	// Restores a host DMA pointer from the stored IOP-memory offset, the
+	// inverse of the FIX_POINTER pass in SPU2Savestate::FreezeIt. Anything
+	// outside IOP memory is treated as absent rather than trusted: the value
+	// comes off disk and is dereferenced by the transfer paths.
+	static u16* UnfixPointer(u64 stored)
+	{
+		if (stored == NULL_POINTER || stored > IOP_MEM_MASK)
+			return nullptr;
+
+		return reinterpret_cast<u16*>(iopPhysMem(0) + static_cast<size_t>(stored));
+	}
+
+	static void RestoreVoice(V_Voice& dst, const Voice& src)
+	{
+		dst.Volume = src.Volume;
+		dst.ADSR = src.ADSR;
+		dst.Pitch = src.Pitch;
+		dst.LoopStartA = src.LoopStartA;
+		dst.StartA = src.StartA;
+		dst.NextA = src.NextA;
+		dst.Prev1 = src.Prev1;
+		dst.Prev2 = src.Prev2;
+		dst.Modulated = src.Modulated;
+		dst.Noise = src.Noise;
+		dst.LoopMode = src.LoopMode;
+		dst.LoopFlags = src.LoopFlags;
+		dst.SP = src.SP;
+		dst.OutX = src.OutX;
+
+		// The sample-decode pipeline was re-architected after 1.0.23 (PV1..PV4
+		// and SCurrent gave way to a decode FIFO), so the position inside the
+		// current 28-sample block does not carry across and the block restarts
+		// — a sub-millisecond hiccup per voice, once. The FIFO and its two
+		// positions stay at the values SPU2::Reset left, and the buffer points
+		// at the cache entry for the current read address, as the native thaw
+		// does. The index is masked because NextA comes off disk.
+		dst.SBuffer = pcm_cache_data[(dst.NextA & 0xFFFFF) / pcm_WordsPerBlock].Sampledata;
+	}
+
+	static void RestoreCore(V_Core& dst, const Core& src)
+	{
+		for (uint v = 0; v < V_Core::NumVoices; v++)
+		{
+			dst.VoiceGates[v] = src.VoiceGates[v];
+			RestoreVoice(dst.Voices[v], src.Voices[v]);
+		}
+
+		dst.DryGate = src.DryGate;
+		dst.WetGate = src.WetGate;
+		dst.MasterVol = src.MasterVol;
+		dst.ExtVol = src.ExtVol;
+		dst.InpVol = src.InpVol;
+		dst.FxVol = src.FxVol;
+
+		dst.IRQA = src.IRQA;
+		dst.TSA = src.TSA;
+		dst.ActiveTSA = src.ActiveTSA;
+		dst.IRQEnable = src.IRQEnable;
+		dst.FxEnable = src.FxEnable;
+		dst.Mute = src.Mute;
+		dst.AdmaInProgress = src.AdmaInProgress;
+		dst.DMABits = src.DMABits;
+		dst.NoiseClk = src.NoiseClk;
+		dst.NoiseCnt = src.NoiseCnt;
+		dst.NoiseOut = src.NoiseOut;
+		dst.AutoDMACtrl = src.AutoDMACtrl;
+		dst.DMAICounter = src.DMAICounter;
+		dst.InputDataLeft = src.InputDataLeft;
+		dst.InputDataTransferred = src.InputDataTransferred;
+		dst.InputPosWrite = src.InputPosWrite;
+		dst.InputDataProgress = src.InputDataProgress;
+		dst.Revb = src.Revb;
+		std::memcpy(dst.RevbDownBuf, src.RevbDownBuf, sizeof(dst.RevbDownBuf));
+		std::memcpy(dst.RevbUpBuf, src.RevbUpBuf, sizeof(dst.RevbUpBuf));
+		dst.RevbSampleBufPos = src.RevbSampleBufPos;
+		dst.EffectsStartA = src.EffectsStartA;
+		dst.EffectsEndA = src.EffectsEndA;
+		dst.Regs = src.Regs;
+		dst.LastEffect = src.LastEffect;
+		dst.CoreEnabled = src.CoreEnabled;
+		dst.AttrBit0 = src.AttrBit0;
+		dst.DmaMode = src.DmaMode;
+		dst.DmaStarted = src.DmaStarted;
+		dst.AutoDmaFree = src.AutoDmaFree;
+		dst.DMAPtr = UnfixPointer(src.DMAPtr);
+		dst.DMARPtr = UnfixPointer(src.DMARPtr);
+		dst.ReadSize = src.ReadSize;
+		dst.IsDMARead = src.IsDMARead;
+		dst.KeyOn = src.KeyOn;
+		dst.psxSoundDataTransferControl = src.psxSoundDataTransferControl;
+		dst.psxSPUSTAT = src.psxSPUSTAT;
+
+		// KeyOff did not exist at 1.0.23: a key-off is edge-triggered by a
+		// register write, so there is no pending one to restore. Left at the
+		// zero SPU2::Reset put there.
+
+		// The DMA interrupt deadline is an IOP-clock stamp, and psxRegs is
+		// already thawed by the time the entries load, so it widens against the
+		// restored clock. Never ahead of it: CheckDMAProgress subtracts the two
+		// as u64, and an ahead baseline would read as a ~2^64 elapsed.
+		dst.LastClock = SaveStateLegacy::WidenCycle(src.LastClock,
+			static_cast<u32>(psxRegs.cycle), psxRegs.cycle);
+		if (dst.LastClock > psxRegs.cycle)
+			dst.LastClock = psxRegs.cycle;
+	}
+} // namespace State9A54SPU2
+
+// Restores register and sample memory, then each core's mixer, voice,
+// streaming and DMA state, then the SPDIF/ring/playmode tail. Everything is
+// carried except each voice's position inside its current 28-sample decode
+// block, which the re-architected decoder cannot express.
+s32 SPU2freeze9A54(const void* data, size_t size)
+{
+	using namespace State9A54SPU2;
+
+	if (size != BLOCK_SIZE)
+	{
+		Console.Error("(LegacyState) SPU2 block is %zu bytes, not the %zu a 0x9A54 block occupies.",
+			size, BLOCK_SIZE);
+		return -1;
+	}
+
+	const u8* const block = static_cast<const u8*>(data);
+	u32 id, version;
+	std::memcpy(&id, block, sizeof(id));
+	std::memcpy(&version, block + VERSION_OFFSET, sizeof(version));
+
+	if (id != SAVE_ID || version != SAVE_VERSION)
+	{
+		Console.Error("(LegacyState) SPU2 block is not a 0x9A54 block (id %08X, version %X).", id, version);
+		return -1;
+	}
+
+	// Wipes the register and sample memory and re-inits both cores, so it has
+	// to happen before the memory is copied back in.
+	SPU2::Reset(false);
+
+	std::memcpy(spu2regs, block + UNKREGS_OFFSET, 0x10000);
+	std::memcpy(_spu2mem, block + MEM_OFFSET, 0x200000);
+
+	// The block came out of a zip read buffer, so copy each structure out
+	// rather than reading it in place at an unknown alignment.
+	for (int c = 0; c < 2; c++)
+	{
+		auto core = std::make_unique<Core>();
+		std::memcpy(core.get(), block + CORES_OFFSET + c * sizeof(Core), sizeof(Core));
+		RestoreCore(Cores[c], *core);
+	}
+
+	Tail tail;
+	std::memcpy(&tail, block + CORES_OFFSET + 2 * sizeof(Core), sizeof(tail));
+	Spdif.Out = tail.SpdifOut;
+	Spdif.Info = tail.SpdifInfo;
+	Spdif.Unknown1 = tail.SpdifUnknown1;
+	Spdif.Mode = tail.SpdifMode;
+	Spdif.Media = tail.SpdifMedia;
+	Spdif.Unknown2 = tail.SpdifUnknown2;
+	Spdif.Protection = tail.SpdifProtection;
+	OutPos = tail.OutPos;
+	InputPos = tail.InputPos;
+	Cycles = tail.Cycles;
+	PlayMode = tail.PlayMode;
+
+	// The ADPCM decode cache indexes sample memory, which just changed under
+	// it. (The native thaw wipes it for the same reason.)
+	std::memset(pcm_cache_data, 0, pcm_BlockCount * sizeof(PcmCacheEntry));
+
+	// Same domain and same guard as V_Core::LastClock above.
+	lClocks = SaveStateLegacy::WidenCycle(tail.lClocks, static_cast<u32>(psxRegs.cycle), psxRegs.cycle);
+	if (lClocks > psxRegs.cycle)
+		lClocks = psxRegs.cycle;
 
 	return 0;
 }

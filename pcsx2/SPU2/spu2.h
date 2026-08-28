@@ -90,6 +90,11 @@ s32 SPU2freeze(FreezeAction mode, freezeData* data);
 // cannot be replayed. See the definition for what is and is not kept.
 s32 SPU2freezeLegacy(const void* data, size_t size);
 
+// Restore from a RetroSystem PS2 0x9A54 block. Same reason it cannot go
+// through the normal thaw: the block self-version did not move while V_Voice
+// and V_Core did. See the definition for what is and is not kept.
+s32 SPU2freeze9A54(const void* data, size_t size);
+
 void SPU2readDMA4Mem(u16* pMem, u32 size);
 void SPU2writeDMA4Mem(u16* pMem, u32 size);
 void SPU2interruptDMA4();

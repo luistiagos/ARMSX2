@@ -72,5 +72,18 @@ falha visível por uma silenciosa.
 
 ## Situação
 
-Aberto, sem correção. O comportamento atual (rejeição limpa) é seguro: nenhum arquivo é perdido, e
-o usuário recebe uma mensagem em vez de um estado corrompido.
+**Corrigido no código pela [TASK-0049](../../task/TASK-0049-carregar-savestates-0x9A54.md); segue
+aberto até um `.p2s` real da 1.0.23 ser carregado**, que é a condição que este próprio registro
+impôs e que continua valendo.
+
+A hipótese corrigida acima se confirmou, e a confirmação foi por medição: a `0x9A54` é o formato
+moderno menos o alargamento dos ciclos, e o leitor novo é um espelho do `FreezeInternals()` atual.
+O varrimento bloco a bloco que a seção anterior pedia foi feito e está na TASK-0049 — inclusive um
+achado que não estava previsto em lugar nenhum: **o `SPU2.bin` também precisa de mapeamento**,
+porque a self-version do bloco (`0x000e`) não se moveu enquanto `V_Voice` e `V_Core` mudaram, então
+o thaw normal aceitaria o bloco e o leria torto.
+
+Enquanto a validação não acontece, o comportamento anterior (rejeição limpa) continua sendo o piso
+seguro: nenhum arquivo é perdido. E o leitor novo tem uma rede própria — ele confere que o blob foi
+consumido inteiro (`m_idx == m_memory.size()`) e recusa o carregamento se sobrar resíduo, em vez de
+retomar de um estado dessincronizado.

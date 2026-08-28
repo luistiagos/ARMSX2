@@ -109,6 +109,11 @@ public:
 	// SaveStateLegacy::IsSupportedVersion). Implemented in SaveStateLegacy.cpp.
 	bool FreezeInternalsLegacy(Error* error);
 
+	// Load-only reader for RetroSystem PS2's pre-fork 0x9A54 blobs: the same
+	// block sequence FreezeInternals() reads, with the cycle counters still
+	// 32-bit. Implemented in SaveStateLegacy.cpp.
+	bool FreezeInternals9A54(Error* error);
+
 	// Loads or saves an arbitrary data type.  Usable on atomic types, structs, and arrays.
 	// For dynamically allocated pointers use FreezeMem instead.
 	template<typename T>

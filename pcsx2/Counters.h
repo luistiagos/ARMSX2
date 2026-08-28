@@ -134,3 +134,8 @@ template< uint page > extern u16 rcntRead32( u32 mem );		// returns u16 by desig
 
 extern void UpdateVSyncRate(bool force);
 
+// DELETEME after 2026-12-01 (see the definition): heals EE counters poisoned by
+// the pre-2026-08-09 u32 rcntSyncCounter blowup. Called from rcntFreeze() and
+// from the 0x9A54 legacy reader, which reads the same counters off the wire.
+extern void rcntRepairPoisonedCounters();
+
