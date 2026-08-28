@@ -93,7 +93,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0038](TASK-0038-fila-de-download-visivel.md) — fila de download visível, e progresso que chega na tela | concluída | FEAT-0001 | fila-download-sem-tela-e-sem-progresso-ao-vivo | `7e4f9d41ce` |
 | [TASK-0040](TASK-0040-fila-de-download-em-tela-propria.md) — fila de download em tela própria | concluída | FEAT-0001 | fila-download-congela-tela-ao-pausar | `a3c7cccf51` |
 | [TASK-0041](TASK-0041-permissao-de-notificacao-do-download.md) — permissão de notificação do download | concluída | FEAT-0001 | notificacao-de-download-invisivel-sem-pedir-permissao | `f1d206eacf` |
-| [TASK-0042](TASK-0042-remover-regra-um-commit-por-task.md) — sai a regra "uma task = um commit" | concluída | FEAT-0002 | — | `d569063f37` |
+| [TASK-0042](TASK-0042-remover-regra-um-commit-por-task.md) — sai a regra "uma task = um commit" | concluída | FEAT-0002 | — | `d569063f37` `8395d24ab6` |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`
