@@ -1691,27 +1691,67 @@ open class MainActivityRuntime : ComponentActivity() {
                 ?: context.dataDir.absolutePath
         }
 
+        /**
+         * Instala uma árvore de assets e **reporta se algum arquivo não chegou ao disco**.
+         *
+         * O relato existe porque a falha é, hoje, invisível: `MainActivity.copyFile` tem o próprio
+         * `catch (IOException)` que loga e fecha os streams, então a exceção nunca sobe até aqui e o
+         * `catch` lá embaixo só vê falha de `assetMgr.list()`. Um gancho naquele `catch` reportaria
+         * quase nada. Por isso a verificação é **por resultado**: depois da cópia, o destino tem de
+         * existir.
+         *
+         * Um relato por passe, não por arquivo: `TelemetryReporter.report` deduplica por
+         * `hash(componente|mensagem)`, e o caminho na mensagem faria de cada arquivo um evento
+         * distinto — um disco cheio viraria uma centena de POSTs durante o boot.
+         */
         fun copyAssetAll(p_context: Context, srcPath: String) {
-            copyAssetAll(p_context, srcPath, assetCopyRoot(p_context))
+            val rootDir = assetCopyRoot(p_context)
+            val failures = ArrayList<String>()
+            copyAssetAll(p_context, srcPath, rootDir, failures)
+            if (failures.isEmpty()) return
+            runCatching {
+                val sample = failures.take(10).joinToString(", ")
+                val ctx = "root=" + rootDir +
+                    "; device=" + Build.MANUFACTURER + ' ' + Build.MODEL +
+                    "; version=" + BuildConfig.VERSION_NAME
+                com.armsx2.telemetry.TelemetryReporter.report(
+                    "assets",
+                    "MainActivityRuntime.kt",
+                    "copyAssetAll",
+                    "Packaged asset installation incomplete: tree=$srcPath failed=${failures.size}",
+                    ctx,
+                    arrayOf(ctx, "missing: $sample"),
+                    /*terminal=*/false,
+                )
+            }
         }
 
-        private fun copyAssetAll(p_context: Context, srcPath: String, rootDir: String) {
+        private fun copyAssetAll(
+            p_context: Context,
+            srcPath: String,
+            rootDir: String,
+            failures: MutableList<String>,
+        ) {
             val assetMgr = p_context.assets
             try {
                 val destPath = rootDir + File.separator + srcPath
                 assetMgr.list(srcPath)?.let {
                     if (it.isEmpty()) {
                         MainActivity.copyFile(p_context, srcPath, destPath)
+                        // copyFile engoliu a própria IOException. Destino ausente é a única evidência
+                        // que sobra — e é inequívoca: um asset de tamanho zero ainda produz arquivo.
+                        if (!File(destPath).exists()) failures.add(srcPath)
                     } else {
                         val dir = File(destPath)
                         if (!dir.exists()) dir.mkdirs()
                         for (element in it) {
-                            copyAssetAll(p_context, srcPath + File.separator + element, rootDir)
+                            copyAssetAll(p_context, srcPath + File.separator + element, rootDir, failures)
                         }
                     }
                 }
             } catch (e: IOException) {
                 android.util.Log.e("ARMSX2", "copyAssetAll failed: $srcPath -> $rootDir: ${e.message}")
+                failures.add(srcPath)
             }
         }
 
@@ -1837,6 +1877,33 @@ open class MainActivityRuntime : ComponentActivity() {
     private val AUTO_BOOT_BIOS = false
 
     /**
+     * Relata ao `/logErr` que a inicializacao nativa nao aconteceu (componente `armsx2/boot`).
+     *
+     * O contexto carrega as ABIs suportadas alem do modelo: o caso classico deste relato e um
+     * aparelho cuja ABI nao casa com nenhum `emucore_*.so` empacotado, e sem essa lista o
+     * relato nao distingue "APK errado" de "biblioteca corrompida".
+     */
+    private fun reportNativeInitFailure(reason: String, stack: String? = null) {
+        runCatching {
+            val ctx = "device=" + Build.MANUFACTURER + ' ' + Build.MODEL +
+                "; fingerprint=" + Build.FINGERPRINT +
+                "; sdk=" + Build.VERSION.SDK_INT +
+                "; abis=" + Build.SUPPORTED_ABIS.joinToString(",") +
+                "; version=" + BuildConfig.VERSION_NAME +
+                "; reason=" + reason
+            com.armsx2.telemetry.TelemetryReporter.report(
+                "boot",
+                "MainActivityRuntime.kt",
+                "kickoffEmucoreInit",
+                "Inicializacao nativa falhou: $reason",
+                ctx,
+                if (stack == null) arrayOf(ctx) else arrayOf(ctx, stack),
+                /*terminal=*/false,
+            )
+        }
+    }
+
+    /**
      * Run the heavy one-shot emucore init (asset copy + EmuFolders +
      * SDL/HID setup + EE/VIF JIT-test prelude). MUST be called only
      * AFTER the user has finished the setup wizard so `MainActivityRuntime.systemDir`
@@ -1948,7 +2015,28 @@ open class MainActivityRuntime : ComponentActivity() {
         // cosmetic and must not block first paint / risk an ANR on slow SD cards.)
 
         invoke {
-            NativeApp.initializeOnce(applicationContext)
+            // `armsx2/boot` — a inicializacao nativa e o unico ponto do boot cuja falha nao deixa
+            // rastro nenhum hoje. `NativeApp` ja detecta a carga falha (poe `hasNoNativeBinary` no
+            // `UnsatisfiedLinkError`), mas nada no app le essa variavel: o boot segue e morre na
+            // primeira chamada JNI, atribuida a tela que chamou `NativeApp` primeiro.
+            //
+            // Os dois modos de falha sao distintos e valem mensagens distintas: a biblioteca que
+            // nao carregou (ABI incompativel, .so ausente do APK) e o `initializeOnce` que lancou.
+            if (NativeApp.hasNoNativeBinary) {
+                reportNativeInitFailure("emucore nao carregou (ABI incompativel ou biblioteca ausente do APK)")
+            }
+            try {
+                NativeApp.initializeOnce(applicationContext)
+            } catch (t: Throwable) {
+                reportNativeInitFailure(
+                    t.javaClass.simpleName + (t.message?.let { ": $it" } ?: ""),
+                    android.util.Log.getStackTraceString(t),
+                )
+                // Relancado de proposito: hoje esta excecao sobe do `eScope.launch` e deixa
+                // `nativeReady` em false. Telemetria nunca muda o comportamento do app, entao o
+                // relato entra no caminho sem desviar dele.
+                throw t
+            }
             nativeReady.value = true
 
             // Lightgun: read the pref and re-assert the USB device type. The ini is

@@ -18,6 +18,14 @@ segmento antes da `/` de volta para este repositório). Componentes emitidos hoj
 | `armsx2/java` | Exceção Java não tratada | `Thread.setDefaultUncaughtExceptionHandler` (via `CrashReporter`) | na hora (síncrono, terminal) |
 | `armsx2/anr`  | ANR (main thread travada > 5 s) | Watchdog do `CrashReporter` | na hora (síncrono) |
 | `armsx2/native` | Crash **nativo** (SIGSEGV/SIGABRT no JIT x86→ARM64 — ex.: *Shadow of the Colossus* em `0x12218`) | `ApplicationExitInfo` (API 30+) lido no **próximo boot** | no próximo boot (assíncrono) |
+| `armsx2/boot` | A inicialização nativa não aconteceu: `emucore` não carregou (ABI incompatível, `.so` ausente) ou `initializeOnce` lançou | `MainActivityRuntime.kickoffEmucoreInit` | na hora (assíncrono) |
+| `armsx2/assets` | Um asset empacotado (BIOS, shaders, `GameIndex.yaml`, fontes) não chegou ao disco | `MainActivityRuntime.copyAssetAll` | na hora (assíncrono) |
+
+> Os três primeiros são de **crash** e vieram na [TASK-0018](../task/TASK-0018-telemetria-no-fork.md);
+> `boot` e `assets` são falhas que **não** derrubam o processo e vieram na
+> [TASK-0044](../task/TASK-0044-telemetria-de-boot-e-de-assets.md). A linha anterior tinha ainda
+> `armsx2/graphics-boot` e `armsx2/graphics`; nenhum dos dois existe neste ramo — ver o escopo da
+> TASK-0044.
 
 ### Como os crashes nativos são recuperados (sem código nativo)
 
