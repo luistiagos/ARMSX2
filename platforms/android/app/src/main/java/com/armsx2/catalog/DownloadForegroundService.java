@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat;
 
 import com.armsx2.R;
 import com.armsx2.Main;
+import com.armsx2.i18n.I18n;
 
 /**
  * Foreground service that keeps downloads alive when the screen locks.
@@ -57,7 +58,8 @@ public class DownloadForegroundService extends Service implements DownloadQueueM
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Notification notification = buildNotification("Iniciando download...", -1);
+        Notification notification =
+                buildNotification(I18n.INSTANCE.get("catalog.queue.notification.starting"), -1);
         try {
             startForeground(NOTIFICATION_ID, notification);
         } catch (RuntimeException e) {
@@ -99,7 +101,7 @@ public class DownloadForegroundService extends Service implements DownloadQueueM
                 return;
             }
         }
-        notify("Download em fila...", -1, true);
+        notify(I18n.INSTANCE.get("catalog.queue.notification.queued"), -1, true);
     }
 
     @Override
@@ -141,7 +143,10 @@ public class DownloadForegroundService extends Service implements DownloadQueueM
 
         mBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_download)
-                .setContentTitle("ARMSX2 — Download")
+                // De `R.string.app_name`, e não de uma literal: UM lugar decide o nome do produto
+                // (TASK-0017). Enquanto a notificação era invisível — a permissão nunca foi pedida
+                // — isto dizia "ARMSX2 — Download", o nome do upstream, e ninguém via.
+                .setContentTitle(getString(R.string.app_name))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setSilent(true)
@@ -165,11 +170,14 @@ public class DownloadForegroundService extends Service implements DownloadQueueM
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Nome e descrição saem do i18n. Os dois são regraváveis: chamar
+            // createNotificationChannel de novo com o mesmo id atualiza ambos (só a importância é
+            // que fica presa), então quem já tem o app instalado também vê o texto corrigido.
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "ROM Downloads",
+                    I18n.INSTANCE.get("catalog.queue.notification.channel"),
                     NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("Downloads de ROMs em segundo plano");
+            channel.setDescription(I18n.INSTANCE.get("catalog.queue.notification.channelDesc"));
             channel.setSound(null, null);
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) nm.createNotificationChannel(channel);

@@ -68,6 +68,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0038](../task/TASK-0038-fila-de-download-visivel.md) | concluída | **Fila de download visível** — a seção da versão anterior volta, e o progresso passa a chegar na tela |
 | [TASK-0039](../task/TASK-0039-credito-da-musica-so-quando-toca.md) | concluída | **Crédito condicional** — a tela Sobre só cita a música quando o toggle está ligado |
 | [TASK-0040](../task/TASK-0040-fila-de-download-em-tela-propria.md) | concluída | **Downloads como tela** — a fila sai de cima da grade e ganha destino próprio, como a aba "Salvos" |
+| [TASK-0041](../task/TASK-0041-permissao-de-notificacao-do-download.md) | concluída | **Notificação de download visível** — a permissão passa a ser pedida, e o texto deixa de dizer "ARMSX2" |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de

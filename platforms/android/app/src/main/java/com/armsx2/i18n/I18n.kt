@@ -707,6 +707,12 @@ private val BASE_EN: Map<String, String> = mapOf(
     "catalog.queue.failed" to "Failed — tap to retry",
     "catalog.paused.short" to "Paused",
     "catalog.queue.progress" to "%1\$s MB of %2\$s MB (%3\$d%%)",
+    // A notificação do serviço. Lida por `I18n.get` (fora de composição) em
+    // DownloadForegroundService; o título vem de R.string.app_name, não daqui.
+    "catalog.queue.notification.channel" to "ROM downloads",
+    "catalog.queue.notification.channelDesc" to "Background ROM downloads",
+    "catalog.queue.notification.starting" to "Starting download…",
+    "catalog.queue.notification.queued" to "Download queued…",
     "games.section.library" to "Library",
     "games.section.recentlyPlayed" to "Recently Played",
     "games.section.allGames" to "All Games",
