@@ -77,15 +77,39 @@ $ python scripts/check_traceability.py
 (sem as linhas de TASK-0016 e TASK-0017)
 ```
 
-Duas coisas que só apareceram ao fazer:
+### A premissa da task estava errada, e a verificação derrubou
+
+Escrevi acima, e no primeiro commit, que TASK-0016 e TASK-0017 "têm dois commits cada". **Não têm.**
+Ao conferir hash por hash antes de fechar:
+
+| Hash | Assunto | Ramo |
+|---|---|---|
+| `9388c6a261` | TASK-0016: estabelece a base do fork | `feature/fork-upstream-android` |
+| `e68aef1491` | TASK-0016: tira o parse do catálogo da main thread | `feature/handoff-end-to-end` |
+
+São **duas tasks diferentes com o mesmo número**, em ramos sem história comum, e `commits_for_task`
+procura em `--all`. A reprovação nunca foi "uma task commitada duas vezes"; era colisão de
+numeração. Registrado em [`numeros-de-task-colidem-entre-ramos`](../bugs/open/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md).
+
+Isso **não** invalida a remoção da regra — o custo real dela (empurrar para `--amend`, medido na
+TASK-0040) continua valendo, e era esse o pedido. Invalida a justificativa que eu tinha dado com os
+dois casos.
+
+E cobrou um preço imediato: com a regra fora, `fill_index` passou a gravar **todos** os hashes e
+escreveu na linha da TASK-0016 do fork o hash da TASK-0016 do handoff. Corrigido aqui mesmo —
+`commits_for_task` ganhou `reachable_only`, e o índice passa a resolver só o que `HEAD` alcança,
+porque o índice descreve **este** ramo. A validação continua em `--all`, que é o que evita reprovar
+task anterior ao fork.
+
+### Outras duas coisas que só apareceram ao fazer
 
 - **`fill_index` só roda com a validação passando** (`main()` retorna 1 antes de chegar nele). Quem
   usa `--fix` para consertar o índice enquanto há qualquer outro problema aberto não recebe nada, e
-  o script não diz que pulou. Não mexi nisso — é escopo da [TASK-0010](TASK-0010-corrigir-validador-rastreabilidade.md),
-  que já existe para o `--fix` — mas fica registrado aqui porque me custou uma rodada.
-- **O índice não tinha linha para a TASK-0016 nem para a TASK-0017**, justamente as duas com dois
-  commits. Sem elas, o caminho novo do `fill_index` não seria exercitado por nada. Foram
-  acrescentadas, e são a prova de que a coluna comporta N hashes.
+  o script não avisa que pulou. Não mexi — é escopo da [TASK-0010](TASK-0010-corrigir-validador-rastreabilidade.md) —
+  mas fica registrado, porque me custou uma rodada.
+- **Cada `--fix` acrescentava um espaço** na célula de commit (o `\s*` do padrão já engolia o
+  espaço, e a substituição concatenava outro). Um `rstrip()` resolveu.
 
-Esta task tem **dois commits**, de propósito: o segundo grava no índice o hash do primeiro. Sob a
-regra que acabou de sair, isso teria exigido `--amend` — exatamente o que ela custava.
+Esta task tem **dois commits**, de propósito: o segundo é esta correção mais o índice. Sob a regra
+que acabou de sair, teria exigido `--amend` — exatamente o que ela custava, e exatamente o tipo de
+volta que agora é permitido.

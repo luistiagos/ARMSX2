@@ -73,7 +73,7 @@ def commit_is_reachable(sha):
         return False
 
 
-def commits_for_task(tid):
+def commits_for_task(tid, reachable_only=False):
     """Fonte de verdade do vinculo task->commit: o assunto do commit. Git nao mente.
 
     Procura em `--all`, nao em `HEAD`. O motivo e o fork: a branch do fork nasce da arvore do
@@ -84,8 +84,16 @@ def commits_for_task(tid):
     Isto NAO enfraquece a checagem de commit orfao mais abaixo. Aquela existe para hash escrito a
     mao no campo `Commit:` de uma task, e um orfao de `--amend` nao e alcancavel por nenhuma ref --
     portanto `--all` continua sem o enxergar.
+
+    `reachable_only` restringe a HEAD, e existe porque os NUMEROS DE TASK NAO SAO UNICOS ENTRE
+    RAMOS: `feature/fork-upstream-android` e `feature/handoff-end-to-end` nao tem historia comum e
+    numeraram tasks em paralelo, entao ha uma TASK-0016 em cada uma, com assuntos completamente
+    diferentes. Para VALIDAR ("existe commit?") a busca larga e desejavel -- e o que evita reprovar
+    task anterior ao fork. Para ESCREVER O INDICE deste worktree, nao: gravar o hash do outro ramo
+    e registrar mentira. Ver o bug `numeros-de-task-colidem-entre-ramos`.
     """
-    out = git("log", "--format=%h", "--grep=^" + tid + ":", "--extended-regexp", "--all")
+    rev = "HEAD" if reachable_only else "--all"
+    out = git("log", "--format=%h", "--grep=^" + tid + ":", "--extended-regexp", rev)
     return [l for l in (out or "").splitlines() if l]
 
 
@@ -213,7 +221,9 @@ def fill_index(tasks):
     text = read(index)
     changed = 0
     for tid in sorted(tasks):
-        found = commits_for_task(tid)
+        # So o que HEAD alcanca: o indice descreve ESTE ramo. Com `--all` a TASK-0016 do fork
+        # recebia o hash da TASK-0016 do handoff, que e outra task inteiramente.
+        found = commits_for_task(tid, reachable_only=True)
         if not found:
             continue
         # Todos os hashes, e nao so o primeiro: desde que "uma task = um commit" saiu (TASK-0042)
@@ -225,8 +235,10 @@ def fill_index(tasks):
         # substitui a celula de commit da linha do indice que cita esta task
         pattern = re.compile(r"^(\|\s*\[" + tid + r"\].*\|\s*)([^|]*)(\|\s*)$", re.MULTILINE)
 
+        # `rstrip()` no grupo 1: o `\s*` do padrao ja engole o espaco depois do `|`, e concatenar
+        # outro a cada passada fazia a celula ganhar um espaco por execucao de `--fix`.
         def repl(m, shas=shas):
-            return m.group(1) + " " + shas + " " + m.group(3)
+            return m.group(1).rstrip() + " " + shas + " " + m.group(3)
 
         new_text, n = pattern.subn(repl, text)
         if n and new_text != text:
