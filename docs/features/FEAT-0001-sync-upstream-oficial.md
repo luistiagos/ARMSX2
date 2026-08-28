@@ -69,6 +69,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0039](../task/TASK-0039-credito-da-musica-so-quando-toca.md) | concluída | **Crédito condicional** — a tela Sobre só cita a música quando o toggle está ligado |
 | [TASK-0040](../task/TASK-0040-fila-de-download-em-tela-propria.md) | concluída | **Downloads como tela** — a fila sai de cima da grade e ganha destino próprio, como a aba "Salvos" |
 | [TASK-0041](../task/TASK-0041-permissao-de-notificacao-do-download.md) | concluída | **Notificação de download visível** — a permissão passa a ser pedida, e o texto deixa de dizer "ARMSX2" |
+| [TASK-0043](../task/TASK-0043-aviso-anti-revenda-do-upstream.md) | aberta | **Aviso anti-revenda do upstream** — aparece a cada boot dizendo "ARMSX2" e mandando pedir reembolso; decisão de licença |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de
