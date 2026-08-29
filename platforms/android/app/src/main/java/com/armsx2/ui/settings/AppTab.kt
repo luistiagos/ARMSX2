@@ -702,6 +702,13 @@ fun AppTab() {
         )
 
         ToggleRow(
+            label = str("app.throttleWarnings"),
+            value = com.armsx2.ThrottleWatcher.enabled.value,
+            description = str("app.throttleWarnings.desc"),
+            onChange = { com.armsx2.ThrottleWatcher.set(it) },
+        )
+
+        ToggleRow(
             label = str("app.libraryMusic"),
             value = com.armsx2.LibraryMusic.enabled.value,
             description = str("app.libraryMusic.desc"),

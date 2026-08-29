@@ -586,6 +586,7 @@ open class MainActivityRuntime : ComponentActivity() {
             // otherwise stay in the set and be re-emitted into the NEXT session.
             com.armsx2.ui.touch.TouchControls.clearHeldPressureKeys()
             com.armsx2.BatteryWatcher.resetForNewSession()
+            com.armsx2.ThrottleWatcher.stop()
             instance?.runOnUiThread { instance?.applyEmulationOrientation() }
         }
 
@@ -725,6 +726,8 @@ open class MainActivityRuntime : ComponentActivity() {
                     WindowImpl.overlayVisible.value = false
                     WindowImpl.toolbarVisible.value = false
                     emulationOwnsOrientation = true
+                    // Aparelho segurando o clock da CPU: só dá para medir com o jogo rodando.
+                    com.armsx2.ThrottleWatcher.start()
                     // Opt-in only: blocks a controller's Home button from minimising the game,
                     // which the app cannot do any other way — HOME never reaches us (#425).
                     instance?.let { com.armsx2.ui.ScreenPinning.start(it) }
@@ -1102,6 +1105,8 @@ open class MainActivityRuntime : ComponentActivity() {
                     // The BIOS is emulation too: claim the renderer rotation tier so it honours the
                     // Renderer page (global, since there is no game) instead of the launcher's.
                     emulationOwnsOrientation = true
+                    // O BIOS também é emulação, e o corte de clock não distingue os dois.
+                    com.armsx2.ThrottleWatcher.start()
                     applyRendererPrefs()
                     // The BIOS mounts the cards too, and its memory card manager can format one or
                     // delete saves off it — so this boot is worth a copy for the same reason a game
@@ -2357,6 +2362,8 @@ open class MainActivityRuntime : ComponentActivity() {
         com.armsx2.SecondScreen.attach(applicationContext)
         com.armsx2.BatteryWatcher.load()
         com.armsx2.BatteryWatcher.start(applicationContext)
+        // Só o interruptor: o vigia do clock nasce e morre com a sessão de emulação (TASK-0050).
+        com.armsx2.ThrottleWatcher.load()
         startAutosaveIntervalJob()
         // Restore the saved rumble master toggle into the native gate (NativeApp.onPadRumble).
         NativeApp.sRumbleEnabled = ControllerMappings.rumbleEnabled()
