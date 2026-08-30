@@ -14,6 +14,15 @@
 #include <sys/system_properties.h>
 #endif
 
+#if defined(ARCH_ARM64) && !defined(_MSC_VER) && defined(__linux__)
+#include <asm/hwcap.h>
+#include <sys/auxv.h>
+// Older uapi headers predate the bit; its value is fixed by the kernel ABI.
+#ifndef HWCAP_EVTSTRM
+#define HWCAP_EVTSTRM (1 << 2)
+#endif
+#endif
+
 static u32 PAUSE_TIME = 0;
 
 static void MultiPause()
@@ -124,8 +133,10 @@ u32 ShortSpin()
 // waiting on a poster 100µs away, 3.5 wake-ups per wait as written against 6708
 // with a CLREX added. Linux's arm64 __cmpwait omits it for the same reason.
 //
-// A monitor that never fires is a latency cost, not a hang: WFE also wakes on
-// the periodic event stream, every ~33µs on this host.
+// A monitor that never fires is a latency cost rather than a hang ONLY where the
+// periodic event stream runs (~33µs on the Cortex-A78C this was tuned on). That is a
+// kernel option, not a guarantee, so callers reach this through HasEventStream() below
+// — without the event stream a WFE with no poster left never returns at all.
 static void MonitoredWait(const std::atomic<s32>& word, s32 expected)
 {
 	s32 seen;
@@ -144,9 +155,51 @@ static void MonitoredWait(const std::atomic<s32>& word, s32 expected)
 }
 #endif
 
+#if defined(ARCH_ARM64) && !defined(_MSC_VER) && defined(__linux__)
+// Whether the architected timer's event stream is running, i.e. whether WFE has a
+// periodic wake-up at all.
+//
+// MonitoredWait() above parks in WFE with exactly two ways out: a store that clears
+// the exclusive monitor, or the event stream. The store is not guaranteed - a waiter
+// whose poster has gone quiet (MTVU with the VM paused, ring buffer empty) has nobody
+// left to write - so the event stream is the only backstop, and it is a kernel option
+// (CONFIG_ARM_ARCH_TIMER_EVTSTREAM), not an architectural promise. Where it is off,
+// that WFE never returns.
+//
+// That is not a latency cost, it is a hang with a misleading shape: WFE is not a yield,
+// so the thread stays runnable and the kernel keeps charging it CPU time. It shows up as
+// a thread pegged at 100% of a core in state R - measured on an Exynos 850 (8x Cortex-A55),
+// MTVU burning 724 ticks in ~7s of wall clock with the VM paused and the screen off.
+// The SPIN_TIME_NS budget cannot save it: WaitForWorkWithSpin() only checks that budget
+// BETWEEN calls to ShortSpinOn(), so a call that never returns is never accounted for and
+// the m_sema.Wait() below it is never reached.
+//
+// AT_HWCAP's HWCAP_EVTSTRM is the kernel telling us directly (same bit as the "evtstrm"
+// flag in /proc/cpuinfo). Without it, fall back to the isb spin, which is bounded by
+// construction and lets the caller reach its sleep.
+//
+// Resolved on first use rather than at static-init time, deliberately: the answer has to
+// reach the log, and at static-init the log file is not open yet, so the warning would be
+// written into nothing.
+static bool HasEventStream()
+{
+	static const bool present = []() {
+		const bool p = (getauxval(AT_HWCAP) & HWCAP_EVTSTRM) != 0;
+		if (!p)
+			Console.Warning("HostSys: ARM64 event stream absent, WFE spin disabled");
+		return p;
+	}();
+	return present;
+}
+#endif
+
 u32 ShortSpinOn(const std::atomic<s32>& word, s32 expected)
 {
 #if defined(ARCH_ARM64) && !defined(_MSC_VER)
+#if defined(__linux__)
+	if (!HasEventStream())
+		return ShortSpin();
+#endif
 	const u64 start = GetCPUTicks();
 	MonitoredWait(word, expected);
 	// Charge unmeasurably short waits as one tick, not zero: the caller

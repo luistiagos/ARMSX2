@@ -5,7 +5,7 @@
 - **Errors (serviço):** nenhum — não gera crash nem ANR, é vazamento silencioso
 - **Classe:** vazamento de recurso / performance
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0046](../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md)
+- **Tasks que o resolvem:** [TASK-0046](../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) (o sintoma no shutdown), [TASK-0056](../../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md) (a causa do giro)
 
 ## Sintoma
 
@@ -78,12 +78,33 @@ que estragou a primeira medição de linha de base desta investigação.
 
 ## Por que o spin não termina sozinho
 
-Não foi determinado, e não precisou ser. `SPIN_TIME_NS` é 50 µs (`common/HostSys.cpp:176`) e
-`ShortSpinOn()` (`common/HostSys.cpp:147`) cobra no mínimo 1 tick justamente para a contagem nunca
-travar, então `WaitForWorkWithSpin()` deveria cair em `m_sema.Wait()` e dormir. A hipótese é que o
-laço externo de `ExecuteRingBuffer()` gira em falso — `WaitForWorkWithSpin()` retornando na hora
-com o ring buffer vazio —, mas isso **não está provado**. Encerrar a thread remove o sintoma
-qualquer que seja o gatilho interno. Fica registrado como pergunta em aberto.
+**Respondido em 2026-08-30** — ver [TASK-0056](../../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md).
+O texto original desta seção fica abaixo porque o raciocínio que ele faz é justamente o que tinha o
+furo, e vale ver onde.
+
+O furo: o teto de `SPIN_TIME_NS` só é conferido **entre** chamadas a `ShortSpinOn()`. Ele não
+limita uma chamada que não retorna — e no ARM64 `ShortSpinOn()` é um `WFE`
+(`MonitoredWait`, `common/HostSys.cpp:129`), que só acorda por uma escrita na palavra observada ou
+pelo event stream do timer arquitetural. Com a VM encerrada não há quem escreva; e o event stream é
+opção de kernel (`CONFIG_ARM_ARCH_TIMER_EVTSTREAM`), publicada em `AT_HWCAP` como `HWCAP_EVTSTRM`.
+Onde ele está desligado, aquele `WFE` não volta nunca.
+
+Isso também explica por que o "mínimo de 1 tick" não ajudou: ele garante que `waited` avança **a
+cada retorno**, e o problema é não haver retorno.
+
+E fecha o formato da evidência: `WFE` não é `yield`, a thread continua *runnable*, e o kernel
+segue cobrando tempo de CPU dela. Por isso a medição encontra a thread em estado **`R`** com tempo
+de CPU igual à idade — se ela tivesse chegado ao `m_sema.Wait()`, estaria em `S`.
+
+A hipótese registrada abaixo (laço externo girando em falso) está **descartada**: um laço em falso
+passaria pelo `m_sema.Wait()` a cada volta e a thread apareceria em `S` em alguma amostra.
+
+> ~~Não foi determinado, e não precisou ser. `SPIN_TIME_NS` é 50 µs (`common/HostSys.cpp:176`) e
+> `ShortSpinOn()` (`common/HostSys.cpp:147`) cobra no mínimo 1 tick justamente para a contagem
+> nunca travar, então `WaitForWorkWithSpin()` deveria cair em `m_sema.Wait()` e dormir. A hipótese
+> é que o laço externo de `ExecuteRingBuffer()` gira em falso — `WaitForWorkWithSpin()` retornando
+> na hora com o ring buffer vazio —, mas isso **não está provado**. Encerrar a thread remove o
+> sintoma qualquer que seja o gatilho interno. Fica registrado como pergunta em aberto.~~
 
 ## Por que passou despercebido
 
