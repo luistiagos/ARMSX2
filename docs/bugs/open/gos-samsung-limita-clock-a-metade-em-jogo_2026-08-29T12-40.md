@@ -10,7 +10,9 @@
 - **Reincidência:** sistêmico — atinge todo aparelho Samsung com o GOS ativo
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** [TASK-0050](../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md)
-  — que **não corrige o defeito** (não há como): apenas detecta e explica ao usuário
+  (detecta e explica) e [TASK-0051](../../task/TASK-0051-acao-para-o-limite-do-aparelho.md) (leva o
+  usuário ao botão que desarma) — **nenhuma das duas corrige o defeito**, porque ele é do aparelho:
+  o app não pode desabilitar o GOS nem forçar a parada dele
 
 ## Sintoma
 
