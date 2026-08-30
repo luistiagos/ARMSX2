@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.Settings
 import com.armsx2.i18n.I18n
 import com.armsx2.ui.WelcomeBanner
+import com.armsx2.ui.common.GlobalConfirm
 import java.io.File
 
 /**
@@ -231,10 +232,25 @@ object ThrottleWatcher {
         // Nomear o culpado só quando ele está lá. O aviso sai de qualquer jeito — um teto medido
         // é um teto medido —, mas acusar o GOS num aparelho onde ele não está instalado, ou está
         // desabilitado, transformaria uma medição em boato.
-        val key = if (vendorActive.value) "throttle.warn.samsung" else "throttle.warn"
-        val text = runCatching { I18n.get(key).format(pct) }.getOrDefault("")
-        if (text.isEmpty()) return
+        val actionable = vendorActive.value
+        val bodyKey = if (actionable) "throttle.dialog.body.samsung" else "throttle.dialog.body"
+        val body = runCatching { I18n.get(bodyKey).format(pct) }.getOrDefault("")
+        if (body.isEmpty()) return
         val activity = com.armsx2.runtime.MainActivityRuntime.instance ?: return
-        activity.runOnUiThread { WelcomeBanner.show(text) }
+        // Diálogo, e não banner: isto é uma instrução de três passos para ler e executar, e o
+        // banner se apaga em 2,6 s. GlobalConfirm é o prompt do proprio app -- PadModal por
+        // baixo, montado uma vez em WindowImpl, desenhado por cima ate de um jogo rodando, e sem
+        // temporizador. Dialog/AlertDialog estao proibidos aqui: cada um e uma janela Android
+        // propria e engole os KeyEvents do gamepad antes do dispatchKeyEvent da Activity.
+        activity.runOnUiThread {
+            GlobalConfirm.ask(
+                title = I18n.get("throttle.dialog.title"),
+                message = body,
+                confirmLabel = if (actionable) I18n.get("throttle.dialog.open") else null,
+                dismissLabel = I18n.get("throttle.dialog.close"),
+            ) {
+                if (actionable) openVendorThrottlerSettings(activity)
+            }
+        }
     }
 }

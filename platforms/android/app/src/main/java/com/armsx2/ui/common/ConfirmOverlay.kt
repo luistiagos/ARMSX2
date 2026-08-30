@@ -49,10 +49,15 @@ fun ConfirmOverlay(
     idPrefix: String = "confirm",
 ) {
     val layer = "confirm-overlay:$idPrefix"
+    // O corpo rola e tem teto de altura, como o do [NotifyOverlay] — e pelo mesmo motivo. Um
+    // prompt com instrução de vários passos, aberto sobre um jogo em paisagem, empurrava os
+    // botões para fora da tela; agora o texto rola no D-pad quando a seleção não tem para onde ir.
+    val bodyScroll = rememberScrollState()
     PadModal(
         key = layer,
         onDismiss = onDismiss,
         initialFocusId = "$layer.cancel",
+        scrollState = bodyScroll,
     ) {
         Surface(
             modifier = Modifier
@@ -74,6 +79,9 @@ fun ConfirmOverlay(
                     message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .heightIn(max = 340.dp)
+                        .verticalScroll(bodyScroll),
                 )
                 Spacer(Modifier.height(18.dp))
                 Row(
@@ -183,6 +191,9 @@ object GlobalConfirm {
         val message: String,
         val confirmLabel: String?,
         val destructive: Boolean,
+        /** Rótulo do botão que só fecha. Nulo = "Cancelar", que é o certo para uma confirmação e
+         *  errado para um aviso, onde não há nada a cancelar — ali cabe "Fechar". */
+        val dismissLabel: String?,
         val onConfirm: () -> Unit,
     )
 
@@ -193,9 +204,10 @@ object GlobalConfirm {
         message: String,
         confirmLabel: String? = null,
         destructive: Boolean = false,
+        dismissLabel: String? = null,
         onConfirm: () -> Unit,
     ) {
-        pending.value = Request(title, message, confirmLabel, destructive, onConfirm)
+        pending.value = Request(title, message, confirmLabel, destructive, dismissLabel, onConfirm)
     }
 
     fun dismiss() {
@@ -209,6 +221,7 @@ object GlobalConfirm {
             title = request.title,
             message = request.message,
             confirmLabel = request.confirmLabel ?: str("action.ok"),
+            dismissLabel = request.dismissLabel ?: str("action.cancel"),
             destructive = request.destructive,
             idPrefix = "global",
             onConfirm = {
