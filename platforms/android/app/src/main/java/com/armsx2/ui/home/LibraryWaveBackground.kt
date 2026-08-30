@@ -39,15 +39,27 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
     val colorArgb by LibraryBackgroundColorPreferences.color
     val rgbCycle by LibraryBackgroundColorPreferences.rgbCycle
 
-    // Elapsed seconds, ticked once per frame. Driven off the animation clock (not a recomposition
-    // loop) so only the Canvas draw re-runs each frame, not the whole tree.
+    // Elapsed seconds, driven off the animation clock (not a recomposition loop) so only the
+    // Canvas draw re-runs, not the whole tree.
+    //
+    // Published at most once every FRAME_INTERVAL_NANOS rather than on every vsync: each write
+    // invalidates the Canvas, and each redraw rebuilds eight Paths (body + crest for four wave
+    // layers, 64 segments each), four vertical gradients and ten glyphs. The GL sibling that
+    // draws the same scene already capped itself for exactly this reason and said why
+    // (XmbGlView.FRAME_TARGET_MS): "the wave is slow, so 30 looks identical to 60 but roughly
+    // halves GPU/CPU load". The argument carries over unchanged -- and it matters more here,
+    // because this is the path taken by the devices that CANNOT run the GL one.
     val timeSec = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         var start = 0L
         withInfiniteAnimationFrameNanos { start = it }
+        var lastPublished = start
         while (true) {
             withInfiniteAnimationFrameNanos { now ->
-                timeSec.floatValue = (now - start) / 1_000_000_000f
+                if (now - lastPublished >= FRAME_INTERVAL_NANOS) {
+                    lastPublished = now
+                    timeSec.floatValue = (now - start) / 1_000_000_000f
+                }
             }
         }
     }
@@ -148,6 +160,10 @@ private fun DrawScope.drawWaveScene(t: Float, base: Color) {
 }
 
 private const val WAVE_LAYERS = 4
+
+/** ~30 fps. Pairs with [XmbGlView]'s FRAME_TARGET_MS -- the two backdrops draw the same scene and
+ *  should not disagree about how often it needs redrawing. */
+private const val FRAME_INTERVAL_NANOS = 33_000_000L
 
 /** (xFrac, yPhase, kind 0..3 = △○✕□, scale). Deterministic so nothing allocates per frame. */
 private val GLYPH_SPOTS: List<Glyph> = listOf(
