@@ -4,6 +4,17 @@
 [`bugs/open/gos-samsung-limita-clock-a-metade-em-jogo`](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 **Data da análise:** 2026-08-30
 **Prioridade:** Alta — é a única trilha em que o usuário leigo ganha velocidade **sem fazer nada**
+**Revisado e aberto em tasks:** 2026-08-30
+
+| item | task | situação |
+|---|---|---|
+| 0 — contadores zerados | [TASK-0055](../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md) | em andamento — código escrito, falta rodar no aparelho |
+| 1 — MTVU queima um núcleo | [TASK-0056](../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md) | em andamento — **causa raiz determinada**, código escrito |
+| 2 — biblioteca parada | [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) | em andamento — limite de taxa escrito; **a atribuição deste item estava errada**, ver abaixo |
+| 3 — release contra debug | [TASK-0058](../task/TASK-0058-medir-release-contra-debug.md) | aberta — é medição, precisa do aparelho |
+
+O que a revisão mudou em cada item está marcado **em linha**, abaixo, com o texto original
+preservado ao redor.
 
 ---
 
@@ -49,6 +60,25 @@ expostos por `Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadUsage` e vizinhos
 `VMManager::HasValidVM()` é falso — mas aqui a VM é válida, então o zero vem do próprio
 `PerformanceMetrics`.
 
+> **Revisão 2026-08-30 — três correções no parágrafo acima:**
+>
+> 1. **A ponte JNI não participa.** A linha de `PerfLog` é impressa dentro do núcleo, em
+>    `PerformanceMetrics::Update()` (`pcsx2/PerformanceMetrics.cpp:405`). Os wrappers em
+>    `native-lib.cpp:889` foram lidos e estão corretos; olhar para eles é olhar para o lugar
+>    errado.
+> 2. **Os nomes reais são `GetGSThreadUsage()` e `GetGPUUsage()`** (maiúsculas), não
+>    `GetGsThreadUsage`/`GetGpuUsage`.
+> 3. **Não é um defeito, são dois.** `EE`/`GS`/`VU` vêm de `ThreadHandle::GetCPUTime()`, cujo
+>    caminho POSIX (`common/Linux/LnxThreads.cpp`) devolve **0 em toda falha** — indistinguível de
+>    thread ociosa, e o único caminho que zera os três de uma vez enquanto o `fps` da mesma função
+>    sai certo. `GPU` é outra coisa: vem de `GSDevice::GetAndResetAccumulatedGPUTime()`, que é
+>    `0.0f` fixo quando o backend não tem timestamp query (`GSDeviceVK.cpp:893`) — ausência de
+>    medição, não medição de zero.
+>
+> Tratado na [TASK-0055](../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md), que faz o
+> log dizer `n/a` (ou omitir o campo) em vez de `0%`, seguindo a convenção que a própria função já
+> usa para o `GSB`.
+
 **Validar:** com um jogo rodando, as quatro figuras deixam de ser 0 e somam algo coerente
 (EE alto num jogo pesado de CPU, GS alto num pesado de GPU).
 
@@ -81,6 +111,26 @@ metade, pesa o dobro.
 **A fazer:** decidir entre (a) voltar a `WaitForWork()` no alvo Android, como a 1.0.23; (b) manter o
 giro só enquanto a VM está **executando**, e dormir quando pausada; (c) encurtar `SPIN_TIME_NS` no
 ARM64. A (a) é a que já tem histórico de campo.
+
+> **Revisão 2026-08-30 — a causa raiz está determinada, e nenhuma das três opções era a certa.**
+>
+> O diagnóstico acima descreve o `WFE` como espera de baixo consumo que não cede o núcleo. É pior
+> que isso: `MonitoredWait()` (`common/HostSys.cpp:129`) só sai por uma escrita em `word` ou pelo
+> **event stream** do timer arquitetural — que é opção de kernel
+> (`CONFIG_ARM_ARCH_TIMER_EVTSTREAM`), não promessa da arquitetura. Com a VM pausada não há quem
+> escreva; sem event stream, aquele `WFE` **não volta**.
+>
+> E o teto de 50 µs não salva: `WaitForWorkWithSpin()` só confere `SPIN_TIME_NS` **entre** chamadas
+> a `ShortSpinOn()`. Uma chamada que não retorna nunca é contabilizada, e o `m_sema.Wait()` abaixo
+> dela nunca é alcançado. Isso fecha a pergunta que a
+> [TASK-0046](../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) deixou explicitamente aberta —
+> e casa com a medição: estado `R` (não `S`), tempo de CPU integral, para sempre.
+>
+> Por isso: **(c) não resolveria nada** (o problema não é o tamanho do teto, é ele nunca ser
+> conferido) e **(a) trataria uma chamadora de um defeito de quatro** — `WaitForWorkWithSpin`,
+> `WaitForEmptyWithSpin` e `UserspaceSemaphore::WaitWithSpin` passam pelo mesmo `ShortSpinOn`, e o
+> MTGS passa pelas mesmas linhas. A [TASK-0056](../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md)
+> corrige o `ShortSpinOn`: se `AT_HWCAP` não traz `HWCAP_EVTSTRM`, o caminho `WFE` não é usado.
 
 **Cuidado:** a [TASK-0046](../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) já mexeu nesta
 área (fechou a thread no shutdown). Ler antes.
@@ -117,6 +167,24 @@ um jogo.
 limitar a taxa do fundo (30 fps ou menos), pausá-lo quando não há interação, ou desligá-lo por
 padrão em aparelho sem núcleo grande.
 
+> **Revisão 2026-08-30 — a "origem provável" não se sustenta como está escrita.**
+>
+> A medição é da tela **"Salvos"**, e `SaveManagerScreen` monta `ArmsBackdrop { ... }` **sem** o
+> parâmetro `backgroundLayer` (`SaveManagerScreen.kt:58`) — é esse parâmetro que carrega o fundo
+> animado, e só `HomeScreen` o passa (`HomeScreen.kt:242`). O `XmbGlView`, além disso, **já** se
+> limita a 30 fps e **já** encerra a thread EGL em `onSurfaceTextureDestroyed`.
+>
+> Sobra uma pergunta, e é ela que decide: `AppNavigation` troca de tela com um `AnimatedContent`
+> cujo `exit` é `ExitTransition.None` (`AppNavigation.kt:78`). Se o Compose descarta o destino que
+> sai, a `HomeScreen` é desmontada, o `LaunchedEffect` da onda é cancelado, e o fundo **não pode**
+> ser o custo medido em "Salvos". Não foi verificado — e não se escreve correção sobre isso sem
+> verificar.
+>
+> A [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) entrega a opção
+> "limitar a taxa" desta lista, que é ganho certo **na biblioteca** e não depende da resposta: o
+> `LibraryWaveBackground` redesenhava a cada vsync enquanto o irmão em GL, que desenha a mesma
+> cena, já se limitava a 30 fps. A task também traz a amostragem que responde à pergunta acima.
+
 **Validar:** mesma amostragem de threads na tela "Salvos" parada — o total deve cair para bem abaixo
 de meio núcleo, e o jank do `gfxinfo` deve desabar.
 
@@ -136,6 +204,16 @@ com e sem o teto do GOS. É a incógnita mais barata do time — pode ser 0% e p
 
 **Cuidado:** o release é ofuscado por R8, e o que o nativo alcança **por nome** precisa de regra em
 `app/proguard-rules.pro`. Falha só aparece em runtime.
+
+> **Revisão 2026-08-30 — o cuidado com o R8 já está coberto.** Os quatro `FindClass` da árvore fora
+> de `3rdparty` (`NativeApp`, `HttpClient`, `HttpClient$Response`, `BiosInfo`) têm regra `-keep`, e
+> os métodos nativos estão cobertos por `-keepclasseswithmembernames class * { native <methods>; }`.
+> A tabela da conferência está na [TASK-0058](../task/TASK-0058-medir-release-contra-debug.md).
+> Reflexão em Kotlin e classes citadas só no manifesto continuam sendo risco — o caminho JNI, que
+> era o citado, não.
+>
+> Fazer esta medição **depois** da TASK-0055: sem os contadores de EE/GS/VU funcionando, a tabela
+> mostra só `fps`, e um `fps` igual não distingue "não mudou nada" de "mudou o gargalo de lugar".
 
 **Validar:** tabela de `PerfLog` das quatro combinações.
 
