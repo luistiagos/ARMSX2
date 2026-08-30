@@ -213,6 +213,10 @@ object WindowImpl {
                 // Authors the app-wide confirmation prompt (GlobalConfirm.ask). It is composed
                 // here, but drawn by PadModalHost above — this call renders nothing itself.
                 com.armsx2.ui.common.GlobalConfirm.Host()
+
+                // O aviso do limite de CPU do aparelho e o assistente que ensina a desarmá-lo.
+                // Mesmo motivo de estar aqui: precisa alcançar a tela por cima de um jogo rodando.
+                com.armsx2.ui.common.ThrottleHelp.Host()
             }
         }
     }

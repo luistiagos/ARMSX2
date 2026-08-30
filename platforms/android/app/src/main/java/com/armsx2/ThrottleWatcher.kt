@@ -7,7 +7,7 @@ import android.os.Build
 import android.provider.Settings
 import com.armsx2.i18n.I18n
 import com.armsx2.ui.WelcomeBanner
-import com.armsx2.ui.common.GlobalConfirm
+import com.armsx2.ui.common.ThrottleHelp
 import java.io.File
 
 /**
@@ -43,9 +43,16 @@ object ThrottleWatcher {
      */
     private const val VENDOR_THROTTLER_PACKAGE = "com.samsung.android.game.gos"
 
-    private const val SAMPLE_MS = 3_000L
-    /** Amostras COM A EMULAÇÃO ATRASADA antes de julgar — cerca de um minuto de jogo lento. */
-    private const val MIN_SLOW_SAMPLES = 20
+    private const val SAMPLE_MS = 1_000L
+    /**
+     * Amostras lentas **consecutivas** antes de julgar — cerca de 15 s de jogo, contra o minuto
+     * da primeira versão, que o teste apontou como espera demais.
+     *
+     * Consecutivas, e não acumuladas: um respiro de velocidade normal (carregamento de disco, uma
+     * cena leve) zera a contagem em vez de somar para um veredito. É o que compensa a janela mais
+     * curta — encurtar E afrouxar ao mesmo tempo é que produziria falso positivo.
+     */
+    private const val MIN_SLOW_SAMPLES = 15
     /** Um cluster que nunca passa desta fração do próprio teto está sendo segurado. */
     private const val CEILING_RATIO = 0.70f
     /** Abaixo disto a emulação está atrasada; em dia, um clock baixo é escolha certa do governador. */
@@ -197,7 +204,10 @@ object ThrottleWatcher {
                 // vez para provar que o aparelho não está preso.
                 for (c in clusters) readKHz(c.cur)?.let { if (it > c.peakKHz) c.peakKHz = it }
 
-                if (speed >= SLOW_BELOW_PCT) continue
+                if (speed >= SLOW_BELOW_PCT) {
+                    slowSamples = 0
+                    continue
+                }
                 if (++slowSamples < MIN_SLOW_SAMPLES) continue
 
                 val held = clusters.all { it.peakKHz <= (it.maxKHz * CEILING_RATIO).toInt() }
@@ -233,24 +243,11 @@ object ThrottleWatcher {
         // é um teto medido —, mas acusar o GOS num aparelho onde ele não está instalado, ou está
         // desabilitado, transformaria uma medição em boato.
         val actionable = vendorActive.value
-        val bodyKey = if (actionable) "throttle.dialog.body.samsung" else "throttle.dialog.body"
-        val body = runCatching { I18n.get(bodyKey).format(pct) }.getOrDefault("")
-        if (body.isEmpty()) return
         val activity = com.armsx2.runtime.MainActivityRuntime.instance ?: return
-        // Diálogo, e não banner: isto é uma instrução de três passos para ler e executar, e o
-        // banner se apaga em 2,6 s. GlobalConfirm é o prompt do proprio app -- PadModal por
-        // baixo, montado uma vez em WindowImpl, desenhado por cima ate de um jogo rodando, e sem
-        // temporizador. Dialog/AlertDialog estao proibidos aqui: cada um e uma janela Android
-        // propria e engole os KeyEvents do gamepad antes do dispatchKeyEvent da Activity.
-        activity.runOnUiThread {
-            GlobalConfirm.ask(
-                title = I18n.get("throttle.dialog.title"),
-                message = body,
-                confirmLabel = if (actionable) I18n.get("throttle.dialog.open") else null,
-                dismissLabel = I18n.get("throttle.dialog.close"),
-            ) {
-                if (actionable) openVendorThrottlerSettings(activity)
-            }
-        }
+        // Aviso curto mais assistente passo a passo ([ThrottleHelp]), e não um parágrafo só: o
+        // público do produto é leigo, e a versão anterior — um diálogo de três passos num texto
+        // corrido — voltou do teste cortada na tela deitada e fechando ao primeiro toque nos
+        // controles do jogo.
+        activity.runOnUiThread { ThrottleHelp.show(pct, actionable) }
     }
 }
