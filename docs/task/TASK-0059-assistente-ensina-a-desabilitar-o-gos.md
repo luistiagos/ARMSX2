@@ -1,8 +1,8 @@
 # TASK-0059: o assistente abre no início do app e ensina o conserto que funciona
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-30
-- **Concluída em:** —
+- **Concluída em:** 2026-08-30
 - **Feature:** nenhuma
 - **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 - **Commit:** o código está em `ea80c1041e`, commitado com o prefixo **`TASK-0055:`** —
@@ -83,4 +83,28 @@ No SM-A127M:
 
 ## Resultado
 
-Preenchido ao concluir.
+Validada no SM-A127M em 2026-08-30, os quatro critérios:
+
+| # | condição | resultado |
+|---|---|---|
+| 1 | GOS ativo, app aberto | aviso aparece **na abertura**, sem abrir jogo |
+| 2 | percorrer o assistente | 10 telas, *Voltar*/*Avançar*, botões de ação funcionando |
+| 3 | GOS desabilitado | **nenhum** aviso — biblioteca limpa |
+| 4 | interruptor desligado, GOS ativo (pid 31778) | **nenhum** aviso |
+
+Os botões que saem do app foram testados um a um, e o desenho "avança antes de sair" se provou:
+depois de tocar em *Abrir a loja* e voltar com o Voltar do aparelho, o assistente estava no
+**passo 3**, e não no 2 que acabara de ser executado.
+
+As telas de Ajustes abertas são as certas, confirmadas pelo foco:
+
+- *Abrir "Sobre o telefone"* → `com.android.settings/…Settings$MyDeviceInfoActivity`
+- *Abrir "Opções do desenvolvedor"* → `com.android.settings/…Settings$DevelopmentSettingsDashboardActivity`
+
+O botão de copiar funcionou: o banner *"Comando copiado — agora cole no LADB"* apareceu, que só
+sai quando `setPrimaryClip` retorna sem exceção.
+
+Uma observação de campo: o `market://` caiu num `ResolverActivity` em vez de abrir a loja direto —
+o aparelho tem mais de um app capaz de resolver. Não é defeito (o usuário escolhe e chega à
+página), mas é um toque a mais para um leigo. Se incomodar, vale tentar a Play Store por nome de
+pacote antes de cair no `market://` genérico.
