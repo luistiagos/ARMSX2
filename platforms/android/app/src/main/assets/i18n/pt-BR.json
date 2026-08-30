@@ -1346,7 +1346,7 @@
  "throttle.help.stepOf": "Passo %d de %d",
  "throttle.help.step1": "Toque no botão aqui embaixo.\n\nO jogo continua aberto e seu aparelho vai mostrar uma tela de configurações chamada \"Game Optimizing Service\".",
  "throttle.help.step2": "Nessa tela, olhe bem no rodapé.\n\nToque em \"Forçar parada\", o da direita.\n\nO botão \"Desativar\", da esquerda, está apagado de propósito — não é ele.",
- "throttle.help.step3": "Vai aparecer uma janelinha perguntando se você tem certeza.\n\nToque em \"OK\".",
+ "throttle.help.step3": "Uma janela vai abrir LÁ EMBAIXO, no rodapé da tela — bem longe de onde você acabou de tocar.\n\nO título dela é \"Forçar interrupção\", e ela avisa que \"poderá causar erros\". É um aviso padrão do Android: pode seguir sem medo.\n\nToque em \"OK\", que fica à DIREITA. O \"Cancelar\", à esquerda, desfaz tudo.",
  "throttle.help.step4": "Agora volte para o jogo usando o botão Voltar do seu aparelho.\n\nEm poucos segundos ele estará na velocidade normal.\n\nSeu aparelho liga esse limite de novo sozinho depois de um tempo. Quando o jogo ficar lento outra vez, é só repetir estes passos.",
  "throttle.help.seeHow": "Me mostre como",
  "throttle.help.openScreen": "Abrir essa tela",
