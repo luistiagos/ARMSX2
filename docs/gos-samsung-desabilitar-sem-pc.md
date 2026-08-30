@@ -42,9 +42,18 @@ adb shell pm disable-user --user 0 com.samsung.android.game.gos
 Usa o **LADB**, um app que abre um shell adb dentro do próprio aparelho, aproveitando a *depuração
 sem fio* do Android 11+. O comando executado é o mesmo do caminho A.
 
-> Existe também o **Shizuku**, muito citado para isso. Ele resolve, mas dá mais trabalho: o Shizuku
-> só *empresta privilégio*, e você ainda precisa de um segundo app cliente para executar o comando.
-> O LADB já é o shell.
+> **Por que o LADB, e não o Shizuku ou o Brevent** — os dois mais citados em vídeos e fóruns:
+>
+> - **Shizuku** resolve, mas dá mais trabalho: ele só *empresta privilégio*, e você ainda precisa de
+>   um segundo app cliente para executar o comando. O LADB já é o shell.
+> - **Brevent** é a escolha mais arriscada, e o motivo é sutil: a função nativa dele é **forçar
+>   parada e pôr em standby**, não desabilitar o pacote. Quem seguir um tutorial até "encontre o GOS
+>   na lista e congele" cai no force-stop — que **nós medimos ser desfeito** assim que o usuário
+>   volta ao jogo. Ele *tem* como executar o comando certo (o `Exec Command`, desde a 2.6.6), mas
+>   isso é uma API por Intent, não um terminal, e há relatos de suportar só "simple shell script".
+>
+> Regra prática para validar qualquer tutorial: **se ele não terminar num `pm disable-user`, não
+> resolve.** Congelar, hibernar e forçar parada são todos o mesmo beco.
 
 ### 1. Liberar as Opções do desenvolvedor
 
@@ -121,6 +130,7 @@ Cada linha abaixo foi testada no aparelho, com medição:
 | **Tirar `isGame` / `appCategory="game"` / `category.GAME`** do app | O app saiu da lista de jogos do Android e o GOS continuou cortando, inclusive com o banco dele zerado. |
 | **`sem_enhanced_cpu_responsiveness=1`** | Sem efeito. |
 | **Desinstalar** o GOS (`pm uninstall`) | Ele é app de sistema (`/system/priv-app`) e volta. Só **desabilitar** segura. |
+| **Congelar / hibernar** pela lista de um app como o Brevent | É force-stop com outro nome, e cai na linha acima: desfeito ao voltar ao jogo. |
 
 ---
 
