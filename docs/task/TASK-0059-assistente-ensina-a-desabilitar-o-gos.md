@@ -1,13 +1,25 @@
-# TASK-0055: o assistente abre no início do app e ensina o conserto que funciona
+# TASK-0059: o assistente abre no início do app e ensina o conserto que funciona
 
 - **Status:** em andamento
 - **Criada em:** 2026-08-30
 - **Concluída em:** —
 - **Feature:** nenhuma
 - **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
-- **Commit:** — (o vínculo é o prefixo `TASK-0055:` no assunto)
+- **Commit:** o código está em `ea80c1041e`, commitado com o prefixo **`TASK-0055:`** —
+  ver a nota de colisão abaixo
 - **Revertida por:** —
 - **Publicado em:** —
+
+> ⚠️ **Esta task nasceu como TASK-0055 e foi renumerada.** Outra sessão alocou o mesmo
+> número no mesmo dia, para a task dos contadores de desempenho, e as TASK-0056 a 0058
+> já dependem dela. Mover esta custou um arquivo e uma linha de índice; mover a outra
+> custaria quatro, com uma sessão ativa mexendo neles.
+>
+> O commit do código (`ea80c1041e`) ficou com o assunto `TASK-0055:` porque a colisão só
+> apareceu depois. Não reescrevi o histórico de propósito — é o estrago que o validador
+> tem uma checagem inteira para detectar. É o mesmo defeito de processo já registrado em
+> [`numeros-de-task-colidem-entre-ramos`](../bugs/open/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md),
+> agora visto **dentro** do mesmo ramo, entre duas sessões simultâneas.
 
 ## Contexto
 

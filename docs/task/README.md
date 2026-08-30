@@ -105,7 +105,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0052](TASK-0052-avisar-do-limite-a-cada-sessao.md) — avisar do limite a cada jogo, e conferir o GOS de verdade | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 | [TASK-0053](TASK-0053-aviso-do-limite-vira-dialogo.md) — o aviso do limite vira diálogo com os passos | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 | [TASK-0054](TASK-0054-assistente-do-limite-do-aparelho.md) — aviso curto com assistente passo a passo, que cabe deitado | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
-| [TASK-0055](TASK-0055-assistente-ensina-a-desabilitar-o-gos.md) — assistente abre no início do app e ensina o conserto que funciona | em andamento | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
+| [TASK-0059](TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) — assistente abre no início do app e ensina o conserto que funciona | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`

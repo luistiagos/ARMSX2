@@ -16,7 +16,10 @@
   vez só) e [TASK-0053](../../task/TASK-0053-aviso-do-limite-vira-dialogo.md) (o aviso vira
   diálogo com os passos) e
   [TASK-0054](../../task/TASK-0054-assistente-do-limite-do-aparelho.md) (assistente passo a
-  passo que cabe deitado) — **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
+  passo que cabe deitado) e
+  [TASK-0059](../../task/TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) (o assistente
+  abre no início do app e ensina o `pm disable-user`, que é o que funciona) —
+  **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
   desabilitar o GOS nem forçar a parada dele
 
 ## Sintoma
@@ -169,7 +172,14 @@ Nenhum dos dois causa esta lentidão — ambos foram medidos e descartados —, 
   shutdown**. O fork usa `WaitForWorkWithSpin()` em [`pcsx2/MTVU.cpp:136`](../../../pcsx2/MTVU.cpp)
   onde a 1.0.23 usava `WaitForWork()`. Custa um núcleo e calor; não causa o teto de clock
   (medido: com a VM pausada e a MTVU girando, o clock estava em 2002 MHz).
-- **Na tela "Salvos", parada, a UI queima ~1,15 núcleo continuamente** desenhando o fundo animado
+  **Causa determinada em 2026-08-30:** o `ShortSpinOn()` do ARM64 é um `WFE` sem despertador
+  garantido, e o teto de 50 µs só é conferido entre chamadas — corrigido pela
+  [TASK-0056](../../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md).
+- **Na tela "Salvos", parada, a UI queima ~1,15 núcleo continuamente**, atribuído aqui ao fundo animado
   (RenderThread 60%, main 17%, hwuiTask0/1 13% cada, mali 12%), com 99,3% de 126.937 quadros em
   jank. Não afeta o jogo (essas threads zeram durante a emulação), mas esquenta o aparelho antes de
-  o jogo começar.
+  o jogo começar. **Ressalva de 2026-08-30:** a atribuição ao fundo animado **não foi confirmada** —
+  a tela "Salvos" monta `ArmsBackdrop` sem `backgroundLayer`, então o fundo não é desenhado ali a
+  menos que a `HomeScreen` sobreviva à troca de rota. Ver a
+  [TASK-0057](../../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md), que traz a
+  medição que decide.
