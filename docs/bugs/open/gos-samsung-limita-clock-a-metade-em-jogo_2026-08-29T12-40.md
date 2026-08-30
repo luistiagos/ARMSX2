@@ -13,7 +13,8 @@
   (detecta e explica), [TASK-0051](../../task/TASK-0051-acao-para-o-limite-do-aparelho.md) (leva o
   usuário ao botão que desarma) e
   [TASK-0052](../../task/TASK-0052-avisar-do-limite-a-cada-sessao.md) (avisa a cada jogo, não uma
-  vez só) — **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
+  vez só) e [TASK-0053](../../task/TASK-0053-aviso-do-limite-vira-dialogo.md) (o aviso vira
+  diálogo com os passos) — **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
   desabilitar o GOS nem forçar a parada dele
 
 ## Sintoma
