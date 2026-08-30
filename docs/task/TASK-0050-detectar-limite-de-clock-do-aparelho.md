@@ -1,8 +1,8 @@
 # TASK-0050: avisar quando o aparelho está segurando o clock da CPU durante o jogo
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-29
-- **Concluída em:** —
+- **Concluída em:** 2026-08-29
 - **Feature:** nenhuma
 - **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0050:` no assunto)
@@ -83,3 +83,29 @@ No SM-A127M, com o mesmo jogo e o mesmo protocolo das medições do bug:
 3. Interruptor desligado em Configurações → Aplicativo → nenhum aviso com o GOS ligado.
 
 O item 2 é o que importa: um detector que avisa sempre não detecta nada.
+
+## Resultado da validação
+
+Feita em 2026-08-29 no SM-A127M, com o APK `githubDebug` deste commit, aparelho partindo de
+AP 30,6 °C. Entre as rodadas o `throttle.warned` foi rearmado por `run-as` para o aviso poder
+disparar de novo.
+
+| # | condição | clock | emulação | avisou? |
+|---|---|---|---|---|
+| 1 | GOS ligado | 1053 MHz | 8,6 fps | **sim**, 62 s após abrir o jogo |
+| 2 | GOS desabilitado | 2002 MHz | 50,1 fps | **não**, em 185 s de jogo |
+| 3 | GOS ligado, interruptor desligado | 1053 MHz | 26–27 fps | **não**, em 150 s de jogo |
+
+A linha gravada na rodada 1, com os números que a medição do bug previa:
+
+```
+@@ANDROID_THROTTLE@@ peakKHz=1053000 maxKHz=2002000 pct=52 speed=19 manufacturer=samsung
+```
+
+O banner foi fotografado sobre o jogo em execução, com o texto da variante Samsung:
+*"O Game Optimizing Service da Samsung está limitando a CPU a 52%."* A linha
+**Aviso de limite do aparelho** aparece em Configurações → App, logo abaixo de Avisos de bateria,
+e escreve `throttle.warnings` como esperado.
+
+A rodada 2 é a que dá valor ao detector: mesmo aparelho, mesmo jogo, mesma duração, e ele fica
+calado quando não há corte.
