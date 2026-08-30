@@ -70,8 +70,36 @@ mesmo APK e o mesmo estado do run 4, minutos depois — a única variável é o 
   notification` não traz uma linha de `com.samsung.android.game.*` com o jogo rodando. O painel com
   o seletor de desempenho é de linha superior.
 
-**Não há correção possível dentro do app.** O único lever que funciona é desabilitar o pacote do
-GOS, o que exige um PC:
+## O que o app pode e o que não pode
+
+**O app não consegue desabilitar o GOS, e não é questão de faltar tentar.** Medido no aparelho:
+`android.permission.CHANGE_COMPONENT_ENABLED_STATE` — a permissão que `pm disable-user` exige —
+tem `protectionLevel: signature|privileged|role`. Só a alcança quem é assinado com a chave da
+plataforma, é privilegiado ou detém um role. O nosso APK é sideload e não tem uma única referência
+a ela (`dumpsys package come.nanodata.armsx2 | grep -c CHANGE_COMPONENT_ENABLED_STATE` → 0). O
+`adb` consegue porque o UID do shell a detém.
+
+**Mas existe caminho sem PC, e ele foi medido.** A página de informações do GOS abre por intent
+documentada, e isso funciona a partir de um app comum:
+
+```
+am start -a android.settings.APPLICATION_DETAILS_SETTINGS -d package:com.samsung.android.game.gos
+```
+
+Nessa página o botão **Desativar está morto** — esmaecido, e o toque não produz diálogo nem
+mudança (verificado). O que está vivo é **Forçar parada**, e ele resolve:
+
+| momento | clock | emulação |
+|---|---|---|
+| jogo rodando, GOS vivo | 1053 MHz | 8,5 fps |
+| 30 s após forçar parada do GOS | 2002 MHz | 39,9 fps (subindo) |
+| 100 s após, processo do GOS ainda morto | 2002 MHz | **49,8 / 49,8 / 50,0 fps** |
+
+O GOS **não voltou sozinho** em 100 s de jogo, e a velocidade cheia se manteve com AP a 48 °C.
+Não foi medido o que acontece depois de reiniciar o aparelho — a expectativa é que volte, e que a
+parada forçada precise ser refeita por boot.
+
+Para quem tem PC, o caminho permanente continua sendo:
 
 ```
 adb shell pm disable-user --user 0 com.samsung.android.game.gos
@@ -107,8 +135,10 @@ com o app em background: o valor sobe.
 - [TASK-0050](../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md) — detectar o corte
   dentro do app e dizer ao usuário o que está acontecendo. É paliativo declarado: o defeito é do
   aparelho.
-- Falta decidir onde documentar a instrução do `pm disable-user` para o cliente final (o app não
-  pode executá-la).
+- **Levar o usuário ao "Forçar parada" a partir do aviso.** O detector já sabe quando o corte
+  existe; falta uma ação no banner e na linha de Configurações que abra a página do GOS pela intent
+  acima e diga o que tocar. É a única saída que não exige PC, e está medida. Precisa de task
+  própria, e de confirmar que a intent parte do nosso app (foi verificada pelo shell).
 - Reteste quando houver um aparelho Samsung de linha superior à mão: lá o Game Booster expõe o
   seletor de desempenho, que pode ser um caminho que o A12 não tem.
 
