@@ -1416,7 +1416,7 @@ private val BASE_EN: Map<String, String> = mapOf(
     "throttle.help.stepOf" to "Step %d of %d",
     "throttle.help.step1" to "Tap the button below.\n\nThe game will stay open and your phone will show a settings screen called \"Game Optimizing Service\".",
     "throttle.help.step2" to "On that screen, look at the very bottom.\n\nTap \"Force stop\", on the right.\n\nThe \"Disable\" button on the left is greyed out on purpose — it is not the one.",
-    "throttle.help.step3" to "A window will open DOWN AT THE BOTTOM of the screen — far from where you just tapped.\n\nIt is titled \"Force stop\" and warns that it \"may cause errors\". That is a standard Android warning: it is safe to go ahead.\n\nTap \"OK\", on the RIGHT. \"Cancel\", on the left, undoes everything.",
+    "throttle.help.step3" to "A white window will open over the screen, titled \"Force stop\" — note the wording differs from the button you just tapped.\n\nIt warns that it \"may cause errors\". That is a standard Android warning: it is safe to go ahead.\n\nTap \"OK\", on the RIGHT. \"Cancel\", on the left, undoes everything.",
     "throttle.help.step4" to "Now go back to the game using your phone's Back button.\n\nWithin a few seconds it will be running at full speed.\n\nYour phone turns this limit back on by itself after a while. When the game slows down again, just repeat these steps.",
     "throttle.help.seeHow" to "Show me how",
     "throttle.help.openScreen" to "Open that screen",
