@@ -95,9 +95,10 @@ mudança (verificado). O que está vivo é **Forçar parada**, e ele resolve:
 | 30 s após forçar parada do GOS | 2002 MHz | 39,9 fps (subindo) |
 | 100 s após, processo do GOS ainda morto | 2002 MHz | **49,8 / 49,8 / 50,0 fps** |
 
-O GOS **não voltou sozinho** em 100 s de jogo, e a velocidade cheia se manteve com AP a 48 °C.
-Não foi medido o que acontece depois de reiniciar o aparelho — a expectativa é que volte, e que a
-parada forçada precise ser refeita por boot.
+O GOS não voltou nos 100 s seguintes, e a velocidade cheia se manteve com AP a 48 °C. **Mas ele
+volta sozinho:** cerca de 40 min depois, sem nenhum `pm enable` e sem reiniciar o aparelho, o
+processo estava vivo de novo (`pidof` → 11295) e o teto de 1053 MHz tinha voltado. A parada
+forçada alivia a sessão, não conserta o aparelho — o texto ao usuário diz isso.
 
 Para quem tem PC, o caminho permanente continua sendo:
 

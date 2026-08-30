@@ -1,6 +1,10 @@
 package com.armsx2
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import com.armsx2.i18n.I18n
 import com.armsx2.ui.WelcomeBanner
 import java.io.File
@@ -28,6 +32,16 @@ object ThrottleWatcher {
 
     private const val PREF_KEY = "throttle.warnings"
     private const val PREF_WARNED = "throttle.warned"
+    /** Houve corte neste aparelho. Diferente de [PREF_WARNED]: este não é rearmado por ninguém —
+     *  é fato sobre o aparelho, e é o que decide se a ação de conserto tem por que existir. */
+    private const val PREF_DETECTED = "throttle.detected"
+
+    /**
+     * O serviço da Samsung que aplica o corte. Só o nome do pacote: o app não o desabilita — a
+     * permissão para isso (`CHANGE_COMPONENT_ENABLED_STATE`) é `signature|privileged|role` —, ele
+     * apenas abre a página onde o usuário pode forçar a parada.
+     */
+    private const val VENDOR_THROTTLER_PACKAGE = "com.samsung.android.game.gos"
 
     private const val SAMPLE_MS = 3_000L
     /** Amostras COM A EMULAÇÃO ATRASADA antes de julgar — cerca de um minuto de jogo lento. */
@@ -39,6 +53,9 @@ object ThrottleWatcher {
 
     /** Interruptor em Configurações → Aplicativo. Ligado por padrão. */
     val enabled = androidx.compose.runtime.mutableStateOf(true)
+
+    /** Já se mediu um corte neste aparelho. Enquanto for falso, oferecer conserto é chute. */
+    val detected = androidx.compose.runtime.mutableStateOf(false)
 
     /** Teto de hardware de um cluster, e o maior clock que ele alcançou nesta sessão. */
     private class Cluster(val cur: File, val maxKHz: Int) {
@@ -53,8 +70,38 @@ object ThrottleWatcher {
 
     fun load() {
         runCatching {
-            enabled.value = com.armsx2.runtime.MainActivityRuntime.prefs.getBoolean(PREF_KEY, true)
+            val prefs = com.armsx2.runtime.MainActivityRuntime.prefs
+            enabled.value = prefs.getBoolean(PREF_KEY, true)
+            detected.value = prefs.getBoolean(PREF_DETECTED, false)
         }
+    }
+
+    /**
+     * Há uma ação concreta a oferecer: mediu-se corte E o aparelho é daquele fabricante cuja tela
+     * de conserto eu conheço. Fora da Samsung o app sabe que há um teto, não quem o pôs — mandar
+     * o usuário a uma tela adivinhada seria pior que não mandar.
+     */
+    fun vendorFixAvailable(): Boolean = detected.value && isSamsung()
+
+    private fun isSamsung(): Boolean = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+
+    /**
+     * Abre a página de informações do serviço que aplica o corte, onde o botão **Forçar parada**
+     * devolve a velocidade cheia (medido: 8,5 fps → 49,8 fps, e o processo não voltou sozinho em
+     * 100 s de jogo). O **Desativar** dessa mesma página está morto no aparelho medido, então a
+     * instrução que acompanha o botão fala em forçar parada, não em desativar.
+     *
+     * Devolve `false` — e diz isso ao usuário — quando nada resolve a intent, em vez de estourar
+     * `ActivityNotFoundException` em cima de quem só queria entender por que o jogo está lento.
+     */
+    fun openVendorThrottlerSettings(context: Context): Boolean {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", VENDOR_THROTTLER_PACKAGE, null),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val ok = runCatching { context.startActivity(intent) }.isSuccess
+        if (!ok) WelcomeBanner.show(I18n.get("throttle.fix.unavailable"))
+        return ok
     }
 
     fun set(value: Boolean) {
@@ -155,16 +202,16 @@ object ThrottleWatcher {
             "@@ANDROID_THROTTLE@@ peakKHz=${top.peakKHz} maxKHz=${top.maxKHz} pct=$pct " +
                 "speed=${speed.toInt()} manufacturer=${Build.MANUFACTURER}"
         )
+        detected.value = true
         runCatching {
             com.armsx2.runtime.MainActivityRuntime.prefs.edit()
-                .putBoolean(PREF_WARNED, true).apply()
+                .putBoolean(PREF_WARNED, true)
+                .putBoolean(PREF_DETECTED, true)
+                .apply()
         }
         // Nomear o culpado só onde ele foi medido. Fora da Samsung o app sabe que HÁ um teto, não
         // quem o pôs — e chutar transformaria uma medição em boato.
-        val key = if (Build.MANUFACTURER.equals("samsung", ignoreCase = true))
-            "throttle.warn.samsung"
-        else
-            "throttle.warn"
+        val key = if (isSamsung()) "throttle.warn.samsung" else "throttle.warn"
         val text = runCatching { I18n.get(key).format(pct) }.getOrDefault("")
         if (text.isEmpty()) return
         val activity = com.armsx2.runtime.MainActivityRuntime.instance ?: return

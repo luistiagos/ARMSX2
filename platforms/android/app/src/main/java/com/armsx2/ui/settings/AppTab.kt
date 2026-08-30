@@ -708,6 +708,32 @@ fun AppTab() {
             onChange = { com.armsx2.ThrottleWatcher.set(it) },
         )
 
+        // Só aparece para quem o corte já atingiu, e só onde eu sei para qual tela mandar. Um
+        // botão de conserto num aparelho sem o defeito seria ruído; num aparelho de outro
+        // fabricante seria um chute com cara de instrução.
+        if (com.armsx2.ThrottleWatcher.vendorFixAvailable()) {
+            Text(
+                str("app.throttleWarnings.fixHint"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val openFix: () -> Unit = {
+                    com.armsx2.ThrottleWatcher.openVendorThrottlerSettings(appContext)
+                }
+                OutlinedButton(
+                    onClick = openFix,
+                    modifier = Modifier.controllerFocusable(
+                        "app.throttleWarnings.fix", onConfirm = openFix,
+                    ),
+                ) { Text(str("app.throttleWarnings.fix")) }
+            }
+        }
+
         ToggleRow(
             label = str("app.libraryMusic"),
             value = com.armsx2.LibraryMusic.enabled.value,
