@@ -10,9 +10,11 @@
 - **Reincidência:** sistêmico — atinge todo aparelho Samsung com o GOS ativo
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** [TASK-0050](../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md)
-  (detecta e explica) e [TASK-0051](../../task/TASK-0051-acao-para-o-limite-do-aparelho.md) (leva o
-  usuário ao botão que desarma) — **nenhuma das duas corrige o defeito**, porque ele é do aparelho:
-  o app não pode desabilitar o GOS nem forçar a parada dele
+  (detecta e explica), [TASK-0051](../../task/TASK-0051-acao-para-o-limite-do-aparelho.md) (leva o
+  usuário ao botão que desarma) e
+  [TASK-0052](../../task/TASK-0052-avisar-do-limite-a-cada-sessao.md) (avisa a cada jogo, não uma
+  vez só) — **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
+  desabilitar o GOS nem forçar a parada dele
 
 ## Sintoma
 
