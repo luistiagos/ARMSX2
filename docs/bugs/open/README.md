@@ -5,7 +5,7 @@
 
 Pasta onde novos bugs encontrados na telemetria de produção (`/logErr`, projeto `armsx2/*`) são gravados.
 
-> **Status atual:** Há 17 investigações nesta pasta — 13 do aplicativo e 4 do próprio processo de
+> **Status atual:** Há 18 investigações nesta pasta — 14 do aplicativo e 4 do próprio processo de
 > rastreabilidade ([FEAT-0002](../../features/FEAT-0002-rastreabilidade-verificavel.md)). A contagem
 > estava em "12 — 9 e 3" e foi recontada ao arquivo em 2026-08-29; ninguém a atualizava ao abrir um
 > bug novo. A produção
