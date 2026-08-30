@@ -1,20 +1,26 @@
 package com.armsx2.ui.common
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,47 +35,48 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.armsx2.i18n.I18n
 import com.armsx2.i18n.str
+import com.armsx2.ui.WelcomeBanner
 import com.armsx2.ui.settings.controllerFocusable
 
 /**
- * O aviso do limite de CPU do aparelho, e o assistente que ensina a desarmá-lo.
+ * Ensina o usuário a desabilitar o Game Optimizing Service da Samsung, que segura a CPU deste
+ * aparelho em 52% do máximo enquanto um jogo roda (8,5 fps contra 49,8 fps, medido).
  *
- * Substitui o diálogo único da TASK-0053, que voltou do teste com quatro defeitos — e cada
- * decisão aqui responde a um deles:
+ * **Por que ensina ESTE caminho e não o mais curto.** As versões anteriores mandavam forçar a
+ * parada do GOS — três toques, e mediram-se 88 s de alívio. Só que um monitor de 5 min mostrou o
+ * defeito do plano: para dar esses três toques o usuário **sai do app**, e a volta ao jogo
+ * ressuscita o serviço. O GOS renasceu 2 s depois da transição de foco, com o teto de volta. As
+ * medições em que a parada segurou tinham o app já em primeiro plano, sem a volta — foi por isso
+ * que os números e o relato de campo se contradiziam.
  *
- * - **Não fecha sozinho.** `onDismiss = null` é o que o [PadModal] chama de modal insistente: o
- *   toque no scrim é engolido e não fecha. Isso não era temporizador, era o `clickable` do scrim
- *   do host: com o jogo deitado os dedos ficam nos controles da tela, que são "fora do card", e
- *   qualquer toque fechava o aviso.
- * - **Cabe deitado.** O card mede o espaço disponível em vez de assumir retrato: o corpo leva
- *   `weight(1f, fill = false)` com rolagem e os botões ficam presos embaixo, então o **Fechar**
- *   nunca sai da tela. Jogo roda deitado, sempre — a versão anterior media 340 dp só de corpo
- *   contra ~288 dp de altura útil.
- * - **Um passo por tela.** O público do produto é leigo; três passos num parágrafo só não é
- *   instrução, é parede de texto.
+ * O que resolve é `pm disable-user`, e há caminho sem PC para ele. É mais longo, mas é **uma vez
+ * na vida do aparelho** contra três toques por sessão que quase sempre não funcionam.
+ *
+ * **Autolimitante:** o aviso só nasce enquanto o GOS estiver ativo. Assim que o usuário concluir,
+ * a condição fica falsa e ele nunca mais aparece — sem precisar de "não mostrar de novo".
  *
  * Não usa `Dialog`/`AlertDialog` pelo motivo que o cabeçalho de [PadModal] explica: cada um é uma
  * janela Android própria e engole os KeyEvents do gamepad antes do `dispatchKeyEvent` da Activity.
  */
 object ThrottleHelp {
     private const val LAYER = "throttle-help"
-    private const val STEPS = 4
+    private const val STEPS = 10
 
-    private val pct = mutableIntStateOf(0)
+    /** O app que dá um shell adb dentro do próprio telefone, sem PC. */
+    private const val LADB_PACKAGE = "com.draco.ladb"
+
+    /** O comando que resolve. Copiado para a área de transferência no passo 8 — digitar isto à
+     *  mão, num teclado de celular, é pedir erro de digitação. */
+    private const val FIX_COMMAND = "pm disable-user --user 0 com.samsung.android.game.gos"
+
     private val step = mutableIntStateOf(0)
-
-    /** Há a tela do GOS para ensinar a mexer. Falso num aparelho que corta o clock sem ser por
-     *  ele: aí o aviso explica o que está havendo e para por aí, porque um assistente que manda
-     *  abrir uma tela inexistente é pior que nenhum. */
-    private val actionable = mutableStateOf(false)
 
     /** Visível. Zero é o aviso curto; 1..[STEPS] são as telas do assistente. */
     val visible = mutableStateOf(false)
 
-    fun show(percent: Int, canFix: Boolean) {
-        pct.intValue = percent
-        actionable.value = canFix
+    fun show() {
         step.intValue = 0
         visible.value = true
     }
@@ -85,7 +92,8 @@ object ThrottleHelp {
         val bodyScroll = rememberScrollState()
         PadModal(
             key = LAYER,
-            // Insistente de propósito — ver o cabeçalho.
+            // Insistente: o scrim do host fecha o modal a qualquer toque fora do card, e com o
+            // jogo deitado os dedos do usuário estão nos controles da tela. Sai só pelo botão.
             onDismiss = null,
             initialFocusId = "$LAYER.primary",
             scrollState = bodyScroll,
@@ -96,46 +104,54 @@ object ThrottleHelp {
             val title = if (s == 0) str("throttle.help.title")
             else str("throttle.help.stepOf").format(s, STEPS)
 
-            val introKey =
-                if (actionable.value) "throttle.help.intro" else "throttle.help.intro.generic"
             val body = when (s) {
-                0 -> str(introKey).format(pct.intValue)
+                0 -> str("throttle.help.intro")
                 1 -> str("throttle.help.step1")
                 2 -> str("throttle.help.step2")
                 3 -> str("throttle.help.step3")
-                else -> str("throttle.help.step4")
+                4 -> str("throttle.help.step4")
+                5 -> str("throttle.help.step5")
+                6 -> str("throttle.help.step6")
+                7 -> str("throttle.help.step7")
+                8 -> str("throttle.help.step8").format(FIX_COMMAND)
+                9 -> str("throttle.help.step9")
+                else -> str("throttle.help.step10")
             }
 
             // Rótulos e ações são VALORES; os dois botões são compostos num ponto só, abaixo.
             // Ramificar a composição dos botões registraria e desregistraria o mesmo controllerId
-            // a cada passo, que é exatamente o laço de recomposição do bug da fila de download.
+            // a cada passo, que é o laço de recomposição do bug da fila de download.
             val primaryLabel = when (s) {
-                0 -> if (actionable.value) str("throttle.help.seeHow") else str("throttle.help.close")
-                1 -> str("throttle.help.openScreen")
+                0 -> str("throttle.help.seeHow")
+                1 -> str("throttle.help.start")
+                2 -> str("throttle.help.openStore")
+                3 -> str("throttle.help.openAbout")
+                4 -> str("throttle.help.openDev")
+                8 -> str("throttle.help.copyCmd")
                 STEPS -> str("throttle.help.close")
-                else -> str("throttle.help.next")
+                else -> str("throttle.help.gotIt")
             }
+            // O botão grande SEMPRE avança; quando há ação, ele age e avança no mesmo toque. Um
+            // leigo não precisa entender a diferença entre "fazer" e "seguir".
             val primaryAction: () -> Unit = when (s) {
-                0 -> if (actionable.value) ({ step.intValue = 1 }) else ({ hide() })
-                // Avança ANTES de sair do app: quem volta do Android encontra a instrução
-                // seguinte, e não a que acabou de executar.
-                1 -> ({
-                    step.intValue = 2
-                    com.armsx2.ThrottleWatcher.openVendorThrottlerSettings(context)
-                    Unit
-                })
                 STEPS -> ({ hide() })
+                2 -> ({ openPlayStore(context); step.intValue = 3 })
+                3 -> ({ openSettings(context, Settings.ACTION_DEVICE_INFO_SETTINGS); step.intValue = 4 })
+                4 -> ({
+                    openSettings(context, Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                    step.intValue = 5
+                })
+                8 -> ({ copyCommand(context); step.intValue = 9 })
                 else -> ({ step.intValue = s + 1 })
             }
-            val secondaryLabel = if (s == 0) str("throttle.help.close") else str("throttle.help.back")
+            val secondaryLabel = if (s == 0) str("throttle.help.later") else str("throttle.help.back")
             val secondaryAction: () -> Unit =
                 if (s == 0) ({ hide() }) else ({ step.intValue = s - 1 })
 
             // safeDrawing ANTES de medir: assim `maxHeight` já desconta barra de status, barra de
             // navegação e recorte. Deitado a barra de navegação fica no rodapé, bem onde ficam os
-            // botões deste card — sem isto o "Fechar" pode nascer embaixo dela.
+            // botões deste card.
             BoxWithConstraints(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
-                // Mede em vez de assumir. Deitado sobram ~288 dp de altura no aparelho de teste.
                 val cardWidth = minOf(460.dp, (maxWidth - 32.dp).coerceAtLeast(200.dp))
                 val cardHeight = (maxHeight - 24.dp).coerceAtLeast(160.dp)
                 Surface(
@@ -186,6 +202,37 @@ object ThrottleHelp {
                 }
             }
         }
+    }
+
+    /** Página do LADB na loja. `market://` abre o app da Play; sem ele, o site resolve. */
+    private fun openPlayStore(context: Context) {
+        val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$LADB_PACKAGE"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { context.startActivity(market) }.isSuccess) return
+        val web = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("https://play.google.com/store/apps/details?id=$LADB_PACKAGE"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (!runCatching { context.startActivity(web) }.isSuccess) warnUnavailable()
+    }
+
+    private fun openSettings(context: Context, action: String) {
+        val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (!runCatching { context.startActivity(intent) }.isSuccess) warnUnavailable()
+    }
+
+    private fun copyCommand(context: Context) {
+        val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val ok = clip != null && runCatching {
+            clip.setPrimaryClip(ClipData.newPlainText("ARMSX2", FIX_COMMAND))
+        }.isSuccess
+        WelcomeBanner.show(I18n.get(if (ok) "throttle.help.copied" else "throttle.help.copyFailed"))
+    }
+
+    /** Aparelho sem a tela que o passo pede. Avisar é melhor que estourar
+     *  `ActivityNotFoundException` em cima de quem só seguia instruções. */
+    private fun warnUnavailable() {
+        WelcomeBanner.show(I18n.get("throttle.help.openFailed"))
     }
 }
 

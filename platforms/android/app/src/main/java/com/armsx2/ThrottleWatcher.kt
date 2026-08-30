@@ -1,12 +1,6 @@
 package com.armsx2
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
-import com.armsx2.i18n.I18n
-import com.armsx2.ui.WelcomeBanner
 import com.armsx2.ui.common.ThrottleHelp
 import java.io.File
 
@@ -21,9 +15,16 @@ import java.io.File
  * inclusive `android.game_mode_config`, porque o Game Mode do Android governa só downscaling de
  * backbuffer e override de fps, e não frequência de CPU.
  *
- * Como não há correção possível daqui, o que este vigia entrega é a única coisa útil que sobra:
- * o app deixa de parecer culpado por uma lentidão que não é dele. Ele não executa nada no sistema
- * e não pretende poder — desabilitar o GOS exige um PC.
+ * Como não há correção possível daqui, este objeto faz duas coisas, e nenhuma delas é consertar:
+ *
+ * 1. **Decide a hora de oferecer ajuda** ([maybeShowStartupNotice]), no início do app e não quando
+ *    um jogo fica lento. A condição que importa é "este aparelho tem o GOS ativo", e dá para
+ *    checá-la sem esperar o usuário apanhar. Quem ensina é o [ThrottleHelp].
+ * 2. **Mede e registra** o corte no log de sessão (`@@ANDROID_THROTTLE@@`), que é o que o suporte
+ *    lê para saber se o teto estava mesmo lá quando o cliente reclamou.
+ *
+ * O app não executa nada no sistema e não pretende poder: a permissão que `pm disable-user` exige
+ * (`CHANGE_COMPONENT_ENABLED_STATE`) é `signature|privileged|role`, e o nosso APK é sideload.
  */
 object ThrottleWatcher {
     /** Um diretório por cluster. Cada um traz o próprio teto e o próprio clock corrente. */
@@ -93,11 +94,30 @@ object ThrottleWatcher {
     }
 
     /**
-     * Há uma ação concreta a oferecer: mediu-se corte E o serviço que sei desarmar está ativo
-     * agora. `Build.MANUFACTURER` não serve para isto — diz o fabricante, não se o GOS está
-     * instalado e habilitado neste aparelho.
+     * Há o que ensinar: o serviço que sei desarmar está instalado e habilitado agora.
+     *
+     * Não exige mais ter medido um corte antes. O corte é consequência do GOS estar ativo, e
+     * esperar a medição para oferecer ajuda significa só oferecer depois que o usuário já
+     * apanhou — enquanto a condição que importa dá para checar no início do app.
      */
-    fun vendorFixAvailable(): Boolean = detected.value && vendorActive.value
+    fun vendorFixAvailable(): Boolean = vendorActive.value
+
+    /**
+     * O aviso do início do app: uma vez por abertura, e só quando as duas condições valem —
+     * fabricante Samsung **e** pacote do GOS instalado e habilitado.
+     *
+     * **Autolimitante de propósito.** Assim que o usuário seguir o assistente, o pacote fica
+     * desabilitado, [vendorActive] passa a ser falso e este aviso nunca mais aparece. É o que
+     * dispensa um "não mostrar de novo": quem resolveu para de ser interrompido sozinho.
+     */
+    fun maybeShowStartupNotice() {
+        if (!enabled.value) return
+        refreshVendorState()
+        if (!vendorActive.value) return
+        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true)) return
+        val activity = com.armsx2.runtime.MainActivityRuntime.instance ?: return
+        activity.runOnUiThread { ThrottleHelp.show() }
+    }
 
     /**
      * Consulta o `PackageManager`. Exige `<queries>` no manifesto: sem isso a visibilidade de
@@ -112,25 +132,6 @@ object ThrottleWatcher {
         vendorActive.value = if (ctx == null) false else runCatching {
             ctx.packageManager.getApplicationInfo(VENDOR_THROTTLER_PACKAGE, 0).enabled
         }.getOrDefault(false)
-    }
-
-    /**
-     * Abre a página de informações do serviço que aplica o corte, onde o botão **Forçar parada**
-     * devolve a velocidade cheia (medido: 8,5 fps → 49,8 fps, e o processo não voltou sozinho em
-     * 100 s de jogo). O **Desativar** dessa mesma página está morto no aparelho medido, então a
-     * instrução que acompanha o botão fala em forçar parada, não em desativar.
-     *
-     * Devolve `false` — e diz isso ao usuário — quando nada resolve a intent, em vez de estourar
-     * `ActivityNotFoundException` em cima de quem só queria entender por que o jogo está lento.
-     */
-    fun openVendorThrottlerSettings(context: Context): Boolean {
-        val intent = Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.fromParts("package", VENDOR_THROTTLER_PACKAGE, null),
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val ok = runCatching { context.startActivity(intent) }.isSuccess
-        if (!ok) WelcomeBanner.show(I18n.get("throttle.fix.unavailable"))
-        return ok
     }
 
     fun set(value: Boolean) {
@@ -242,12 +243,10 @@ object ThrottleWatcher {
         // Nomear o culpado só quando ele está lá. O aviso sai de qualquer jeito — um teto medido
         // é um teto medido —, mas acusar o GOS num aparelho onde ele não está instalado, ou está
         // desabilitado, transformaria uma medição em boato.
-        val actionable = vendorActive.value
-        val activity = com.armsx2.runtime.MainActivityRuntime.instance ?: return
-        // Aviso curto mais assistente passo a passo ([ThrottleHelp]), e não um parágrafo só: o
-        // público do produto é leigo, e a versão anterior — um diálogo de três passos num texto
-        // corrido — voltou do teste cortada na tela deitada e fechando ao primeiro toque nos
-        // controles do jogo.
-        activity.runOnUiThread { ThrottleHelp.show(pct, actionable) }
+        // Daqui não sai mais diálogo. O aviso passou a nascer no INÍCIO DO APP
+        // ([maybeShowStartupNotice]), porque o gatilho certo é "este aparelho tem o GOS ativo" e
+        // não "este jogo está lento agora" — e porque esperar o jogo ficar lento para avisar
+        // significa avisar tarde. O que este caminho ainda faz é deixar a medição no log de
+        // sessão, que é o que o suporte lê para saber se o corte estava mesmo lá.
     }
 }

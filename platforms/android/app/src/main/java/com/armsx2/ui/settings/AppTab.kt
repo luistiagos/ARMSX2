@@ -722,9 +722,9 @@ fun AppTab() {
                 Modifier.fillMaxWidth().padding(top = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                val openFix: () -> Unit = {
-                    com.armsx2.ThrottleWatcher.openVendorThrottlerSettings(appContext)
-                }
+                // Reabre o assistente, e não mais a tela do GOS: quem chega aqui quer a receita
+                // inteira, não o atalho para um botão cujo efeito o sistema desfaz.
+                val openFix: () -> Unit = { com.armsx2.ui.common.ThrottleHelp.show() }
                 OutlinedButton(
                     onClick = openFix,
                     modifier = Modifier.controllerFocusable(

@@ -2364,6 +2364,10 @@ open class MainActivityRuntime : ComponentActivity() {
         com.armsx2.BatteryWatcher.start(applicationContext)
         // Só o interruptor: o vigia do clock nasce e morre com a sessão de emulação (TASK-0050).
         com.armsx2.ThrottleWatcher.load()
+        // O aviso do limite da Samsung nasce AQUI, no início do app, e não quando um jogo fica
+        // lento: a condição que importa é "este aparelho tem o GOS ativo", e dá para checá-la sem
+        // esperar o usuário apanhar. Não faz nada fora de um Samsung com o serviço habilitado.
+        com.armsx2.ThrottleWatcher.maybeShowStartupNotice()
         startAutosaveIntervalJob()
         // Restore the saved rumble master toggle into the native gate (NativeApp.onPadRumble).
         NativeApp.sRumbleEnabled = ControllerMappings.rumbleEnabled()
