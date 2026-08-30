@@ -212,6 +212,11 @@ static float s_average_gpu_time = 0.0f;
 static float s_last_gpu_time = 0.0f;
 static float s_accumulated_gpu_time = 0.0f;
 static float s_gpu_usage = 0.0f;
+static bool s_gpu_timing_available = false;
+// Whether the per-thread CPU clock could be read at all this window. A thread that has
+// ever run has non-zero CPU time, so a live handle reporting exactly 0 is a failed read,
+// not an idle thread - see ThreadHandle::GetCPUTime().
+static bool s_thread_cpu_time_readable = true;
 static u32 s_presents_since_last_update = 0;
 static double s_average_gpu_vs_invocations = 0.0;
 static double s_average_gpu_ps_invocations = 0.0;
@@ -364,6 +369,11 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 	const u64 vu_time = THREAD_VU1 ? vu1Thread.GetThreadHandle().GetCPUTime() : 0;
 	const u64 capture_time = GSCapture::IsCapturing() ? GSCapture::GetEncoderThreadHandle().GetCPUTime() : 0;
 
+	// A CPU thread that has run for half a second cannot have consumed literally no CPU
+	// time; a flat zero here is the clock read failing, and printing it as "0%" is what
+	// made every EE/GS/VU figure on Android look like a measurement.
+	s_thread_cpu_time_readable = !(s_cpu_thread_handle && cpu_time == 0);
+
 	const u64 cpu_delta = cpu_time - s_last_cpu_time;
 	const u64 gs_delta = gs_time - s_last_gs_time;
 	const u64 vu_delta = vu_time - s_last_vu_time;
@@ -398,15 +408,32 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 	s_log_accum_frames += s_frames_since_last_update;
 	if (s_log_accum_time >= LOG_INTERVAL)
 	{
-		// The back thread only exists under GSBackThreadMode >= Lockstep, so the field is
-		// omitted rather than logged as a permanent 0% in the default configuration.
+		// A counter that does not exist is left out of the line rather than printed as a
+		// permanent 0%, which reads as a measurement and is not one. Three can be missing:
+		//   GSB - the back thread only runs under GSBackThreadMode >= Lockstep;
+		//   GPU - the backend has no usable timestamp query (SetGPUTimingAvailable);
+		//   EE/GS/VU - the per-thread CPU clock could not be read at all.
 		char gs_back[32] = {};
 		if (HasGSBackThread())
 			std::snprintf(gs_back, sizeof(gs_back), " GSB %.0f%%", s_gs_back_thread_usage);
 
-		Console.WriteLn("PerfLog: %.1f fps | EE %.0f%% GS %.0f%%%s VU %.0f%% GPU %.0f%% | frame %llu",
-			static_cast<float>(s_log_accum_frames) / s_log_accum_time, s_cpu_thread_usage,
-			s_gs_thread_usage, gs_back, s_vu_thread_usage, s_gpu_usage,
+		char cpu[96] = {};
+		if (s_thread_cpu_time_readable)
+		{
+			std::snprintf(cpu, sizeof(cpu), "EE %.0f%% GS %.0f%%%s VU %.0f%%", s_cpu_thread_usage,
+				s_gs_thread_usage, gs_back, s_vu_thread_usage);
+		}
+		else
+		{
+			std::snprintf(cpu, sizeof(cpu), "EE n/a GS n/a VU n/a");
+		}
+
+		char gpu[32] = {};
+		if (s_gpu_timing_available)
+			std::snprintf(gpu, sizeof(gpu), " GPU %.0f%%", s_gpu_usage);
+
+		Console.WriteLn("PerfLog: %.1f fps | %s%s | frame %llu",
+			static_cast<float>(s_log_accum_frames) / s_log_accum_time, cpu, gpu,
 			static_cast<unsigned long long>(s_frame_number));
 		s_log_accum_time = 0.0f;
 		s_log_accum_frames = 0;
@@ -690,6 +717,16 @@ double PerformanceMetrics::GetGSSWThreadUsage(u32 index)
 double PerformanceMetrics::GetGSSWThreadAverageTime(u32 index)
 {
 	return s_gs_sw_threads[index].time;
+}
+
+void PerformanceMetrics::SetGPUTimingAvailable(bool available)
+{
+	s_gpu_timing_available = available;
+}
+
+bool PerformanceMetrics::HasGPUTiming()
+{
+	return s_gpu_timing_available;
 }
 
 float PerformanceMetrics::GetGPUUsage()

@@ -16,6 +16,7 @@
 #include "Host.h"
 #include "Input/InputManager.h"
 #include "MTGS.h"
+#include "PerformanceMetrics.h"
 #include "pcsx2/GS.h"
 #include "GS/Renderers/Null/GSDeviceNone.h"
 #include "GS/Renderers/Null/GSRendererNull.h"
@@ -178,7 +179,13 @@ static bool OpenGSDevice(GSRendererType renderer, bool clear_state_on_fail, bool
 		return false;
 	}
 
-	if (!g_gs_device->SetGPUTimingEnabled(true))
+	// This is the only place that learns whether the device can time the GPU at all: the
+	// answer never reaches PerformanceMetrics otherwise, and every GPU figure there is then a
+	// fixed 0.0f that is indistinguishable from an idle GPU. Tell it, so the perf log can
+	// leave the field out instead of reporting a permanent 0%.
+	const bool gpu_timing = g_gs_device->SetGPUTimingEnabled(true);
+	PerformanceMetrics::SetGPUTimingAvailable(gpu_timing);
+	if (!gpu_timing)
 		GSConfig.OsdShowGPU = false;
 	if (GSConfig.OsdShowGPUStats && !g_gs_device->SetGPUPipelineStatisticsEnabled(true))
 		GSConfig.OsdShowGPUStats = false;
@@ -197,6 +204,10 @@ static void CloseGSDevice(bool clear_state)
 	ImGuiManager::Shutdown(clear_state);
 	g_gs_device->Destroy();
 	g_gs_device.reset();
+
+	// The next device may be a different backend with a different answer; leaving the old
+	// one standing would have the perf log print GPU figures no device is producing.
+	PerformanceMetrics::SetGPUTimingAvailable(false);
 }
 
 static void GSClampUpscaleMultiplier(Pcsx2Config::GSOptions& config)
@@ -1156,7 +1167,9 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 
 	if (GSConfig.OsdShowGPU && !old_config.OsdShowGPU)
 	{
-		if (!g_gs_device->SetGPUTimingEnabled(true))
+		const bool gpu_timing = g_gs_device->SetGPUTimingEnabled(true);
+		PerformanceMetrics::SetGPUTimingAvailable(gpu_timing);
+		if (!gpu_timing)
 			GSConfig.OsdShowGPU = false;
 	}
 

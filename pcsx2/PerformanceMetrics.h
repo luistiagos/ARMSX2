@@ -91,6 +91,13 @@ namespace PerformanceMetrics
 	double GetGSSWThreadUsage(u32 index);
 	double GetGSSWThreadAverageTime(u32 index);
 
+	/// Whether the GS backend can time the GPU at all. False on a device whose
+	/// backend refuses timestamp queries (Vulkan: timestampComputeAndGraphics /
+	/// timestampValidBits), where every GPU figure is a fixed 0.0f rather than a
+	/// measurement. Set from GS.cpp, the one place that already asks the device.
+	void SetGPUTimingAvailable(bool available);
+	bool HasGPUTiming();
+
 	float GetGPUUsage();
 	float GetGPUAverageTime();
 	/// GPU time for the most recent present only, not a window average. Used by the

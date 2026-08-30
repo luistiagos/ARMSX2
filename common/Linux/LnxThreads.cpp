@@ -7,7 +7,9 @@
 
 #include "common/Threading.h"
 #include "common/Assertions.h"
+#include "common/Console.h"
 
+#include <atomic>
 #include <memory>
 #include <cstdio>
 #include <cstdlib>
@@ -157,6 +159,36 @@ Threading::ThreadHandle& Threading::ThreadHandle::operator=(const ThreadHandle& 
 
 u64 Threading::ThreadHandle::GetCPUTime() const
 {
+#if defined(__linux__)
+	// Ask the kernel for the thread's CPU clock by TID, which the handle already carries.
+	//
+	// The clockid below is byte-for-byte what pthread_getcpuclockid() would hand back
+	// (MAKE_THREAD_CPUCLOCK in the kernel's posix-cpu-timers), so this is the same clock,
+	// reached without going through libc's thread registry first. That lookup is the one
+	// step here that can fail for reasons unrelated to the clock, and its failure is
+	// indistinguishable from an idle thread, because get_thread_time() reports it as 0 -
+	// which is why every PerformanceMetrics CPU figure can read a flat 0% while the
+	// framerate beside it is correct.
+	if (m_native_id != 0)
+	{
+		// Built in unsigned to keep the shift of a negative value out of it.
+		const clockid_t cid = static_cast<clockid_t>((~static_cast<unsigned int>(m_native_id) << 3) | 6u); // CPUCLOCK_SCHED | CPUCLOCK_PERTHREAD_MASK
+		struct timespec ts;
+		if (clock_gettime(cid, &ts) == 0)
+			return (u64)ts.tv_sec * (u64)1e6 + (u64)ts.tv_nsec / (u64)1e3;
+
+		// Say it once, with errno, rather than returning a plausible zero forever. The
+		// pthread path below still gets its turn; this only reports that the direct one
+		// did not work.
+		static std::atomic<bool> reported{false};
+		if (!reported.exchange(true))
+		{
+			Console.Warning("Threading: thread CPU clock unreadable for tid %u (errno %d); "
+							"CPU usage figures will read 0%%",
+				m_native_id, errno);
+		}
+	}
+#endif
 	return m_native_handle ? get_thread_time((uptr)m_native_handle) : 0;
 }
 
