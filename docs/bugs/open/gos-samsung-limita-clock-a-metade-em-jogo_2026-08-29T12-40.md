@@ -143,10 +143,18 @@ com o app em background: o valor sobe.
 - [TASK-0050](../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md) — detectar o corte
   dentro do app e dizer ao usuário o que está acontecendo. É paliativo declarado: o defeito é do
   aparelho.
-- **Levar o usuário ao "Forçar parada" a partir do aviso.** O detector já sabe quando o corte
-  existe; falta uma ação no banner e na linha de Configurações que abra a página do GOS pela intent
-  acima e diga o que tocar. É a única saída que não exige PC, e está medida. Precisa de task
-  própria, e de confirmar que a intent parte do nosso app (foi verificada pelo shell).
+- **O "Forçar parada" a partir do aviso está entregue, mas é auto-derrotante — rever.** As
+  TASK-0051/0053/0054 levam o usuário à tela do GOS e ensinam os toques. Só que, para executá-los,
+  ele **sai do app**, e a volta ao jogo ressuscita o serviço: um monitor de 5 min pegou o GOS
+  renascendo 2 s depois da transição de foco, com o teto de 1053 MHz de volta e cravado por 35 s.
+  Nas medições em que ele ficou morto (88 s, 58 s, 15 s), o app **já estava** em primeiro plano —
+  nunca houve a volta. O texto do assistente promete conserto onde há, no melhor caso, alívio
+  inconstante.
+- **Instrução de suporte escrita:** [`docs/gos-samsung-desabilitar-sem-pc.md`](../../gos-samsung-desabilitar-sem-pc.md)
+  — o `pm disable-user` por USB e o caminho equivalente sem PC (LADB, depuração sem fio), mais a
+  tabela do que já foi testado e **não** funciona.
+- **Trilha de desempenho**, a única que ajuda quem não vai fazer nada disso:
+  [`docs/backlog/desempenho-com-clock-cortado-a55.md`](../../backlog/desempenho-com-clock-cortado-a55.md).
 - Reteste quando houver um aparelho Samsung de linha superior à mão: lá o Game Booster expõe o
   seletor de desempenho, que pode ser um caminho que o A12 não tem.
 
