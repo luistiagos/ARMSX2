@@ -8,6 +8,14 @@
     <!-- Cover artwork can be loaded from the configured remote artwork source. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Package visibility (Android 11+): sem esta declaração o PackageManager esconde o GOS e a
+         checagem do ThrottleWatcher responderia "não existe" em todo aparelho Samsung. Só
+         consulta se ele está instalado e habilitado — o app não pode desabilitá-lo
+         (CHANGE_COMPONENT_ENABLED_STATE é signature|privileged|role). -->
+    <queries>
+        <package android:name="com.samsung.android.game.gos" />
+    </queries>
+
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"
         tools:ignore="ScopedStorage" />

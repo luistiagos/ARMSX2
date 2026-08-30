@@ -31,9 +31,8 @@ object ThrottleWatcher {
     private const val CPU0_CPUFREQ = "/sys/devices/system/cpu/cpu0/cpufreq"
 
     private const val PREF_KEY = "throttle.warnings"
-    private const val PREF_WARNED = "throttle.warned"
-    /** Houve corte neste aparelho. Diferente de [PREF_WARNED]: este não é rearmado por ninguém —
-     *  é fato sobre o aparelho, e é o que decide se a ação de conserto tem por que existir. */
+    /** Houve corte neste aparelho. Grudento de propósito: responde "este aparelho já sofreu isso",
+     *  e é o que decide se a linha de conserto aparece em Configurações — não se o aviso dispara. */
     private const val PREF_DETECTED = "throttle.detected"
 
     /**
@@ -57,6 +56,14 @@ object ThrottleWatcher {
     /** Já se mediu um corte neste aparelho. Enquanto for falso, oferecer conserto é chute. */
     val detected = androidx.compose.runtime.mutableStateOf(false)
 
+    /**
+     * O pacote do GOS está instalado E habilitado. Reavaliado a cada início de sessão porque o
+     * estado muda debaixo do app: o serviço volta sozinho depois de uma parada forçada (medido —
+     * o mesmo pid reapareceu ~40 min depois), e pode ter sido desabilitado por `pm disable-user`
+     * entre uma partida e outra.
+     */
+    private val vendorActive = androidx.compose.runtime.mutableStateOf(false)
+
     /** Teto de hardware de um cluster, e o maior clock que ele alcançou nesta sessão. */
     private class Cluster(val cur: File, val maxKHz: Int) {
         var peakKHz = 0
@@ -74,16 +81,30 @@ object ThrottleWatcher {
             enabled.value = prefs.getBoolean(PREF_KEY, true)
             detected.value = prefs.getBoolean(PREF_DETECTED, false)
         }
+        refreshVendorState()
     }
 
     /**
-     * Há uma ação concreta a oferecer: mediu-se corte E o aparelho é daquele fabricante cuja tela
-     * de conserto eu conheço. Fora da Samsung o app sabe que há um teto, não quem o pôs — mandar
-     * o usuário a uma tela adivinhada seria pior que não mandar.
+     * Há uma ação concreta a oferecer: mediu-se corte E o serviço que sei desarmar está ativo
+     * agora. `Build.MANUFACTURER` não serve para isto — diz o fabricante, não se o GOS está
+     * instalado e habilitado neste aparelho.
      */
-    fun vendorFixAvailable(): Boolean = detected.value && isSamsung()
+    fun vendorFixAvailable(): Boolean = detected.value && vendorActive.value
 
-    private fun isSamsung(): Boolean = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+    /**
+     * Consulta o `PackageManager`. Exige `<queries>` no manifesto: sem isso a visibilidade de
+     * pacotes do Android 11+ esconde o GOS e a resposta seria sempre "não existe".
+     *
+     * Um pacote desabilitado por `pm disable-user` levanta `NameNotFoundException` com flag 0, e
+     * cair em `false` aqui é a resposta certa — desabilitado é o mesmo que inativo para quem
+     * pergunta se ainda há corte a desarmar.
+     */
+    private fun refreshVendorState() {
+        val ctx = com.armsx2.runtime.MainActivityRuntime.instance?.applicationContext
+        vendorActive.value = if (ctx == null) false else runCatching {
+            ctx.packageManager.getApplicationInfo(VENDOR_THROTTLER_PACKAGE, 0).enabled
+        }.getOrDefault(false)
+    }
 
     /**
      * Abre a página de informações do serviço que aplica o corte, onde o botão **Forçar parada**
@@ -107,19 +128,23 @@ object ThrottleWatcher {
     fun set(value: Boolean) {
         enabled.value = value
         runCatching {
-            val editor = com.armsx2.runtime.MainActivityRuntime.prefs.edit()
-                .putBoolean(PREF_KEY, value)
-            // Religar o aviso rearma quem já foi avisado: é a única forma de o usuário vê-lo de
-            // novo depois de dispensá-lo, já que o aviso é de uma vez por instalação.
-            if (value) editor.putBoolean(PREF_WARNED, false)
-            editor.apply()
+            com.armsx2.runtime.MainActivityRuntime.prefs.edit()
+                .putBoolean(PREF_KEY, value).apply()
         }
     }
 
-    /** Começa a vigiar. Chamado quando a emulação começa (jogo ou BIOS). Idempotente. */
+    /**
+     * Começa a vigiar. Chamado quando a emulação começa (jogo ou BIOS). Idempotente.
+     *
+     * **Um aviso por sessão, e não por instalação.** A versão anterior guardava um
+     * `throttle.warned` e nunca mais avisava — e o relato que derrubou isso foi um jogo aberto a
+     * 15,0 fps de média, com o clock preso, e nenhum aviso na tela porque ele já tinha aparecido
+     * horas antes. O corte vai e volta (o GOS reinicia sozinho), então o usuário precisa saber
+     * toda vez que esbarra nele: a ação que o desarma também tem de ser refeita toda vez.
+     */
     fun start() {
         if (!enabled.value || sysfsUnreadable || sampler != null) return
-        if (alreadyWarned()) return
+        refreshVendorState()
         val clusters = readClusters()
         if (clusters.isEmpty()) {
             sysfsUnreadable = true
@@ -136,10 +161,6 @@ object ThrottleWatcher {
         sampler?.interrupt()
         sampler = null
     }
-
-    private fun alreadyWarned(): Boolean = runCatching {
-        com.armsx2.runtime.MainActivityRuntime.prefs.getBoolean(PREF_WARNED, false)
-    }.getOrDefault(false)
 
     /**
      * Um [Cluster] por policy. `cpuinfo_max_freq` é o teto de hardware — e não `scaling_max_freq`,
@@ -205,13 +226,12 @@ object ThrottleWatcher {
         detected.value = true
         runCatching {
             com.armsx2.runtime.MainActivityRuntime.prefs.edit()
-                .putBoolean(PREF_WARNED, true)
-                .putBoolean(PREF_DETECTED, true)
-                .apply()
+                .putBoolean(PREF_DETECTED, true).apply()
         }
-        // Nomear o culpado só onde ele foi medido. Fora da Samsung o app sabe que HÁ um teto, não
-        // quem o pôs — e chutar transformaria uma medição em boato.
-        val key = if (isSamsung()) "throttle.warn.samsung" else "throttle.warn"
+        // Nomear o culpado só quando ele está lá. O aviso sai de qualquer jeito — um teto medido
+        // é um teto medido —, mas acusar o GOS num aparelho onde ele não está instalado, ou está
+        // desabilitado, transformaria uma medição em boato.
+        val key = if (vendorActive.value) "throttle.warn.samsung" else "throttle.warn"
         val text = runCatching { I18n.get(key).format(pct) }.getOrDefault("")
         if (text.isEmpty()) return
         val activity = com.armsx2.runtime.MainActivityRuntime.instance ?: return

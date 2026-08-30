@@ -102,6 +102,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0049](TASK-0049-carregar-savestates-0x9A54.md) — carregar savestates `0x9A54` da 1.0.23 no fork | aberta | — | savestate-formato-9a54-rejeitado-pelo-fork | — |
 | [TASK-0050](TASK-0050-detectar-limite-de-clock-do-aparelho.md) — avisar quando o aparelho segura o clock da CPU | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 | [TASK-0051](TASK-0051-acao-para-o-limite-do-aparelho.md) — dar ao usuário a ação que desarma o limite | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
+| [TASK-0052](TASK-0052-avisar-do-limite-a-cada-sessao.md) — avisar do limite a cada jogo, e conferir o GOS de verdade | em andamento | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`
