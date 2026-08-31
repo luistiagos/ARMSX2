@@ -590,6 +590,18 @@ fun RendererTab(state: MutableState<Settings>) {
                 apply(s.copy(forceMaliFbFetch = it))
             }
             SettingsDivider()
+            // The PS2 Z floor is dropped by the device itself on Mali (Vulkan only) and on
+            // Apple, to keep early-ZS alive on a tiler. That makes the SAME GPU emulate depth
+            // differently depending on which backend Auto picked, with no way to ask for the
+            // floor back — this is that way. Default OFF: on is a test, not a fix.
+            ToggleRow(
+                str("renderer.forcePs2DepthQuantization.label"),
+                s.forcePs2DepthQuantization,
+                description = str("renderer.forcePs2DepthQuantization.description"),
+            ) {
+                apply(s.copy(forcePs2DepthQuantization = it))
+            }
+            SettingsDivider()
             // ANGLE for the OpenGL renderer now lives in the graphics-API driver picker
             // (AngleDriverSection), shown when OpenGL is selected — see RendererBackendSection.
             ToggleRow(

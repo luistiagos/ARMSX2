@@ -3874,8 +3874,14 @@ bool GSDeviceVK::CheckFeatures()
 	// the shader path skipped entirely. God of War II's Athena statue speckles the
 	// same way. Biasing the stored value one PS2 Z unit down also clears it, which
 	// puts the disagreement below a single Z unit.
-	m_features.no_ps2_z_quantization =
-		GSConfig.DisablePS2DepthQuantization || IsDeviceMali() || IsDeviceAppleGPU();
+	//
+	// ForcePS2DepthQuantization is what makes the "opt-out via INI" above true. It was not:
+	// the device terms are an unconditional OR, so on Mali and on Apple no value of
+	// DisablePS2DepthQuantization could bring the floor back, and a title that needs PS2 Z
+	// precision had no way to ask for it. It defaults false, so this line resolves exactly as
+	// before on every device until someone sets it.
+	m_features.no_ps2_z_quantization = !GSConfig.ForcePS2DepthQuantization &&
+		(GSConfig.DisablePS2DepthQuantization || IsDeviceMali() || IsDeviceAppleGPU());
 
 	// whether we can do point/line expand depends on the range of the device
 	const float f_upscale = static_cast<float>(GSConfig.UpscaleMultiplier);

@@ -906,6 +906,14 @@ struct Pcsx2Config
 					EnableAdrenoFramebufferFetch : 1,
 					ForceMaliFramebufferFetch : 1,
 					DisablePS2DepthQuantization : 1,
+					// Wins over DisablePS2DepthQuantization AND over the per-device
+					// defaults below it, which is the whole point: the device gates are
+					// an unconditional OR (Mali on Vulkan, Apple everywhere), so without
+					// this key there is no value of DisablePS2DepthQuantization that
+					// restores the PS2 Z floor on that hardware -- the "opt-out via INI"
+					// its comment promises does not exist. Default false, so every
+					// device keeps the behaviour it has today.
+					ForcePS2DepthQuantization : 1,
 					DisableVertexShaderExpand : 1,
 					SkipDuplicateFrames : 1,
 					OsdShowSpeed : 1,

@@ -1043,7 +1043,13 @@ bool GSDeviceOGL::CheckFeatures()
 	// API. See the matching gate in GSDeviceVK::CheckFeatures for the measurements. Mali is
 	// deliberately not included: the Vulkan path opts it out for early-ZS, but that has not been
 	// tested on a Mali GL driver.
-	m_features.no_ps2_z_quantization = GSConfig.DisablePS2DepthQuantization || vendor_id_apple;
+	//
+	// ForcePS2DepthQuantization overrides both terms. Mali is not gated here, so on this
+	// backend the key only rescues Apple GPUs -- but the key has to mean the same thing on
+	// every backend, because the whole reason it exists is that moving one device between
+	// backends silently moved this decision with it.
+	m_features.no_ps2_z_quantization =
+		!GSConfig.ForcePS2DepthQuantization && (GSConfig.DisablePS2DepthQuantization || vendor_id_apple);
 
 	// GLES may omit dual-source blending (GL_EXT/ARB_blend_func_extended); desktop GL always has it.
 	// When absent, GSRendererHW emulates SRC1 blend equations in-shader per-draw rather than forcing

@@ -293,6 +293,20 @@ data class Settings(
      * exact breakage this works around). Inert on other GPUs/renderers. Applies on game
      * restart. */
     val forceMaliFbFetch: Boolean = false,
+    /** EmuCore/GS/ForcePS2DepthQuantization — restore the PS2 32-bit Z floor on hardware
+     * where the device turns it off by itself. Declaring gl_FragDepth for the floor kills
+     * early-ZS on a tiler, so GSDeviceVK drops it on ALL Mali (and Apple), and GSDeviceOGL
+     * drops it on Apple only — the same GPU therefore emulates depth differently depending
+     * on which backend the Auto renderer picked. Without the floor, GSRendererHW notes that
+     * a ZTST_GREATER retest can FALSE-PASS, which shows up as depth artifacts.
+     *
+     * The core's own comment advertised an "opt-out via INI" that did not exist: the device
+     * terms are an unconditional OR, so DisablePS2DepthQuantization could only push the
+     * floor further off. This key is the missing direction, and it is per-game because the
+     * trade is per-title: it costs tiler fill rate and only Z-precision-sensitive games get
+     * anything back. Default OFF = today's behaviour on every device. Applies on game
+     * restart (read once in CheckFeatures, at device creation). */
+    val forcePs2DepthQuantization: Boolean = false,
     /** EmuCore/GS/AndroidUseAngleOpenGL — run the OpenGL renderer through ANGLE's
      *  GLES-on-Vulkan translation (bundled libEGL_angle.so / libGLESv2_angle.so).
      *  Useful on devices with a broken native GLES driver (e.g. some MediaTek Mali).
@@ -1274,6 +1288,7 @@ data class Settings(
             adrenoFbFetch = boolAt("EmuCore/GS/EnableAdrenoFramebufferFetch") ?: this.adrenoFbFetch,
             coalesceRenderPasses = boolAt("EmuCore/GS/CoalesceRenderPasses") ?: this.coalesceRenderPasses,
             forceMaliFbFetch = boolAt("EmuCore/GS/ForceMaliFramebufferFetch") ?: this.forceMaliFbFetch,
+            forcePs2DepthQuantization = boolAt("EmuCore/GS/ForcePS2DepthQuantization") ?: this.forcePs2DepthQuantization,
             useAngleOpenGL = boolAt("EmuCore/GS/AndroidUseAngleOpenGL") ?: this.useAngleOpenGL,
             overrideTextureBarriers = intAt("EmuCore/GS/OverrideTextureBarriers") ?: this.overrideTextureBarriers,
             gsBackThreadMode = intAt("EmuCore/GS/GSBackThreadMode") ?: this.gsBackThreadMode,
@@ -1496,6 +1511,7 @@ data class Settings(
         put("EmuCore/GS", "EnableAdrenoFramebufferFetch", "bool", adrenoFbFetch.toString())
         put("EmuCore/GS", "CoalesceRenderPasses", "bool", coalesceRenderPasses.toString())
         put("EmuCore/GS", "ForceMaliFramebufferFetch", "bool", forceMaliFbFetch.toString())
+        put("EmuCore/GS", "ForcePS2DepthQuantization", "bool", forcePs2DepthQuantization.toString())
         // Parity write (native reads the ARMSX2_ANGLE_EGL_LIBRARY env var set by
         // MainActivityRuntime.applyAngleEnv, not this key) — kept so the config file
         // reflects the toggle.
@@ -1760,6 +1776,7 @@ data class Settings(
         put("adrenoFbFetch", adrenoFbFetch)
         put("coalesceRenderPasses", coalesceRenderPasses)
         put("forceMaliFbFetch", forceMaliFbFetch)
+        put("forcePs2DepthQuantization", forcePs2DepthQuantization)
         put("useAngleOpenGL", useAngleOpenGL)
         put("overrideTextureBarriers", overrideTextureBarriers)
         put("gsBackThreadMode", gsBackThreadMode)
@@ -2044,6 +2061,7 @@ data class Settings(
                 adrenoFbFetch = json.optBoolean("adrenoFbFetch", def.adrenoFbFetch),
                 coalesceRenderPasses = json.optBoolean("coalesceRenderPasses", def.coalesceRenderPasses),
                 forceMaliFbFetch = json.optBoolean("forceMaliFbFetch", def.forceMaliFbFetch),
+                forcePs2DepthQuantization = json.optBoolean("forcePs2DepthQuantization", def.forcePs2DepthQuantization),
                 useAngleOpenGL = json.optBoolean("useAngleOpenGL", def.useAngleOpenGL),
                 overrideTextureBarriers = json.optInt("overrideTextureBarriers", def.overrideTextureBarriers),
                 gsBackThreadMode = json.optInt("gsBackThreadMode", def.gsBackThreadMode),
@@ -2299,6 +2317,7 @@ data class Settings(
             if (current.adrenoFbFetch != base.adrenoFbFetch) j.put("adrenoFbFetch", current.adrenoFbFetch)
             if (current.coalesceRenderPasses != base.coalesceRenderPasses) j.put("coalesceRenderPasses", current.coalesceRenderPasses)
             if (current.forceMaliFbFetch != base.forceMaliFbFetch) j.put("forceMaliFbFetch", current.forceMaliFbFetch)
+            if (current.forcePs2DepthQuantization != base.forcePs2DepthQuantization) j.put("forcePs2DepthQuantization", current.forcePs2DepthQuantization)
             if (current.useAngleOpenGL != base.useAngleOpenGL) j.put("useAngleOpenGL", current.useAngleOpenGL)
             if (current.overrideTextureBarriers != base.overrideTextureBarriers) j.put("overrideTextureBarriers", current.overrideTextureBarriers)
             if (current.gsBackThreadMode != base.gsBackThreadMode) j.put("gsBackThreadMode", current.gsBackThreadMode)
@@ -2544,6 +2563,7 @@ data class Settings(
             adrenoFbFetch = if (overrides.has("adrenoFbFetch")) overrides.getBoolean("adrenoFbFetch") else base.adrenoFbFetch,
             coalesceRenderPasses = if (overrides.has("coalesceRenderPasses")) overrides.getBoolean("coalesceRenderPasses") else base.coalesceRenderPasses,
             forceMaliFbFetch = if (overrides.has("forceMaliFbFetch")) overrides.getBoolean("forceMaliFbFetch") else base.forceMaliFbFetch,
+            forcePs2DepthQuantization = if (overrides.has("forcePs2DepthQuantization")) overrides.getBoolean("forcePs2DepthQuantization") else base.forcePs2DepthQuantization,
             useAngleOpenGL = if (overrides.has("useAngleOpenGL")) overrides.getBoolean("useAngleOpenGL") else base.useAngleOpenGL,
             overrideTextureBarriers = if (overrides.has("overrideTextureBarriers")) overrides.getInt("overrideTextureBarriers") else base.overrideTextureBarriers,
             gsBackThreadMode = if (overrides.has("gsBackThreadMode")) overrides.getInt("gsBackThreadMode") else base.gsBackThreadMode,

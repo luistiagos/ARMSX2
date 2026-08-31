@@ -758,6 +758,7 @@ Pcsx2Config::GSOptions::GSOptions()
 	DisableShaderCache = false;
 	DisableFramebufferFetch = false;
 	DisablePS2DepthQuantization = false;
+	ForcePS2DepthQuantization = false;
 	DisableVertexShaderExpand = false;
 	EnableAdrenoFramebufferFetch = false;
 	ForceMaliFramebufferFetch = false;
@@ -978,6 +979,7 @@ bool Pcsx2Config::GSOptions::IsRestartOption(const char* ini_key)
 		"DisableShaderCache",
 		"DisableFramebufferFetch",
 		"DisablePS2DepthQuantization",
+		"ForcePS2DepthQuantization",
 		"DisableVertexShaderExpand",
 		"EnableAdrenoFramebufferFetch",
 		"ForceMaliFramebufferFetch",
@@ -1008,6 +1010,7 @@ bool Pcsx2Config::GSOptions::RestartOptionsAreEqual(const GSOptions& right) cons
 		   OpEqu(DisableShaderCache) &&
 		   OpEqu(DisableFramebufferFetch) &&
 		   OpEqu(DisablePS2DepthQuantization) &&
+		   OpEqu(ForcePS2DepthQuantization) &&
 		   OpEqu(DisableVertexShaderExpand) &&
 		   OpEqu(EnableAdrenoFramebufferFetch) &&
 		   OpEqu(ForceMaliFramebufferFetch) &&
@@ -1064,6 +1067,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBool(DisableShaderCache);
 	SettingsWrapBitBool(DisableFramebufferFetch);
 	SettingsWrapBitBool(DisablePS2DepthQuantization);
+	SettingsWrapBitBool(ForcePS2DepthQuantization);
 	SettingsWrapBitBool(DisableVertexShaderExpand);
 	SettingsWrapBitBool(EnableAdrenoFramebufferFetch);
 	SettingsWrapBitBool(ForceMaliFramebufferFetch);

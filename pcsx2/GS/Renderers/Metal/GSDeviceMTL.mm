@@ -1355,7 +1355,10 @@ bool GSDeviceMTL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	// shows through as pinpoints -- God of War II's Athena statue, and dark walls in Black.
 	// Skipping the floor also drops [[depth(less)]] output, restoring early-ZS on a TBDR.
 	// See the matching gate in GSDeviceVK::CheckFeatures for the measurements.
-	m_features.no_ps2_z_quantization = GSConfig.DisablePS2DepthQuantization || m_dev.features.apple_gpu;
+	// ForcePS2DepthQuantization overrides both terms, so a Z-precision-sensitive title can ask
+	// for the floor back on an Apple GPU. Default false: unchanged behaviour until it is set.
+	m_features.no_ps2_z_quantization = !GSConfig.ForcePS2DepthQuantization &&
+		(GSConfig.DisablePS2DepthQuantization || m_dev.features.apple_gpu);
 	// MetalFX spatial upscaler: macOS 13+ / iOS 16+ device. The supportsDevice:
 	// probe returns NO on devices whose GPU lacks the hardware. On the iOS Simulator
 	// the MetalFX framework is absent at compile time (PCSX2_HAS_METALFX=0), so the
