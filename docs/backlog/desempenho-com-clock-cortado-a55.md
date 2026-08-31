@@ -308,10 +308,41 @@ adb shell cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
 # velocidade real da emulação
 adb shell "grep PerfLog /storage/emulated/0/Android/data/come.nanodata.armsx2/files/logs/emulog.txt | tail -4"
 
-# consumo por thread do app
+# consumo por thread do app  -- VER AS TRES ARMADILHAS ABAIXO ANTES DE USAR
 adb shell "PID=\$(pidof come.nanodata.armsx2); for t in \$(ls /proc/\$PID/task); do \
   echo \"\$t \$(cat /proc/\$PID/task/\$t/comm) \$(awk '{print \$14+\$15}' /proc/\$PID/task/\$t/stat)\"; done"
+
+# quadros REALMENTE desenhados -- e o que decide se um limite de taxa e no-op
+adb shell "dumpsys gfxinfo come.nanodata.armsx2 reset"; sleep 15
+adb shell "dumpsys gfxinfo come.nanodata.armsx2 | grep -E 'Total frames|Janky|Slow issue|percentile'"
+
+# onde uma thread que gira esta presa, sem precisar de perf
+adb shell "grep -E '^(State|voluntary|nonvoluntary)' /proc/<pid>/task/<tid>/status"
 ```
+
+> ### Tres armadilhas no one-liner acima — cada uma custou uma medicao em 2026-08-30
+>
+> 1. **`comm` pode ter espaco.** `/proc/<tid>/stat` e `pid (comm) state ...`, e `CPU Thread`
+>    tem um espaco dentro dos parenteses, o que desloca **todo** `awk '{print $14+$15}'`.
+>    Contar os campos a partir do **ultimo** `)`. Threads sem espaco no nome (`RenderThread`,
+>    `MTVU`) saem certas, o que faz a tabela inteira parecer boa.
+> 2. **Em `sh`, `$12` nao e o parametro 12** — e `$1` seguido de um `2` literal. Escrever
+>    `${12}`. Com o erro a soma da zero e a thread parece ociosa; foi assim que a MTVU
+>    "sumiu" de uma amostra.
+> 3. **A janela real nao e o `sleep`.** O laco gera ~90 processos por snapshot, entao
+>    amostrar com `sleep 10` produz uma janela de ~14 s. Dividir pelo delta de
+>    `/proc/uptime`, nunca pelo sleep pedido, senao todo percentual sai ~40% alto.
+>
+> ### E o que **nao** funciona neste aparelho
+>
+> **`simpleperf` esta bloqueado**, mesmo com `perf_event_paranoid = -1` e o app
+> `profileable android:shell="true"`: `failed to open perf event file for event_type
+> cpu-cycles: Permission denied`, e o mesmo com `-e cpu-clock`, que nem usa PMU. E o Knox.
+>
+> Para achar onde uma thread esta presa sem perf, o que funcionou foi
+> **`voluntary_ctxt_switches`** (zero = a thread nunca bloqueou, uma vez sequer) mais uma
+> sonda temporaria que registra o estado da thread **de fora**: uma thread presa num laco de
+> userspace nao consegue registrar nada sobre si mesma.
 
 Para comparar números com os desta análise, **matar o GOS antes** (`adb shell am force-stop
 com.samsung.android.game.gos`) e conferir que o clock subiu — senão a medição mede a Samsung, não o
