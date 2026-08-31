@@ -52,8 +52,9 @@ ele: 30 fps com engasgo de 20.
 
 ## A causa, e ela está no código
 
-`Number Slow issue draw commands` em **100% dos quadros** aponta para o lado de emitir comandos, não
-para preencher pixels. E lendo a cena:
+`Number Slow issue draw commands` em 100% dos quadros *sugeriu* o lado de emitir comandos — mas essa
+métrica é relativa ao orçamento de 16,7 ms e diz ~100% para qualquer app a 30 fps, então ela aponta
+uma direção, não prova uma causa (ver "O que está medido"). A prova está no código:
 
 ```kotlin
 val baseY = h * (0.40f + 0.16f * f)                 // sem t
@@ -80,7 +81,10 @@ o Skia entregar um shader novo ao driver. Junto com eles, oito `Path` e catorze 
 - `LibraryWaveBackground.kt` — `WaveScratch`, que constrói uma vez (por cor e por tamanho) tudo o que
   não se move: os cinco `Brush`, as cores e larguras de crista, os raios e traços dos glifos. Os
   `Path` **mudam** todo quadro, então são reusados com `reset()` em vez de cacheados.
-- O limite de ~30 fps, **depois** disso e por causa disso — ver "Ordem importa" abaixo.
+- O limite de ~30 fps, com portão em **25 ms** e não 33: a 60 Hz os callbacks chegam em
+  0/16,7/33,3 ms e um limite de 33 senta em cima do terceiro, de modo que qualquer jitter abaixo
+  dele descarta o quadro — 30 fps com engasgo de 20. Qualquer valor em (16,7 ; 33,3) escolhe o
+  segundo callback de forma determinística, e continua dando 30 fps a 90 ou 120 Hz.
 
 **NÃO entra:**
 
@@ -91,26 +95,61 @@ o Skia entregar um shader novo ao driver. Junto com eles, oito `Path` e catorze 
 - **O `SaverGlView`** (`FRAME_TARGET_MS = 16L`). Opt-in explícito, e uma simulação de partículas a
   30 fps fica visivelmente pior.
 
-## Ordem importa, e custou uma medição descobrir
+## O que está medido, e o que NÃO está
 
-O cache sozinho, sem limite de taxa:
+**Medido, e sólido:**
 
-| | antes | depois |
-|---|---|---|
-| `Number Slow issue draw commands` | 1656 (100%) | **3 (0,16%)** |
-| Janky frames | 1656 (99,70%) | **3 (0,16%)** |
-| GPU p50 | 19 ms | 15 ms |
-| quadros desenhados | 30 fps | **60 fps** |
-| CPU total | 0,85 núcleo | **1,11 núcleo** |
+| | |
+|---|---|
+| a tela desenhava a **exatos 30,0 fps** antes de qualquer mudança | 453 quadros / 15,1 s, duas vezes |
+| um portão de **33 ms é no-op** nesse estado | 30 fps antes e 30 fps depois |
+| com o custo por quadro reduzido, a tela **alcança 60 fps** | 906 quadros / 15,9 s |
+| o portão de **25 ms segura em 30 fps** | 454 quadros / 15,1 s |
+| o desenho é **visualmente idêntico** | captura de tela antes/depois |
 
-O custo por quadro caiu tanto que a tela passou a **alcançar** o vsync — e gastou toda a folga
-desenhando uma onda lenta com o dobro da frequência. O total **subiu**.
+**NÃO medido — e uma afirmação anterior desta task estava errada:**
 
-É exatamente aí que o limite de taxa deixa de ser no-op e vira a peça que guarda o ganho em vez de
-gastá-lo. Ele voltou, agora com base medida, e com o portão em **25 ms** e não 33: a 60 Hz os
-callbacks chegam em 0/16,7/33,3 ms, e um limite de 33 ms senta em cima do terceiro — qualquer
-jitter abaixo dele descarta o quadro. Qualquer valor em (16,7 ; 33,3) escolhe o segundo callback de
-forma determinística, e continua dando 30 fps a 90 ou 120 Hz.
+Uma versão anterior deste texto apresentou como prova do ganho do cache uma tabela de `gfxinfo`:
+`Janky frames` de 99,70% → 0,16% e `Number Slow issue draw commands` de 100% → 0,16%.
+
+**Essas duas métricas não servem para esta comparação.** Ambas são medidas contra o orçamento de
+16,7 ms de um vsync de 60 Hz, então **um app que desenha a 30 fps é 100% "janky" por definição**,
+por mais barato que cada quadro seja. A "melhora" que li foi o app ter passado a desenhar a 60 fps,
+não o quadro ter ficado mais barato. Com o limite reintroduzido — mesmo custo por quadro, 30 fps de
+novo — as duas voltam a ~100%, como tinham de voltar.
+
+A única métrica que compara os dois estados é **CPU por segundo em taxa igual**, e essa medição
+**não foi obtida**: o A/B ficou pronto (dois APKs diferindo só no cache, ambos limitados a 30 fps)
+mas a rodada foi invalidada porque **outra sessão iniciou um download no mesmo aparelho** no meio
+dela — o painel "Downloads em Andamento" mudou o layout da tela sob teste, apareceram
+`RenderThread` extras, e o `wlan0` mostrou 44 MB em 20 s de tráfego concorrente.
+
+Portanto: **o cache é mantido por argumento de código, não por medição.** O argumento é forte e
+verificável sem aparelho — `baseY`, `amp`, `startY` e `endY` não são função de `t`, logo os cinco
+`Brush` eram reconstruídos 30×/s para produzir o objeto idêntico —, mas "faz menos trabalho" e
+"custa menos CPU medida" são coisas diferentes, e só a primeira está estabelecida.
+
+## Como fechar esta task
+
+Os dois APKs do A/B estão prontos e a diferença entre eles é **só** o `WaveScratch`; os dois
+limitam a 30 fps, então qualquer diferença de CPU é custo por quadro. Repetir com o aparelho
+exclusivo:
+
+```bash
+# para cada braço: instalar, abrir a biblioteca, deixar assentar 40 s, amostrar 20 s
+adb install -r apk_B.apk   # sem cache
+adb shell "sleep 40; sh /data/local/tmp/tsample.sh 20"
+adb install -r apk_A.apk   # com cache
+adb shell "sleep 40; sh /data/local/tmp/tsample.sh 20"
+```
+
+**Pré-condições que a rodada invalidada ensinou:** nenhum download em andamento (o painel muda o
+layout da tela sob teste), a mesma quantidade de jogos na grade nos dois braços, e conferir por
+captura de tela que os dois braços estão na mesma tela antes de comparar número com número.
+
+Critério: o braço com cache abaixo do braço sem cache, na mesma taxa de quadros. Se a diferença for
+pequena, a alavanca seguinte é o preenchimento de GPU (`WAVE_LAYERS` de 4 para 2), que é decisão de
+produto porque muda o que o usuário vê.
 
 ## Como validar
 
@@ -122,12 +161,12 @@ adb shell "sh /data/local/tmp/tsample.sh 12 'RenderThread|nanodata|hwuiTask|mali
 adb shell "dumpsys gfxinfo come.nanodata.armsx2" | grep -E 'Janky|Slow issue|50th'
 ```
 
-Critério: `Slow issue draw commands` perto de zero (**medido: 100% → 0,16%**), 30 fps desenhados, e
-o total por thread abaixo do 0,85 núcleo da linha de base.
+Critério: 30 fps desenhados (**medido**), e o total por thread abaixo do 0,85 núcleo da linha de
+base (**não medido** — ver acima).
 
-> ⏳ **A medição final, com o limite de taxa reintroduzido, está pendente**: o aparelho caiu do ADB
-> no meio da bateria de testes. O que está medido é o cache (tabela acima). O esperado do limite é
-> metade de 1,11, ou seja ~0,55 núcleo — e é isso que fecha esta task.
+**Não usar `Janky frames` nem `Number Slow issue draw commands` como critério.** São relativos ao
+orçamento de 16,7 ms e dão ~100% para qualquer app que desenhe a 30 fps, independentemente do custo
+real do quadro. Foi assim que a primeira leitura desta task saiu errada.
 
 **Armadilhas de medição** que custaram uma amostra cada, para quem repetir:
 

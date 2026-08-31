@@ -251,18 +251,25 @@ padrão em aparelho sem núcleo grande.
 > do relógio** — e eram reconstruídos trinta vezes por segundo, cada reconstrução entregando um
 > shader novo ao driver.
 >
-> Depois de cachear o que não se move (TASK-0057):
+> A [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) cacheia o que não se
+> move e limita a taxa a 30 fps com portão de 25 ms (33 ms cairia em cima do terceiro callback de
+> 60 Hz e viraria 20 fps no primeiro jitter).
 >
-> | | antes | depois |
-> |---|---|---|
-> | `Slow issue draw commands` | 1656 (100%) | **3 (0,16%)** |
-> | Janky frames | 99,70% | **0,16%** |
-> | GPU p50 | 19 ms | 15 ms |
-> | quadros desenhados | 30 fps | **60 fps** |
+> ⚠️ **O ganho de CPU do cache NÃO está medido, e uma versão anterior desta anotação dizia que
+> estava.** A "prova" era `Janky frames` 99,70% → 0,16% e `Slow issue draw commands` 100% → 0,16%.
+> As duas métricas são relativas ao orçamento de 16,7 ms de um vsync de 60 Hz, então **um app que
+> desenha a 30 fps é 100% "janky" por definição** — o que elas mostraram foi o app ter passado a
+> 60 fps, não o quadro ter ficado mais barato. Com o limite de volta, as duas voltam a ~100%.
 >
-> E aí o limite de taxa passa a fazer sentido — mas só aí: com o custo por quadro corrigido a tela
-> alcança o vsync e gasta a folga desenhando o dobro (0,85 → 1,11 de um núcleo). É o limite que
-> guarda o ganho em vez de gastá-lo. **Ordem importa**, e foi preciso medir para descobrir.
+> O A/B que decide (dois APKs diferindo só no cache, ambos a 30 fps) ficou pronto e foi invalidado
+> por outra sessão iniciar um download no mesmo aparelho no meio da rodada. Está descrito em "Como
+> fechar esta task", com as pré-condições que a rodada perdida ensinou.
+>
+> **Medido e sólido:** a tela desenhava a exatos 30,0 fps antes de tudo (logo o portão de 33 ms era
+> no-op), o custo por quadro caiu o bastante para ela alcançar 60 fps, e o portão de 25 ms a segura
+> em 30. O cache fica por **argumento de código** — `baseY`, `amp`, `startY` e `endY` não são função
+> de `t`, logo os cinco `Brush` eram reconstruídos 30×/s para produzir o objeto idêntico —, e
+> "faz menos trabalho" não é o mesmo que "custa menos CPU medida".
 
 **Validar:** mesma amostragem de threads na tela "Salvos" parada — o total deve cair para bem abaixo
 de meio núcleo, e o jank do `gfxinfo` deve desabar.
