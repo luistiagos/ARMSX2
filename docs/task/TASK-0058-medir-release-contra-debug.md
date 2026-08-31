@@ -10,12 +10,51 @@
 - **Revertida por:** —
 - **Publicado em:** —
 
-## Por que está aberta e não em andamento
+## 🔴 A premissa desta task estava errada: não são duas variáveis, são três
 
-**Esta task é uma medição, e não há aparelho nesta sessão.** Não dá para entregá-la escrevendo
-código: o que ela produz é uma tabela de quatro linhas colhida num Galaxy A12. Fica registrada
-para que o item 3 do backlog tenha um lugar, e para que o trabalho estático que *era* possível —
-a conferência do R8, abaixo — não fique escondido dentro de outra task.
+O texto abaixo (e o backlog) descrevem release-vs-debug como "R8 mais `debuggable`", com o núcleo
+nativo igual dos dois lados porque o `CMakeCache.txt` do debug traz `-O3 -g`. **As flags são
+mesmo iguais; o LTO não é.** Lido nas duas árvores que o AGP configura:
+
+| | `githubDebug` | `githubRelease` |
+|---|---|---|
+| `CMAKE_CXX_FLAGS` | `-O3 -g` | `-O3 -g` |
+| `CMAKE_BUILD_TYPE` | `Debug` | `Release` |
+| **`LTO_PCSX2_CORE`** | **`OFF`** | **`ON`** |
+
+Ou seja, o flavor de release **já** liga LTO no núcleo. A afirmação de "NÃO entra" mais abaixo —
+que LTO é "uma terceira variável e entra depois, sozinha" — **não se sustenta**: ela não é
+separável, porque medir `githubRelease` mede LTO junto. E LTO toca o código nativo, que é
+justamente onde a [TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) mediu o gargalo
+(`EE 100%`). Isso torna a medição *mais* interessante do que o backlog supunha, não menos.
+
+### E isso deixa de ser teórico para a UB da TASK-0060
+
+A [TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) registra que dividir por
+`GetTickFrequency()` valendo zero é **comportamento indefinido em C++**, e que hoje se observa
+`udiv → 0` só porque o compilador não enxerga o divisor através da fronteira de tradução.
+
+**Com LTO ligado ele enxerga.** O build que vai para o cliente é exatamente o que pode inlinear
+`GetTickFrequency()` dentro de `ShortSpinOn` e assumir que a divisão nunca acontece. Todo o
+diagnóstico daquela investigação foi feito em `githubDebug`, sem LTO — o release podia estar se
+comportando de outro jeito, e ninguém teria como saber. Consertar o contrato (o que a TASK-0060
+fez) fecha isso; blindar cada divisão não fecharia.
+
+## Como medir sem destruir os dados do usuário
+
+O caminho ingênuo — `adb install -r` do release por cima do debug — **não funciona e é
+destrutivo**. Verificado no aparelho:
+
+- `armsx2_keystore.properties` existe, então o release é assinado com `retrosystem_release.jks`
+  (SHA256 `D3:4A:78:8A:…`), **chave diferente** da do debug instalado. O `install -r` recusa.
+- A "solução" seria desinstalar, e o diretório do app tem **14 GB**: 14 GB de ROMs, 17 MB de
+  memory cards e os savestates. Desinstalar apaga tudo.
+
+O caminho seguro, e que é o usado aqui: construir o release com **outro `applicationId`**
+(`-Parmsx2.applicationId=come.nanodata.armsx2.perf`), instalar **ao lado**, semear só o necessário
+no diretório próprio dele — o BIOS (4 MB), a ROM de teste (103 MB) e o `PCSX2-Android.ini`, para
+que a configuração do núcleo seja idêntica — e desinstalar o pacote de teste no fim. O app real
+não é tocado em momento nenhum.
 
 ## Contexto
 
@@ -57,8 +96,10 @@ citadas só no manifesto continuam sendo risco, e as regras existentes já mostr
 
 - Mudar `isMinifyEnabled`, o flavor publicado ou as regras do R8. Se a medição mostrar que o
   release ganha, ele já é o canal; se mostrar que perde, aí sim abre-se a discussão — com número.
-- LTO. O release do upstream liga `LTO_PCSX2_CORE`, e um build com LTO ainda não foi medido: é uma
-  terceira variável e entra depois, sozinha.
+- ~~LTO. O release do upstream liga `LTO_PCSX2_CORE`, e um build com LTO ainda não foi medido: é uma
+  terceira variável e entra depois, sozinha.~~ **Riscado:** LTO não é separável de `githubRelease`,
+  porque o flavor já a liga — ver a caixa no topo. A medição desta task inclui LTO, e dizer o
+  contrário seria descrever um experimento que não é o que está sendo feito.
 
 ## Como validar
 
