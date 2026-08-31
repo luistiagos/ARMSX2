@@ -11,9 +11,30 @@
 - **Publicado em:** —
 
 
-> **Situação em 2026-08-30:** o código está escrito e compila (ninja dos quatro objetos afetados, exit 0). O status
-> segue **em andamento** de propósito: os critérios de "Como validar" abaixo exigem o Galaxy A12, e
-> nada aqui foi executado em aparelho. Compilar não é validar.
+> ## Validada no A12 em 2026-08-30 — e a hipótese central estava errada
+>
+> O que esta task supunha: os `EE 0% GS 0% VU 0%` vinham de `get_thread_time()` falhando em
+> silêncio. Para provar ou derrubar isso, ela adicionou um aviso de uma linha.
+>
+> **O aviso não disparou.** O relógio por thread lê perfeitamente — e foi esse silêncio que apontou
+> para o outro lado da conta, o divisor. A causa real é `CNTFRQ_EL0` lendo 0
+> ([TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md)): em `double`,
+> `100.0 * (1.0 / (x / 0.0))` é `100 * (1/+inf)` = **`0.0`**, que é o `0%` impresso.
+>
+> Depois da TASK-0060, com o código desta task no lugar:
+>
+> ```
+> antes:   PerfLog: 25.6 fps | EE 0%   GS 0%  VU 0% GPU 0% | frame 771
+> depois:  PerfLog: 25.0 fps | EE 100% GS 37% VU 0% GPU 0% | frame 758
+> ```
+>
+> **O que fica desta task, e vale:** o relógio por TID (uma dependência a menos da lista de threads
+> da libc), o aviso — que fez o seu trabalho ao **não** disparar —, e o `n/a`/campo omitido, que é o
+> que impede o próximo zero de se passar por medição.
+>
+> **`GPU 0%` sobreviveu à correção**, e portanto é outro defeito: o campo é impresso, logo
+> `SetGPUTimingAvailable(true)` foi chamado e o backend aceita timestamp query — mas não produz
+> tempo de GPU. Isolado, e em aberto.
 
 ## Contexto
 

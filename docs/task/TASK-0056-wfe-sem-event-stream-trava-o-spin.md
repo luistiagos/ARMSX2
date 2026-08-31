@@ -1,19 +1,43 @@
 # TASK-0056: não estacionar num `WFE` que ninguém promete acordar
 
-- **Status:** em andamento
+- **Status:** revertida
 - **Criada em:** 2026-08-30
 - **Concluída em:** —
 - **Feature:** nenhuma
 - **Bugs que resolve:** [mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm](../bugs/done/mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm_2026-08-28T15-24.md)
 - **Backlog:** item 1 de [`desempenho-com-clock-cortado-a55`](../backlog/desempenho-com-clock-cortado-a55.md) — e o achado de lado registrado em [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0056:` no assunto)
-- **Revertida por:** —
+- **Revertida por:** `d71a0631d9`
 - **Publicado em:** —
 
 
-> **Situação em 2026-08-30:** o código está escrito e compila (ninja de `common/HostSys.cpp`, exit 0). O status
-> segue **em andamento** de propósito: os critérios de "Como validar" abaixo exigem o Galaxy A12, e
-> nada aqui foi executado em aparelho. Compilar não é validar.
+> ## 🔴 REVERTIDA em 2026-08-30 — o diagnóstico abaixo está errado
+>
+> O primeiro passo do "Como validar" desta própria task era:
+>
+> ```bash
+> adb shell "grep -o 'evtstrm' /proc/cpuinfo | head -1"
+> ```
+>
+> Rodado no Galaxy A12, ele responde **`evtstrm`**. O aparelho **tem** o event stream, `HWCAP_EVTSTRM`
+> está setado, `HasEventStream()` devolve `true`, e a guarda que esta task escreveu é um **no-op
+> exatamente no aparelho onde o defeito foi medido**.
+>
+> A causa real está na [TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md): `CNTFRQ_EL0`
+> lê **0** neste SoC, então `ShortSpinOn()` devolve `(elapsed * 1e9) / 0 == 0` — `udiv` por zero no
+> AArch64 não tem exceção, devolve zero — e o orçamento `waited` de `WaitForWorkWithSpin()` nunca
+> alcança `SPIN_TIME_NS`. Não era o `WFE` não acordar; era o relógio não contar.
+>
+> **O que esta task acertou:** que a thread estava presa *dentro* de uma chamada a
+> `WaitForWorkWithSpin()`, e que o teto de 50 µs só é conferido *entre* chamadas. Esse raciocínio
+> está certo e é o que levou à sonda que achou a resposta. O que estava errado foi o motivo de a
+> chamada não retornar.
+>
+> **Por que a guarda não ficou "por segurança":** é código no core do upstream, para um aparelho
+> hipotético, que não pode ser testado, escrito a partir de uma inferência que o único aparelho
+> disponível derrubou. O risco que ela descrevia ficou anotado no comentário de `MonitoredWait`.
+>
+> O texto original segue abaixo, inteiro.
 
 ## Contexto
 

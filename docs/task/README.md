@@ -106,10 +106,11 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0053](TASK-0053-aviso-do-limite-vira-dialogo.md) — o aviso do limite vira diálogo com os passos | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 | [TASK-0054](TASK-0054-assistente-do-limite-do-aparelho.md) — aviso curto com assistente passo a passo, que cabe deitado | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 | [TASK-0055](TASK-0055-contadores-de-desempenho-que-nao-mentem.md) — o `PerfLog` diz a verdade sobre EE, GS, VU e GPU | em andamento | — | — | — |
-| [TASK-0056](TASK-0056-wfe-sem-event-stream-trava-o-spin.md) — não estacionar num `WFE` que ninguém promete acordar | em andamento | — | mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm | — |
+| [TASK-0056](TASK-0056-wfe-sem-event-stream-trava-o-spin.md) — não estacionar num `WFE` que ninguém promete acordar | revertida | — | — | `d71a0631d9` |
 | [TASK-0057](TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) — limitar a taxa do fundo 2D da biblioteca | em andamento | — | — | — |
 | [TASK-0058](TASK-0058-medir-release-contra-debug.md) — medir `githubRelease` contra `githubDebug` | aberta | — | — | — |
 | [TASK-0059](TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) — assistente abre no início do app e ensina o conserto que funciona | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
+| [TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) — relógio de ticks quando `CNTFRQ_EL0` lê zero | em andamento | — | cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`
