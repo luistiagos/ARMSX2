@@ -110,7 +110,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0057](TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) — limitar a taxa do fundo 2D da biblioteca | em andamento | — | — | — |
 | [TASK-0058](TASK-0058-medir-release-contra-debug.md) — medir `githubRelease` contra `githubDebug` | aberta | — | — | — |
 | [TASK-0059](TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) — assistente abre no início do app e ensina o conserto que funciona | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
-| [TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) — relógio de ticks quando `CNTFRQ_EL0` lê zero | em andamento | — | cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks | — |
+| [TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) — relógio de ticks quando `CNTFRQ_EL0` lê zero | concluída | — | cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`

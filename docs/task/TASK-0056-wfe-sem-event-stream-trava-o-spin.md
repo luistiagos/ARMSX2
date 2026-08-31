@@ -54,7 +54,7 @@ Está determinada agora, e o raciocínio acima tem um furo: o teto de 50 µs só
 chamadas a `ShortSpinOn()`. Se uma chamada não retorna, `waited` não avança e o `m_sema.Wait()`
 nunca é alcançado.
 
-`ShortSpinOn()` no ARM64 (`common/HostSys.cpp:147`) é exatamente isso:
+`ShortSpinOn()` no ARM64 (`common/HostSys.cpp:151`) é exatamente isso:
 
 ```cpp
 static void MonitoredWait(const std::atomic<s32>& word, s32 expected)

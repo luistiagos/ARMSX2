@@ -32,9 +32,23 @@
 > da libc), o aviso — que fez o seu trabalho ao **não** disparar —, e o `n/a`/campo omitido, que é o
 > que impede o próximo zero de se passar por medição.
 >
-> **`GPU 0%` sobreviveu à correção**, e portanto é outro defeito: o campo é impresso, logo
-> `SetGPUTimingAvailable(true)` foi chamado e o backend aceita timestamp query — mas não produz
-> tempo de GPU. Isolado, e em aberto.
+> ### ⚠️ E sobre o campo `GPU`, o que se sabe é menos do que eu escrevi antes
+>
+> Uma versão anterior desta anotação dizia: "`GPU 0%` sobreviveu à correção, portanto é outro
+> defeito — o backend não produz tempo de GPU". **Não se sustenta.**
+>
+> O `GPU 0%` foi observado em dois builds, ambos de 30/08. Num build de 31/08, o **mesmo jogo, mesmo
+> save** passou a marcar `GPU 15%`, e o God of War II marca `GPU 73%`. Nada meu mudou nesse caminho
+> entre os dois — mas **outra sessão editou `GSUtil.cpp`, `GSGPUDriverProfile.cpp` e
+> `GSGPUProfile.h` às 03:04 de 31/08**, e o segundo build carrega esse trabalho não commitado.
+>
+> Então: não é defeito confirmado, não é correção minha, e a diferença não é atribuível sem uma
+> árvore limpa. Fica como **pergunta em aberto**, a ser remedida quando o trabalho da outra sessão
+> estiver commitado.
+>
+> O que **é** meu e vale por si: o campo só é impresso quando o backend já produziu ao menos uma
+> leitura não-nula. Um backend que aceita a query e nunca entrega nada deixa de imprimir um `0%`
+> fabricado — que era a regra que esta task se propôs a aplicar.
 
 ## Contexto
 
@@ -50,7 +64,7 @@ O `fps` está certo; os quatro percentuais, não. Enquanto isso não muda, não 
 gargalo é EE, GS ou GPU — nem provar que uma otimização ajudou.
 
 A linha é impressa **dentro do núcleo**, em `PerformanceMetrics::Update()`
-(`pcsx2/PerformanceMetrics.cpp:405`), não pela ponte JNI. O backlog aponta
+(`pcsx2/PerformanceMetrics.cpp:435`), não pela ponte JNI. O backlog aponta
 `Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadUsage` e vizinhos
 (`native-lib.cpp:889`) como "onde olhar": esses wrappers estão corretos e não participam do
 `PerfLog`. Corrigido no backlog nesta task.
@@ -85,9 +99,11 @@ função sai certo — e é silencioso por construção: o valor de falha é um 
 `GSDevice::GetAndResetAccumulatedGPUTime()`, que devolve `0.0f` fixo quando o backend não tem
 timestamp query. No Vulkan isso é
 `m_gpu_timing_supported = (limits.timestampComputeAndGraphics != 0 && ...)`
-(`GSDeviceVK.cpp:893`); `GS.cpp:181` já trata a recusa (`SetGPUTimingEnabled(true)` falso →
+(`pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp:893`); `pcsx2/GS/GS.cpp:186` já trata a recusa (`SetGPUTimingEnabled(true)` falso →
 `GSConfig.OsdShowGPU = false`) e depois ninguém mais é avisado. Um Mali sem timestamp válido
-imprime `GPU 0%` para sempre, e isso não é medição — é ausência de medição.
+imprime `GPU 0%` para sempre, e isso não é medição — é ausência de medição. (Se esse é ou não o
+caso do A12 ficou **em aberto** — ver a caixa acima: a observação está confundida pelo trabalho de
+outra sessão na mesma árvore.)
 
 ### A função já tem a convenção certa, três linhas acima
 
@@ -125,7 +141,7 @@ nunca `0%` para "não sei medir".
 **NÃO entra:**
 
 - **Acessor `IsGPUTimingEnabled()` no `GSDevice`.** Seriam seis backends tocados (DX11, DX12,
-  Metal, Null, OGL, VK) para um dado que `GS.cpp:181` já tem na mão. Divergência do core em troca
+  Metal, Null, OGL, VK) para um dado que `pcsx2/GS/GS.cpp:186` já tem na mão. Divergência do core em troca
   de nada.
 - **Provar qual das duas chamadas POSIX falha no A12.** Não é determinável sem o aparelho; a
   linha de log desta task é exatamente o instrumento que responde na próxima execução.

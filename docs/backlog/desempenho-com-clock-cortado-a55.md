@@ -24,7 +24,8 @@
 >   nunca alcança `SPIN_TIME_NS`, a thread nunca chega ao `m_sema.Wait()` → **MTVU a 90% de um
 >   núcleo, em estado `R`, com a VM pausada**
 > * `VMManager::UpdateTargetSpeed` → `s_limiter_ticks_per_frame` = `0` → **o limitador de quadros
->   não limita** (terceiro defeito, que nem estava no backlog)
+>   não limita** (terceiro defeito, que nem estava no backlog — este é *derivado do código*, não
+>   medido; os dois de cima estão medidos antes e depois)
 >
 > Registro completo em
 > [`cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks`](../bugs/open/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md).
@@ -83,7 +84,7 @@ expostos por `Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadUsage` e vizinhos
 > **Revisão 2026-08-30 — três correções no parágrafo acima:**
 >
 > 1. **A ponte JNI não participa.** A linha de `PerfLog` é impressa dentro do núcleo, em
->    `PerformanceMetrics::Update()` (`pcsx2/PerformanceMetrics.cpp:405`). Os wrappers em
+>    `PerformanceMetrics::Update()` (`pcsx2/PerformanceMetrics.cpp:435`). Os wrappers em
 >    `native-lib.cpp:889` foram lidos e estão corretos; olhar para eles é olhar para o lugar
 >    errado.
 > 2. **Os nomes reais são `GetGSThreadUsage()` e `GetGPUUsage()`** (maiúsculas), não
@@ -92,7 +93,7 @@ expostos por `Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadUsage` e vizinhos
 >    caminho POSIX (`common/Linux/LnxThreads.cpp`) devolve **0 em toda falha** — indistinguível de
 >    thread ociosa, e o único caminho que zera os três de uma vez enquanto o `fps` da mesma função
 >    sai certo. `GPU` é outra coisa: vem de `GSDevice::GetAndResetAccumulatedGPUTime()`, que é
->    `0.0f` fixo quando o backend não tem timestamp query (`GSDeviceVK.cpp:893`) — ausência de
+>    `0.0f` fixo quando o backend não tem timestamp query (`pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp:893`) — ausência de
 >    medição, não medição de zero.
 >
 > Tratado na [TASK-0055](../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md), que faz o
@@ -110,8 +111,12 @@ expostos por `Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadUsage` e vizinhos
 > depois:  PerfLog: 25.0 fps | EE 100% GS 37% VU 0% GPU 0% | frame 758
 > ```
 >
-> **`EE 100%`** — o gargalo deste aparelho é a thread EE, e agora está visível. O `GPU 0%`
-> sobreviveu à correção e é outro defeito, agora isolado.
+> **`EE 100%`** — o gargalo deste aparelho é a thread EE, e agora está visível.
+>
+> O `GPU 0%` dessas linhas ficou **em aberto e não atribuído**: num build posterior o mesmo jogo
+> marca `GPU 15%` e o God of War II marca `GPU 73%`, mas esse build carrega trabalho não commitado
+> de outra sessão em `GSUtil.cpp` / `GSGPUDriverProfile.cpp`. Remedir em árvore limpa antes de
+> chamar de defeito ou de correção.
 
 **Validar:** com um jogo rodando, as quatro figuras deixam de ser 0 e somam algo coerente
 (EE alto num jogo pesado de CPU, GS alto num pesado de GPU).
@@ -149,7 +154,7 @@ ARM64. A (a) é a que já tem histórico de campo.
 > **Revisão 2026-08-30 — a causa raiz está determinada, e nenhuma das três opções era a certa.**
 >
 > O diagnóstico acima descreve o `WFE` como espera de baixo consumo que não cede o núcleo. É pior
-> que isso: `MonitoredWait()` (`common/HostSys.cpp:129`) só sai por uma escrita em `word` ou pelo
+> que isso: `MonitoredWait()` (`common/HostSys.cpp:133`) só sai por uma escrita em `word` ou pelo
 > **event stream** do timer arquitetural — que é opção de kernel
 > (`CONFIG_ARM_ARCH_TIMER_EVTSTREAM`), não promessa da arquitetura. Com a VM pausada não há quem
 > escreva; sem event stream, aquele `WFE` **não volta**.

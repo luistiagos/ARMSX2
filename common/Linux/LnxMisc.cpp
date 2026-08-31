@@ -478,7 +478,8 @@ void Threading::Sleep(int ms)
 void Threading::SleepUntil(u64 ticks)
 {
 	// GetCPUTicks() values are not necessarily in the CLOCK_MONOTONIC domain (on AArch64 they are
-	// raw CNTVCT_EL0 counter values with a different epoch), so we can't use TIMER_ABSTIME here.
+	// usually raw CNTVCT_EL0 counter values with a different epoch - see ArchTimerFrequency for the
+	// case where they are not), so we can't use TIMER_ABSTIME here.
 	// Sleep off the remaining delta instead, retrying on early wakeups, matching the Windows and
 	// Darwin implementations.
 	for (;;)

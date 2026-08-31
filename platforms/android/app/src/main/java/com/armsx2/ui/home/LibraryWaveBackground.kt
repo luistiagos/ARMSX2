@@ -33,10 +33,14 @@ import kotlin.math.sin
  * frame — a few hundred segments, nothing a weak tiler struggles with. No textures, no blur, no
  * offscreen passes. The readability scrim is applied by HomeScreen on top, same as for the GL wave.
  *
- * "Cheap" was the intent, not the measurement. On a Galaxy A12 (Mali-G52), the library screen sat
- * at 34–46 ms per frame (gfxinfo p50 = 38 ms) with `Number Slow issue draw commands` on 100% of
- * frames, and burned ~0.85 of a core standing still. Everything the scene draws that does NOT move
- * is now built once and reused — see [WaveScratch].
+ * "Cheap" was the intent, not the measurement. On a Galaxy A12 (Mali-G52) this screen costs 34–46 ms
+ * per frame and burns most of a core standing still. [WaveScratch] removes the part of that which
+ * was pure waste — five gradients rebuilt every frame to produce the identical object — and an A/B
+ * on the device put that part at about 3 points of a core, all of it on the UI thread.
+ *
+ * So: still expensive, and the rest is fill rate. What is left is four alpha-blended bands covering
+ * most of the panel; making THAT cheaper means fewer or shorter bands, which changes what the user
+ * sees. Do not read the caching below as having solved the cost of this screen.
  */
 @Composable
 fun LibraryWaveBackground(modifier: Modifier = Modifier) {
@@ -49,12 +53,11 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
     //
     // Held to ~30 fps, matching the GL sibling ([XmbGlView]'s FRAME_TARGET_MS).
     //
-    // ORDER MATTERS HERE, and it cost a measurement to learn: before [WaveScratch] existed, this
-    // cap was worthless. A frame cost ~38 ms, so the screen was already pinned to every second
-    // vsync — capping something that is already frame-bound saves nothing. With the per-frame cost
-    // fixed, the screen reached a full 60 fps and spent the headroom redrawing a slow wave twice as
-    // often (measured on the A12: 0.85 -> 1.11 of a core). NOW the cap is the thing that banks the
-    // win instead of spending it.
+    // This cap earns its place by preventing a regression, not by winning anything. Measured on the
+    // A12: before [WaveScratch] a frame cost ~38 ms, so the screen was already pinned to every
+    // second vsync and a cap changed nothing. After it, the screen can reach a full 60 fps — and
+    // would then spend the headroom redrawing a slow wave twice as often, at 1.11 of a core against
+    // 0.94 capped. The cap is what stops the cheaper frame from turning into more frames.
     //
     // The gate is 25 ms rather than 33 ms on purpose. At a 60 Hz vsync the frame callbacks land at
     // 0/16.7/33.3 ms, so a 33 ms threshold sits right on top of the third one and any jitter below
@@ -86,7 +89,7 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
             colorArgb == 0 -> DEFAULT_WAVE
             else -> Color(colorArgb)
         }
-        drawWaveScene(t, base, scratch.forSize(base, size.width, size.height, size.minDimension))
+        drawWaveScene(t, scratch.forSize(base, size.width, size.height, size.minDimension))
     }
 }
 
@@ -119,9 +122,14 @@ private const val FRAME_INTERVAL_NANOS = 25_000_000L
  * cost, no more.
  */
 private class WaveScratch {
-    private var keyColor: ULong = ULong.MAX_VALUE
-    private var keyW = Float.NaN
-    private var keyH = Float.NaN
+    // An explicit flag, not a sentinel key: `layers` is empty until the first build, and
+    // drawWaveScene indexes it, so a key that happened to match before building would be an
+    // IndexOutOfBounds rather than a wrong colour. Cheaper to be sure than to argue that no
+    // real Color.value can equal ULong.MAX_VALUE.
+    private var built = false
+    private var keyColor: ULong = 0uL
+    private var keyW = 0f
+    private var keyH = 0f
 
     var backdrop: Brush = Brush.verticalGradient(listOf(Color.Black, Color.Black))
         private set
@@ -148,13 +156,21 @@ private class WaveScratch {
         private set
 
     // Reused across frames; the geometry is rewritten every frame with reset().
+    //
+    // One object PER DRAW, never one shared by several draws in the same frame. Reuse across
+    // frames is safe because the previous frame's display list already holds its own copy of the
+    // path (Skia records drawPath by value), but reusing one within a frame would depend on that
+    // copy happening at record time for draws that have not been submitted yet — a bet on
+    // rendering internals, for three triangles' worth of allocation. The glyph paths are per
+    // SPOT for exactly that reason: GLYPH_SPOTS holds three `kind == 0` entries, so a single
+    // shared path would be reset and redrawn three times in one frame.
     val bodyPath = Array(WAVE_LAYERS) { Path() }
     val crestPath = Array(WAVE_LAYERS) { Path() }
-    val glyphPath = Path()
+    val glyphPath = Array(GLYPH_SPOTS.size) { Path() }
 
     fun forSize(base: Color, w: Float, h: Float, minDim: Float): WaveScratch {
-        if (base.value == keyColor && w == keyW && h == keyH) return this
-        keyColor = base.value; keyW = w; keyH = h
+        if (built && base.value == keyColor && w == keyW && h == keyH) return this
+        built = true; keyColor = base.value; keyW = w; keyH = h
 
         backdrop = Brush.verticalGradient(
             0.0f to base.scaleRgb(0.10f),
@@ -192,7 +208,7 @@ private class WaveScratch {
     }
 }
 
-private fun DrawScope.drawWaveScene(t: Float, base: Color, s: WaveScratch) {
+private fun DrawScope.drawWaveScene(t: Float, s: WaveScratch) {
     val w = size.width
     val h = size.height
 
@@ -240,7 +256,7 @@ private fun DrawScope.drawWaveScene(t: Float, base: Color, s: WaveScratch) {
         val y = h * (1.1f - (drift % 1.2f))                 // rise from below, loop past the top
         val x = w * ((spot.x + 0.02f * sin(t * 0.2f + i)) % 1f)
         drawGlyph(spot.kind, Offset(x, y), s.glyphRadius[i], s.glyphColor, t + i,
-            s.glyphStroke[i], s.glyphPath)
+            s.glyphStroke[i], s.glyphPath[i])
     }
 }
 

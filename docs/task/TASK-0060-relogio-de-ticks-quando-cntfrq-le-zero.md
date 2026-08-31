@@ -1,8 +1,8 @@
 # TASK-0060: relógio de ticks que sobrevive a um `CNTFRQ_EL0` não programado
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-30
-- **Concluída em:** —
+- **Concluída em:** 2026-08-31 (validada no A12: registrador, contadores e MTVU)
 - **Feature:** nenhuma
 - **Bugs que resolve:** [cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks](../bugs/open/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md)
 - **Backlog:** itens 0 e 1 de [`desempenho-com-clock-cortado-a55`](../backlog/desempenho-com-clock-cortado-a55.md) — **os dois, pela mesma causa**
@@ -22,6 +22,8 @@ O registro completo, com a medição, está no
 [bug](../bugs/open/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md). O
 resumo é que **um registrador explica três defeitos**: os contadores de desempenho zerados, a
 thread MTVU girando a 90% de um núcleo com a VM pausada, e o limitador de quadros que não limita.
+Os dois primeiros estão **medidos** antes e depois; o terceiro é **derivado** do código — a tabela
+"O que é medido e o que é derivado" no registro do bug separa um do outro.
 
 ## Objetivo
 
@@ -52,11 +54,17 @@ forma, que o `PAUSE_TIME` de `HostSys.cpp` já usa.
 
 **NÃO entra:**
 
-- **Corrigir cada divisão.** São pelo menos quatro (`ShortSpinOn`, `PerformanceMetrics::Update`,
-  `VMManager::UpdateTargetSpeed`, `GSDevice`'s present throttle), e blindar uma a uma deixaria a
-  quinta. O contrato é "ticks e frequência combinam"; consertar o contrato conserta todas.
-- **`GPU 0%` no `PerfLog`.** Sobrevive à correção, então é outro defeito: o backend não produz
-  tempo de GPU. Fica em aberto, agora isolado.
+- **Corrigir cada divisão.** São cinco encontradas (`ShortSpinOn`, `PerformanceMetrics::Update`,
+  `VMManager::UpdateTargetSpeed`, `Threading::SleepUntil`, `GSDevice::ThrottlePresentation`) — e as
+  duas últimas só apareceram numa revisão posterior, que é exatamente o argumento: blindar uma a uma
+  deixaria a sexta. O contrato é "ticks e frequência combinam"; consertar o contrato conserta todas.
+  Vale também porque dividir por zero é **UB em C++**: hoje o compilador emite a instrução crua
+  porque não consegue provar nada sobre o divisor, mas isso não é uma garantia entre builds.
+- **`GPU 0%` no `PerfLog`.** Sobreviveu a esta correção, e eu cheguei a registrar isso como "outro
+  defeito: o backend não produz tempo de GPU". **Não se sustenta:** num build posterior o mesmo
+  jogo marca `GPU 15%` sem que nada meu tenha mudado nesse caminho — mas esse build carrega
+  edições não commitadas de outra sessão em `GSUtil.cpp` / `GSGPUDriverProfile.cpp`. Pergunta em
+  aberto, a remedir em árvore limpa.
 - **A thread MTVU ligar sem núcleo grande.** Portão separado, já registrado.
 
 ## Como validar

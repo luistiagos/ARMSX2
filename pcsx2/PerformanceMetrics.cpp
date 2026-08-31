@@ -213,6 +213,15 @@ static float s_last_gpu_time = 0.0f;
 static float s_accumulated_gpu_time = 0.0f;
 static float s_gpu_usage = 0.0f;
 static bool s_gpu_timing_available = false;
+// "The backend accepted timestamp queries" and "the backend produces timings" are not the same
+// claim, and only the second one makes GPU% a measurement: SetGPUTimingEnabled() returning true
+// says the queries were created, not that any of them ever came back. A backend where the second
+// half fails would print a fabricated "GPU 0%" under a gate that only checks the first.
+//
+// A frame that reached the GPU at all is never timed at exactly 0.0f, so "no non-zero sample yet"
+// is the honest test for the difference. This is the same rule the GSB and EE/GS/VU fields follow:
+// a counter that is not a measurement is left out of the line rather than printed as a zero.
+static bool s_gpu_time_ever_nonzero = false;
 // Whether the per-thread CPU clock could be read at all this window. A thread that has
 // ever run has non-zero CPU time, so a live handle reporting exactly 0 is a failed read,
 // not an idle thread - see ThreadHandle::GetCPUTime().
@@ -248,6 +257,9 @@ void PerformanceMetrics::Clear()
 	s_average_gpu_time = 0.0f;
 	s_last_gpu_time = 0.0f;
 	s_gpu_usage = 0.0f;
+	// Cleared per VM, not per Reset(): Reset() also runs on unpause and on the fast-boot speed
+	// change, and forgetting there would flip the field to n/a for one window every time.
+	s_gpu_time_ever_nonzero = false;
 
 	s_frame_number = 0;
 
@@ -411,7 +423,8 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 		// A counter that does not exist is left out of the line rather than printed as a
 		// permanent 0%, which reads as a measurement and is not one. Three can be missing:
 		//   GSB - the back thread only runs under GSBackThreadMode >= Lockstep;
-		//   GPU - the backend has no usable timestamp query (SetGPUTimingAvailable);
+		//   GPU - the backend has no usable timestamp query (SetGPUTimingAvailable), or it
+		//         accepted one and never produced a reading (s_gpu_time_ever_nonzero);
 		//   EE/GS/VU - the per-thread CPU clock could not be read at all.
 		char gs_back[32] = {};
 		if (HasGSBackThread())
@@ -429,7 +442,7 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 		}
 
 		char gpu[32] = {};
-		if (s_gpu_timing_available)
+		if (s_gpu_timing_available && s_gpu_time_ever_nonzero)
 			std::snprintf(gpu, sizeof(gpu), " GPU %.0f%%", s_gpu_usage);
 
 		Console.WriteLn("PerfLog: %.1f fps | %s%s | frame %llu",
@@ -450,6 +463,8 @@ void PerformanceMetrics::OnGPUPresent(float gpu_time, u64 vs_invocations, u64 ps
 {
 	s_last_gpu_time = gpu_time;
 	s_accumulated_gpu_time += gpu_time;
+	if (gpu_time > 0.0f)
+		s_gpu_time_ever_nonzero = true;
 	s_accumulated_gpu_vs_invocations += vs_invocations;
 	s_accumulated_gpu_ps_invocations += ps_invocations;
 	s_presents_since_last_update++;

@@ -9,14 +9,15 @@
 
 ## Sintoma
 
-Três defeitos que pareciam separados, e são um só:
+Cinco defeitos que pareciam separados, e são um só. Os três primeiros são os que doem:
 
 1. **`PerfLog` reporta `EE 0% GS 0% VU 0%`** com o jogo a 8 fps e a 50 fps — item 0 do backlog
    [`desempenho-com-clock-cortado-a55`](../../backlog/desempenho-com-clock-cortado-a55.md).
 2. **A thread `MTVU` queima ~90% de um núcleo** em estado `R`, com a VM **pausada** e nada a
    fazer — item 1 do mesmo backlog, e a pergunta que a
    [TASK-0046](../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) deixou em aberto.
-3. **O limitador de quadros não limita nada** (`VMManager::Throttle`).
+3. **O limitador de quadros não limita nada** (`VMManager::Internal::Throttle`) — *derivado do
+   código, não medido*; ver "O que é medido e o que é derivado".
 
 ## Causa
 
@@ -35,9 +36,16 @@ Cada sintoma acima é uma divisão por essa zero:
 
 | onde | expressão | com freq = 0 |
 |---|---|---|
-| `ShortSpinOn` (`common/HostSys.cpp:147`) | `(elapsed * 1e9) / GetTickFrequency()` | `0` — inteiro, `udiv` |
-| `PerformanceMetrics::Update` (`pcsx2/PerformanceMetrics.cpp:362`) | `100.0 * (1.0 / ((ticks*1e6) / freq))` | `100 * (1/+inf)` = `0.0` — **double**, sem trap |
+| `ShortSpinOn` (`common/HostSys.cpp:151`) | `(elapsed * 1e9) / GetTickFrequency()` | `0` — inteiro, `udiv` |
+| `PerformanceMetrics::Update` (`pcsx2/PerformanceMetrics.cpp:370`) | `100.0 * (1.0 / ((ticks*1e6) / freq))` | `100 * (1/+inf)` = `0.0` — **double**, sem trap |
 | `VMManager::UpdateTargetSpeed` (`pcsx2/VMManager.cpp:2439`) | `s64(double(freq) / fps)` | `0` ticks por quadro |
+| `Threading::SleepUntil` (`common/Linux/LnxMisc.cpp:491`) | `diff / freq`, `(diff % freq) * 1e9 / freq` | `{0, 0}` — dorme zero |
+| `GSDevice::ThrottlePresentation` (`pcsx2/GS/Renderers/Common/GSDevice.cpp:495`) | `double(freq) / throttle_rate` | período `0` |
+
+As duas últimas foram encontradas na revisão, depois da correção, e são de baixo impacto — vale
+registrá-las porque mostram o **alcance**: qualquer código que peça uma duração a este relógio
+recebe zero. `SleepUntil` acaba retornando de imediato (o `diff <= 0` a salva de girar), e a
+regulagem de apresentação só age com o vsync desligado.
 
 E o de `ShortSpinOn` é o que produz o item 2 do sintoma: `WaitForWorkWithSpin()`
 (`common/Semaphore.cpp:63`) acumula `waited += ShortSpinOn(...)` até `SPIN_TIME_NS` antes de dormir
@@ -47,6 +55,32 @@ contagem não travar não ajuda: ele garante o numerador, e quem zera é o denom
 
 Por que o `fps` do mesmo `PerfLog` sai certo: `Common::Timer` usa `CLOCK_MONOTONIC`, não este
 relógio. Só as figuras que dividem por `GetTickFrequency()` morrem.
+
+### E, formalmente, isto é comportamento indefinido — o que é o argumento para corrigir o contrato
+
+Dividir por zero é **UB em C++**, não "devolve 0". O que devolve 0 é a instrução `udiv`/`sdiv` do
+AArch64, e é isso que se observa hoje porque o compilador não consegue provar que o divisor é
+não-nulo (é o retorno de uma função externa) e por isso emite a instrução crua. Basta o divisor
+virar visível para o otimizador — um `inline`, um LTO — para o compilador poder assumir que a
+divisão nunca acontece e apagar o caminho inteiro.
+
+Ou seja: o comportamento atual não é só errado, é **instável entre builds**. É por isso que a
+correção garante que `GetTickFrequency()` nunca devolva 0, em vez de blindar cada divisão: com o
+contrato restaurado, a UB deixa de ser alcançável.
+
+### O que é medido e o que é derivado
+
+| afirmação | como se sabe |
+|---|---|
+| `CNTFRQ_EL0` lê 0 | **medido** — linha no `emulog.txt` do aparelho |
+| `PerfLog` com EE/GS/VU em 0% → valores reais | **medido** — antes/depois, mesmo jogo |
+| MTVU `R`/90% → `S`/0%, `voluntary_ctxt_switches` 0 → 4 | **medido** — `/proc`, antes/depois |
+| MTVU presa dentro de uma chamada, em `STATE_SPINNING` | **medido** — sonda, `turns` congelado |
+| limitador de quadros inerte | **derivado** — `s_limiter_ticks_per_frame` = 0 e o `return` que segue |
+| `SleepUntil` dormindo zero, `ThrottlePresentation` sem período | **derivado** — mesma aritmética |
+
+Os três derivados seguem da mesma medição (`freq == 0`) mais leitura do código, e nenhum deles foi
+observado diretamente no aparelho. Não é motivo para duvidar — é motivo para não escrever "medido".
 
 ## Evidência medida
 
@@ -88,7 +122,11 @@ informação existe.
 que mostra que os ~100% que ela consumia jogando eram o mesmo giro quebrado, e não trabalho de VU1.
 É um núcleo de oito recuperado o tempo todo, não só na pausa.
 
-`GPU 0%` continua e **não é este defeito** — é o backend não produzir tempo de GPU. Fica em aberto.
+`GPU 0%` continua nas duas linhas acima e **não é este defeito**. O que ele *é* ficou em aberto:
+num build de 31/08 o mesmo jogo marca `GPU 15%` e o God of War II marca `GPU 73%`, sem mudança
+minha nesse caminho — mas esse build carrega edições não commitadas de outra sessão em
+`GSUtil.cpp` / `GSGPUDriverProfile.cpp` / `GSGPUProfile.h`. Sem árvore limpa não dá para atribuir a
+diferença, então não se afirma nem que há defeito nem que foi corrigido.
 
 ## Como reproduzir
 

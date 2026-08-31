@@ -103,8 +103,8 @@ do laço externo **congelado** em 1751 por 18 s, com o semáforo em `STATE_SPINN
 > nunca retornava por falta do event stream do timer (`HWCAP_EVTSTRM`). O A12 **tem** `evtstrm`.
 > Registrada e revertida na [TASK-0056](../../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md).
 
-> ~~Não foi determinado, e não precisou ser. `SPIN_TIME_NS` é 50 µs (`common/HostSys.cpp:176`) e
-> `ShortSpinOn()` (`common/HostSys.cpp:147`) cobra no mínimo 1 tick justamente para a contagem
+> ~~Não foi determinado, e não precisou ser. `SPIN_TIME_NS` é 50 µs (`common/HostSys.cpp:180`) e
+> `ShortSpinOn()` (`common/HostSys.cpp:151`) cobra no mínimo 1 tick justamente para a contagem
 > nunca travar, então `WaitForWorkWithSpin()` deveria cair em `m_sema.Wait()` e dormir. A hipótese
 > é que o laço externo de `ExecuteRingBuffer()` gira em falso — `WaitForWorkWithSpin()` retornando
 > na hora com o ring buffer vazio —, mas isso **não está provado**. Encerrar a thread remove o
