@@ -108,9 +108,11 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0055](TASK-0055-contadores-de-desempenho-que-nao-mentem.md) — o `PerfLog` diz a verdade sobre EE, GS, VU e GPU | em andamento | — | — | — |
 | [TASK-0056](TASK-0056-wfe-sem-event-stream-trava-o-spin.md) — não estacionar num `WFE` que ninguém promete acordar | revertida | — | — | `d71a0631d9` |
 | [TASK-0057](TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) — limitar a taxa do fundo 2D da biblioteca | em andamento | — | — | — |
-| [TASK-0058](TASK-0058-medir-release-contra-debug.md) — medir `githubRelease` contra `githubDebug` | aberta | — | — | — |
+| [TASK-0058](TASK-0058-medir-release-contra-debug.md) — medir `githubRelease` contra `githubDebug` | concluída | — | — | — |
 | [TASK-0059](TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) — assistente abre no início do app e ensina o conserto que funciona | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 | [TASK-0060](TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) — relógio de ticks quando `CNTFRQ_EL0` lê zero | concluída | — | cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks | — |
+| [TASK-0061](TASK-0061-cobertura-de-capa-2d-do-catalogo.md) — medir a capa 2D que aparece, e não o campo preenchido | em andamento | — | — | — |
+| [TASK-0062](TASK-0062-teclado-virtual-toque-fora-e-latencia.md) — teclado virtual: toque fora fecha, e a tecla deixa de esperar o dedo subir | em andamento | — | teclado-virtual-scrim-de-tamanho-zero | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`

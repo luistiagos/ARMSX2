@@ -11,7 +11,7 @@
 | 0 — contadores zerados | [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) | ✅ **corrigido e medido** — `EE 0%` → `EE 100%` |
 | 1 — MTVU queima um núcleo | [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) | ✅ **corrigido e medido** — `R`/90% → `S`/0% |
 | 2 — biblioteca parada | [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) | em andamento — custo por quadro corrigido e medido |
-| 3 — release contra debug | [TASK-0058](../task/TASK-0058-medir-release-contra-debug.md) | aberta — é medição |
+| 3 — release contra debug | [TASK-0058](../task/TASK-0058-medir-release-contra-debug.md) | ✅ **medido** — EE 61% → 50% |
 
 > ## Os itens 0 e 1 eram o mesmo defeito, e nenhuma das duas hipóteses de escritório acertou
 >
@@ -298,6 +298,39 @@ com e sem o teto do GOS. É a incógnita mais barata do time — pode ser 0% e p
 
 **Cuidado:** o release é ofuscado por R8, e o que o nativo alcança **por nome** precisa de regra em
 `app/proguard-rules.pro`. Falha só aparece em runtime.
+
+> ## ✅ Medido em 2026-08-31 — e o `fps` sozinho teria mentido
+>
+> Boot frio dos dois lados, mesma ROM, mesmo BIOS, mesmo `PCSX2-Android.ini`, comparados em
+> **números de quadro casados** (o contador de quadros é o índice de tempo do jogo). Em regime:
+>
+> | | `githubDebug` | `githubRelease` |
+> |---|---|---|
+> | fps | **50,0** | **50,0** |
+> | **EE** | **61,2%** | **49,8%** |
+> | GS | 84,3% | 82,4% |
+> | GPU | 51,5% | 51,2% |
+>
+> **Os dois marcam 50,0 fps** — os dois batem no teto do limitador do PAL. O release não deixa mais
+> rápido, deixa **~19% mais barato na thread que é o gargalo**. E era exatamente esse o risco que a
+> nota abaixo antecipava: sem os contadores da [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md),
+> a tabela mostraria "50,0 contra 50,0" e a conclusão teria sido "não muda nada".
+>
+> Num jogo que **não** alcança o alvo — o `007` a ~29 de 59,94 — os mesmos 19% saem em fps.
+>
+> **São quatro variáveis, não duas.** Além de R8 e `debuggable`, o release liga `LTO_PCSX2_CORE` e
+> compila com **`-DNDEBUG`** (2045 arquivos contra 0 no debug). A suspeita principal é o `NDEBUG`,
+> porque o ganho está concentrado na EE e não aparece em GS nem GPU — asserções vivas dentro do
+> recompilador batem no EE e em mais nada. Isolar as quatro é a próxima task.
+>
+> ⚠️ **Consequência para os números desta análise:** a referência do topo — **8,5 fps com o teto,
+> 49,8 sem** — foi colhida em `githubDebug`, com asserções ativas no núcleo. O teto do GOS continua
+> real (ele mede a Samsung, não o nosso código), mas esses números absolutos são **piso**, não o que
+> o cliente vê.
+>
+> **E o R8 passou:** build sem erro, app sobe, catálogo com 6311 jogos, jogo roda 8 mil quadros,
+> zero exceções no `emulog.txt` e zero no buffer de crash. 46,6 MB contra 93,8 MB do debug. A
+> conferência estática das regras de `-keep` se confirmou na prática.
 
 > **Revisão 2026-08-30 — o cuidado com o R8 já está coberto.** Os quatro `FindClass` da árvore fora
 > de `3rdparty` (`NativeApp`, `HttpClient`, `HttpClient$Response`, `BiosInfo`) têm regra `-keep`, e
