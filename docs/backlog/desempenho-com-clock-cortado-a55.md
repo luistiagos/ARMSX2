@@ -4,17 +4,37 @@
 [`bugs/open/gos-samsung-limita-clock-a-metade-em-jogo`](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 **Data da análise:** 2026-08-30
 **Prioridade:** Alta — é a única trilha em que o usuário leigo ganha velocidade **sem fazer nada**
-**Revisado e aberto em tasks:** 2026-08-30
+**Revisado em:** 2026-08-30 · **Medido no Galaxy A12:** 2026-08-30
 
 | item | task | situação |
 |---|---|---|
-| 0 — contadores zerados | [TASK-0055](../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md) | em andamento — código escrito, falta rodar no aparelho |
-| 1 — MTVU queima um núcleo | [TASK-0056](../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md) | em andamento — **causa raiz determinada**, código escrito |
-| 2 — biblioteca parada | [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) | em andamento — limite de taxa escrito; **a atribuição deste item estava errada**, ver abaixo |
-| 3 — release contra debug | [TASK-0058](../task/TASK-0058-medir-release-contra-debug.md) | aberta — é medição, precisa do aparelho |
+| 0 — contadores zerados | [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) | ✅ **corrigido e medido** — `EE 0%` → `EE 100%` |
+| 1 — MTVU queima um núcleo | [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) | ✅ **corrigido e medido** — `R`/90% → `S`/0% |
+| 2 — biblioteca parada | [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) | em andamento — custo por quadro corrigido e medido |
+| 3 — release contra debug | [TASK-0058](../task/TASK-0058-medir-release-contra-debug.md) | aberta — é medição |
 
-O que a revisão mudou em cada item está marcado **em linha**, abaixo, com o texto original
-preservado ao redor.
+> ## Os itens 0 e 1 eram o mesmo defeito, e nenhuma das duas hipóteses de escritório acertou
+>
+> **`CNTFRQ_EL0` lê 0 neste aparelho.** O firmware não programou o registrador, e no AArch64 a
+> divisão por zero não levanta exceção — `udiv` devolve `0`, e em `double` a recíproca de `+inf`
+> devolve `0.0`. Todo relógio de ticks do emulador divide por ele:
+>
+> * `PerformanceMetrics::Update` → `100.0 * (1.0 / (x/0.0))` = `0.0` → **`EE 0% GS 0% VU 0%`**
+> * `ShortSpinOn` → `(elapsed * 1e9) / 0` = `0` → o orçamento `waited` de `WaitForWorkWithSpin()`
+>   nunca alcança `SPIN_TIME_NS`, a thread nunca chega ao `m_sema.Wait()` → **MTVU a 90% de um
+>   núcleo, em estado `R`, com a VM pausada**
+> * `VMManager::UpdateTargetSpeed` → `s_limiter_ticks_per_frame` = `0` → **o limitador de quadros
+>   não limita** (terceiro defeito, que nem estava no backlog)
+>
+> Registro completo em
+> [`cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks`](../bugs/open/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md).
+> Correção e medições na [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md).
+>
+> **Duas hipóteses anteriores foram ao aparelho e voltaram erradas**, e as anotações "Revisão
+> 2026-08-30" abaixo estão marcadas onde isso aconteceu. Ficam no texto de propósito: as duas eram
+> consistentes com todo o código lido e com toda a medição existente, e o que as derrubou foi
+> **executar** — uma em trinta segundos de `grep evtstrm /proc/cpuinfo`, a outra no primeiro
+> `PerfLog` depois de instalar.
 
 ---
 
@@ -78,6 +98,20 @@ expostos por `Java_kr_co_iefriends_pcsx2_NativeApp_getCpuThreadUsage` e vizinhos
 > Tratado na [TASK-0055](../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md), que faz o
 > log dizer `n/a` (ou omitir o campo) em vez de `0%`, seguindo a convenção que a própria função já
 > usa para o `GSB`.
+>
+> **Medido em 2026-08-30 — o ponto (3) acima está errado na metade que importa.** O aviso que a
+> TASK-0055 adicionou para a falha do relógio por thread **não disparou**: o relógio lê
+> perfeitamente. O zero vem do **divisor**, não do dividendo — `CNTFRQ_EL0` lê 0 e
+> `100.0 * (1.0 / (x/0.0))` é `0.0`. Corrigido pela
+> [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md):
+>
+> ```
+> antes:   PerfLog: 25.6 fps | EE 0%   GS 0%  VU 0% GPU 0% | frame 771
+> depois:  PerfLog: 25.0 fps | EE 100% GS 37% VU 0% GPU 0% | frame 758
+> ```
+>
+> **`EE 100%`** — o gargalo deste aparelho é a thread EE, e agora está visível. O `GPU 0%`
+> sobreviveu à correção e é outro defeito, agora isolado.
 
 **Validar:** com um jogo rodando, as quatro figuras deixam de ser 0 e somam algo coerente
 (EE alto num jogo pesado de CPU, GS alto num pesado de GPU).
@@ -131,6 +165,39 @@ ARM64. A (a) é a que já tem histórico de campo.
 > `WaitForEmptyWithSpin` e `UserspaceSemaphore::WaitWithSpin` passam pelo mesmo `ShortSpinOn`, e o
 > MTGS passa pelas mesmas linhas. A [TASK-0056](../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md)
 > corrige o `ShortSpinOn`: se `AT_HWCAP` não traz `HWCAP_EVTSTRM`, o caminho `WFE` não é usado.
+>
+> 🔴 **Medido em 2026-08-30: a TASK-0056 está REVERTIDA — o A12 TEM `evtstrm`.**
+>
+> ```
+> $ adb shell "grep -o 'evtstrm' /proc/cpuinfo | head -1"
+> evtstrm
+> ```
+>
+> Era o primeiro passo do "Como validar" daquela própria task, e derrubou-a em trinta segundos. A
+> guarda era um no-op exatamente no aparelho onde o defeito foi medido.
+>
+> **O que o raciocínio acima acertou:** que a thread está presa *dentro* de uma chamada, e que o teto
+> de 50 µs só é conferido *entre* chamadas. Isso foi confirmado por uma sonda que lê o estado da
+> thread de fora (uma thread presa num laço de userspace não consegue registrar nada sobre si mesma):
+>
+> ```
+> @@MTVU_PROBE@@ open=1 turns=1751 state=-2 done=1     <- 18 s depois, os mesmos 1751
+> ```
+>
+> **O que errou:** o motivo de a chamada não retornar. Não é o `WFE` não acordar — é `ShortSpinOn`
+> devolver **0**, porque `CNTFRQ_EL0` lê 0 e `(elapsed * 1e9) / 0` é zero. Somar zero para sempre
+> nunca alcança 50 µs. Corrigido pela
+> [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md):
+>
+> | VM pausada, tela bloqueada | antes | depois |
+> |---|---|---|
+> | `State` | `R (running)` | `S (sleeping)` |
+> | CPU | 89–91% de um núcleo | 0% |
+> | `voluntary_ctxt_switches` | **`0`**, na vida inteira da thread | 4 |
+>
+> E o ganho é maior do que este item supunha: a MTVU fica em `S` a 0% **durante o jogo** também, o
+> que mostra que os ~100% que ela consumia jogando eram o mesmo giro quebrado, e não trabalho de
+> VU1. É um núcleo de oito recuperado o tempo todo.
 
 **Cuidado:** a [TASK-0046](../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) já mexeu nesta
 área (fechou a thread no shutdown). Ler antes.
@@ -167,23 +234,35 @@ um jogo.
 limitar a taxa do fundo (30 fps ou menos), pausá-lo quando não há interação, ou desligá-lo por
 padrão em aparelho sem núcleo grande.
 
-> **Revisão 2026-08-30 — a "origem provável" não se sustenta como está escrita.**
+> 🔴 **Uma "revisão" de escritório disse aqui que a atribuição deste item estava errada. Estava
+> errada a revisão.** Ela procurou "Salvos" em `SaveManagerScreen.kt` — o gerenciador de arquivos de
+> save. **"Salvos" é a aba da BIBLIOTECA** (a outra é "Catálogo"), montada por `HomeScreen`, e ela
+> desenha o fundo animado. Confirmado por captura de tela do aparelho: ondas e glifos de
+> PlayStation, que são o caminho 2D do `LibraryWaveBackground`. O backlog estava certo.
 >
-> A medição é da tela **"Salvos"**, e `SaveManagerScreen` monta `ArmsBackdrop { ... }` **sem** o
-> parâmetro `backgroundLayer` (`SaveManagerScreen.kt:58`) — é esse parâmetro que carrega o fundo
-> animado, e só `HomeScreen` o passa (`HomeScreen.kt:242`). O `XmbGlView`, além disso, **já** se
-> limita a 30 fps e **já** encerra a thread EGL em `onSurfaceTextureDestroyed`.
+> **Medido em 2026-08-30, e o diagnóstico "limitar a taxa" também não era o certo.** A tela já
+> desenhava a **exatos 30,0 fps** — não porque algo limitasse, mas porque **cada quadro custava
+> 34–46 ms** (`gfxinfo` p50 = 38 ms) e portanto caía em todo segundo vsync. Limitar o que já está
+> preso não economiza nada.
 >
-> Sobra uma pergunta, e é ela que decide: `AppNavigation` troca de tela com um `AnimatedContent`
-> cujo `exit` é `ExitTransition.None` (`AppNavigation.kt:78`). Se o Compose descarta o destino que
-> sai, a `HomeScreen` é desmontada, o `LaunchedEffect` da onda é cancelado, e o fundo **não pode**
-> ser o custo medido em "Salvos". Não foi verificado — e não se escreve correção sobre isso sem
-> verificar.
+> O custo era **por quadro**, e o `gfxinfo` dizia onde: `Number Slow issue draw commands` em **100%
+> dos quadros**. A causa está no código: os cinco gradientes verticais da cena (o fundo, mais um por
+> camada de onda) dependem só da cor e da altura — `baseY`, `amp`, `startY`, `endY` **não dependem
+> do relógio** — e eram reconstruídos trinta vezes por segundo, cada reconstrução entregando um
+> shader novo ao driver.
 >
-> A [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) entrega a opção
-> "limitar a taxa" desta lista, que é ganho certo **na biblioteca** e não depende da resposta: o
-> `LibraryWaveBackground` redesenhava a cada vsync enquanto o irmão em GL, que desenha a mesma
-> cena, já se limitava a 30 fps. A task também traz a amostragem que responde à pergunta acima.
+> Depois de cachear o que não se move (TASK-0057):
+>
+> | | antes | depois |
+> |---|---|---|
+> | `Slow issue draw commands` | 1656 (100%) | **3 (0,16%)** |
+> | Janky frames | 99,70% | **0,16%** |
+> | GPU p50 | 19 ms | 15 ms |
+> | quadros desenhados | 30 fps | **60 fps** |
+>
+> E aí o limite de taxa passa a fazer sentido — mas só aí: com o custo por quadro corrigido a tela
+> alcança o vsync e gasta a folga desenhando o dobro (0,85 → 1,11 de um núcleo). É o limite que
+> guarda o ganho em vez de gastá-lo. **Ordem importa**, e foi preciso medir para descobrir.
 
 **Validar:** mesma amostragem de threads na tela "Salvos" parada — o total deve cair para bem abaixo
 de meio núcleo, e o jank do `gfxinfo` deve desabar.

@@ -78,26 +78,30 @@ que estragou a primeira medição de linha de base desta investigação.
 
 ## Por que o spin não termina sozinho
 
-**Respondido em 2026-08-30** — ver [TASK-0056](../../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md).
-O texto original desta seção fica abaixo porque o raciocínio que ele faz é justamente o que tinha o
-furo, e vale ver onde.
+**Respondido em 2026-08-30, medindo no aparelho** — ver
+[TASK-0060](../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md).
 
-O furo: o teto de `SPIN_TIME_NS` só é conferido **entre** chamadas a `ShortSpinOn()`. Ele não
-limita uma chamada que não retorna — e no ARM64 `ShortSpinOn()` é um `WFE`
-(`MonitoredWait`, `common/HostSys.cpp:129`), que só acorda por uma escrita na palavra observada ou
-pelo event stream do timer arquitetural. Com a VM encerrada não há quem escreva; e o event stream é
-opção de kernel (`CONFIG_ARM_ARCH_TIMER_EVTSTREAM`), publicada em `AT_HWCAP` como `HWCAP_EVTSTRM`.
-Onde ele está desligado, aquele `WFE` não volta nunca.
+O furo do raciocínio original: o teto de `SPIN_TIME_NS` só é conferido **entre** chamadas a
+`ShortSpinOn()`. Ele não limita uma chamada que não retorna, nem uma que retorna sempre **zero**.
 
-Isso também explica por que o "mínimo de 1 tick" não ajudou: ele garante que `waited` avança **a
-cada retorno**, e o problema é não haver retorno.
+E é zero. `ShortSpinOn()` devolve `(elapsed * 1e9) / GetTickFrequency()`, e **`CNTFRQ_EL0` lê 0**
+neste SoC — o firmware não o programou. No AArch64, `udiv` por zero não levanta exceção: devolve
+`0`. Então `waited += 0` para sempre, `SPIN_TIME_NS` nunca é alcançado, e a thread **nunca chega ao
+`m_sema.Wait()`**. O `std::max(elapsed, 1)`, que existe justamente para a contagem não travar,
+garante o numerador; quem zera é o denominador.
 
-E fecha o formato da evidência: `WFE` não é `yield`, a thread continua *runnable*, e o kernel
-segue cobrando tempo de CPU dela. Por isso a medição encontra a thread em estado **`R`** com tempo
-de CPU igual à idade — se ela tivesse chegado ao `m_sema.Wait()`, estaria em `S`.
+Isso fecha o formato da evidência: a thread fica em estado **`R`** com tempo de CPU igual à idade
+porque está mesmo girando em userspace — e `voluntary_ctxt_switches` fica em **`0`**, o número que
+prova que ela nunca bloqueou uma única vez.
 
-A hipótese registrada abaixo (laço externo girando em falso) está **descartada**: um laço em falso
-passaria pelo `m_sema.Wait()` a cada volta e a thread apareceria em `S` em alguma amostra.
+A hipótese registrada abaixo (laço externo girando em falso) está **descartada**, e desta vez por
+medição e não por argumento: uma sonda lendo o estado da thread de fora mostrou o contador de voltas
+do laço externo **congelado** em 1751 por 18 s, com o semáforo em `STATE_SPINNING`. Ela está presa
+*dentro* de uma chamada, não girando em volta dela.
+
+> Uma segunda hipótese, também errada, chegou a virar código: a de que o `WFE` de `MonitoredWait`
+> nunca retornava por falta do event stream do timer (`HWCAP_EVTSTRM`). O A12 **tem** `evtstrm`.
+> Registrada e revertida na [TASK-0056](../../task/TASK-0056-wfe-sem-event-stream-trava-o-spin.md).
 
 > ~~Não foi determinado, e não precisou ser. `SPIN_TIME_NS` é 50 µs (`common/HostSys.cpp:176`) e
 > `ShortSpinOn()` (`common/HostSys.cpp:147`) cobra no mínimo 1 tick justamente para a contagem

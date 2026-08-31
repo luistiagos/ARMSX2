@@ -32,6 +32,11 @@ import kotlin.math.sin
  * Deliberately cheap: one vertical gradient, four stroked sine paths, and ten small glyphs per
  * frame — a few hundred segments, nothing a weak tiler struggles with. No textures, no blur, no
  * offscreen passes. The readability scrim is applied by HomeScreen on top, same as for the GL wave.
+ *
+ * "Cheap" was the intent, not the measurement. On a Galaxy A12 (Mali-G52), the library screen sat
+ * at 34–46 ms per frame (gfxinfo p50 = 38 ms) with `Number Slow issue draw commands` on 100% of
+ * frames, and burned ~0.85 of a core standing still. Everything the scene draws that does NOT move
+ * is now built once and reused — see [WaveScratch].
  */
 @Composable
 fun LibraryWaveBackground(modifier: Modifier = Modifier) {
@@ -39,16 +44,22 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
     val colorArgb by LibraryBackgroundColorPreferences.color
     val rgbCycle by LibraryBackgroundColorPreferences.rgbCycle
 
-    // Elapsed seconds, driven off the animation clock (not a recomposition loop) so only the
-    // Canvas draw re-runs, not the whole tree.
+    // Elapsed seconds, ticked once per frame. Driven off the animation clock (not a recomposition
+    // loop) so only the Canvas draw re-runs each frame, not the whole tree.
     //
-    // Published at most once every FRAME_INTERVAL_NANOS rather than on every vsync: each write
-    // invalidates the Canvas, and each redraw rebuilds eight Paths (body + crest for four wave
-    // layers, 64 segments each), four vertical gradients and ten glyphs. The GL sibling that
-    // draws the same scene already capped itself for exactly this reason and said why
-    // (XmbGlView.FRAME_TARGET_MS): "the wave is slow, so 30 looks identical to 60 but roughly
-    // halves GPU/CPU load". The argument carries over unchanged -- and it matters more here,
-    // because this is the path taken by the devices that CANNOT run the GL one.
+    // Held to ~30 fps, matching the GL sibling ([XmbGlView]'s FRAME_TARGET_MS).
+    //
+    // ORDER MATTERS HERE, and it cost a measurement to learn: before [WaveScratch] existed, this
+    // cap was worthless. A frame cost ~38 ms, so the screen was already pinned to every second
+    // vsync — capping something that is already frame-bound saves nothing. With the per-frame cost
+    // fixed, the screen reached a full 60 fps and spent the headroom redrawing a slow wave twice as
+    // often (measured on the A12: 0.85 -> 1.11 of a core). NOW the cap is the thing that banks the
+    // win instead of spending it.
+    //
+    // The gate is 25 ms rather than 33 ms on purpose. At a 60 Hz vsync the frame callbacks land at
+    // 0/16.7/33.3 ms, so a 33 ms threshold sits right on top of the third one and any jitter below
+    // it drops that frame entirely — 30 fps with a 20 fps stutter. Anything in (16.7, 33.3) picks
+    // every second callback deterministically, and still gives 30 fps at 90 or 120 Hz.
     val timeSec = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         var start = 0L
@@ -64,6 +75,8 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
         }
     }
 
+    val scratch = remember { WaveScratch() }
+
     Canvas(modifier) {
         val t = timeSec.floatValue
         // Base colour: the RGB cycle sweeps the hue wheel (~28s/turn, matching the GL peripheral
@@ -73,7 +86,7 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
             colorArgb == 0 -> DEFAULT_WAVE
             else -> Color(colorArgb)
         }
-        drawWaveScene(t, base)
+        drawWaveScene(t, base, scratch.forSize(base, size.width, size.height, size.minDimension))
     }
 }
 
@@ -82,88 +95,154 @@ fun LibraryWaveBackground(modifier: Modifier = Modifier) {
  *  mesmo app mostra fundos diferentes conforme o aparelho tenha ou nao GLES3. */
 private val DEFAULT_WAVE = Color(0xFF16243D)
 
-private fun DrawScope.drawWaveScene(t: Float, base: Color) {
+private const val WAVE_LAYERS = 4
+private const val SAMPLES = 64
+
+/** ~30 fps, deliberately gated below the 33.3 ms mark — see the comment at the call site. */
+private const val FRAME_INTERVAL_NANOS = 25_000_000L
+
+/**
+ * Everything in the scene that does not depend on the clock.
+ *
+ * This is the whole optimisation, and it is worth spelling out why it is safe: a wave layer's
+ * `baseY`, `amp`, gradient stops and `startY`/`endY` are functions of the LAYER INDEX, the canvas
+ * size and the colour — the animation clock `t` only enters through `phase`, which moves the curve,
+ * not the paint. The five vertical gradients (backdrop + one per layer) were therefore being rebuilt
+ * thirty times a second to produce the identical object, and each rebuild makes Skia hand the driver
+ * a fresh shader. That is what `Number Slow issue draw commands: 100% of frames` was reporting.
+ *
+ * The [Path] objects DO change every frame (the curve moves), so they are reused rather than
+ * cached — `reset()` keeps the allocation instead of leaving eight of them per frame to the GC.
+ *
+ * Rebuilt only when the colour or the canvas size changes. With the RGB hue cycle on, the colour
+ * changes every frame and this legitimately rebuilds every frame — that mode costs what it always
+ * cost, no more.
+ */
+private class WaveScratch {
+    private var keyColor: ULong = ULong.MAX_VALUE
+    private var keyW = Float.NaN
+    private var keyH = Float.NaN
+
+    var backdrop: Brush = Brush.verticalGradient(listOf(Color.Black, Color.Black))
+        private set
+    var glyphColor: Color = Color.Transparent
+        private set
+
+    class LayerPaint(
+        val baseY: Float,
+        val amp: Float,
+        val len: Float,
+        val speed: Float,
+        val body: Brush,
+        val crestColor: Color,
+        val crestStroke: Stroke,
+    )
+
+    var layers: List<LayerPaint> = emptyList()
+        private set
+
+    /** Stroke per glyph SPOT, not per glyph kind: the width follows the spot's scale. */
+    var glyphStroke: List<Stroke> = emptyList()
+        private set
+    var glyphRadius: FloatArray = FloatArray(0)
+        private set
+
+    // Reused across frames; the geometry is rewritten every frame with reset().
+    val bodyPath = Array(WAVE_LAYERS) { Path() }
+    val crestPath = Array(WAVE_LAYERS) { Path() }
+    val glyphPath = Path()
+
+    fun forSize(base: Color, w: Float, h: Float, minDim: Float): WaveScratch {
+        if (base.value == keyColor && w == keyW && h == keyH) return this
+        keyColor = base.value; keyW = w; keyH = h
+
+        backdrop = Brush.verticalGradient(
+            0.0f to base.scaleRgb(0.10f),
+            0.55f to base.scaleRgb(0.35f),
+            1.0f to base.scaleRgb(0.85f),
+        )
+        layers = (0 until WAVE_LAYERS).map { layer ->
+            val f = layer.toFloat() / (WAVE_LAYERS - 1)
+            val baseY = h * (0.40f + 0.16f * f)       // deeper layers sit lower
+            val amp = h * (0.05f + 0.028f * (1f - f)) // gentle undulation
+            val tint = base.lighten(0.30f + 0.22f * f)
+            LayerPaint(
+                baseY = baseY,
+                amp = amp,
+                len = 1.05f + 0.5f * f,
+                speed = 0.26f + 0.14f * f,
+                body = Brush.verticalGradient(
+                    0.00f to tint.copy(alpha = 0f),
+                    0.05f to tint.copy(alpha = 0.10f + 0.05f * f), // soft glow under the crest
+                    0.55f to base.scaleRgb(1.06f).copy(alpha = 0.04f + 0.03f * f),
+                    1.00f to base.scaleRgb(0.75f).copy(alpha = 0f),
+                    startY = baseY - amp * 1.6f,
+                    endY = h,
+                ),
+                crestColor = base.lighten(0.62f).copy(alpha = 0.07f + 0.07f * f),
+                crestStroke = Stroke(width = minDim * (0.008f + 0.004f * f), cap = StrokeCap.Round),
+            )
+        }
+        glyphColor = base.lighten(0.6f).copy(alpha = 0.06f)
+        glyphRadius = FloatArray(GLYPH_SPOTS.size) { minDim * 0.04f * GLYPH_SPOTS[it].scale }
+        glyphStroke = GLYPH_SPOTS.indices.map {
+            Stroke(width = glyphRadius[it] * 0.14f, cap = StrokeCap.Round)
+        }
+        return this
+    }
+}
+
+private fun DrawScope.drawWaveScene(t: Float, base: Color, s: WaveScratch) {
     val w = size.width
     val h = size.height
 
     // 1) Vertical gradient — near-black anchor at the top (where the content/grid sits), deepening
     //    to the chosen colour at the bottom. Same 0.20 top/bottom ratio the GL path uses.
-    drawRect(
-        Brush.verticalGradient(
-            0.0f to base.scaleRgb(0.10f),
-            0.55f to base.scaleRgb(0.35f),
-            1.0f to base.scaleRgb(0.85f),
-        ),
-    )
+    drawRect(s.backdrop)
 
     // 2) Soft flowing wave BANDS — filled translucent sheets that glow just under the crest and
     //    fade downward, layered back-to-front. Reads as flowing light, not thin squiggly lines.
-    val samples = 64
-    val step = w / samples
+    val step = w / SAMPLES
     val twoPi = 2f * PI.toFloat()
     for (layer in 0 until WAVE_LAYERS) {
-        val f = layer.toFloat() / (WAVE_LAYERS - 1)
-        val baseY = h * (0.40f + 0.16f * f)                 // deeper layers sit lower
-        val amp = h * (0.05f + 0.028f * (1f - f))           // gentle undulation
-        val len = 1.05f + 0.5f * f
-        val speed = 0.26f + 0.14f * f
-        val phase = t * speed + layer * 2.2f
+        val lp = s.layers[layer]
+        val phase = t * lp.speed + layer * 2.2f
         fun waveY(nx: Float): Float =
-            baseY + amp * sin(nx * len * twoPi + phase) +
-                amp * 0.34f * sin(nx * len * 2.1f * twoPi - phase * 1.35f + layer)
+            lp.baseY + lp.amp * sin(nx * lp.len * twoPi + phase) +
+                lp.amp * 0.34f * sin(nx * lp.len * 2.1f * twoPi - phase * 1.35f + layer)
         // Filled sheet from the crest curve down past the bottom edge.
-        val body = Path().apply {
+        val body = s.bodyPath[layer].apply {
+            reset()
             moveTo(0f, h + 2f)
             var i = 0
-            while (i <= samples) { lineTo(i * step, waveY(i.toFloat() / samples)); i++ }
+            while (i <= SAMPLES) { lineTo(i * step, waveY(i.toFloat() / SAMPLES)); i++ }
             lineTo(w, h + 2f)
             close()
         }
-        val tint = base.lighten(0.30f + 0.22f * f)
-        drawPath(
-            path = body,
-            brush = Brush.verticalGradient(
-                0.00f to tint.copy(alpha = 0f),
-                0.05f to tint.copy(alpha = 0.10f + 0.05f * f),   // soft glow under the crest
-                0.55f to base.scaleRgb(1.06f).copy(alpha = 0.04f + 0.03f * f),
-                1.00f to base.scaleRgb(0.75f).copy(alpha = 0f),
-                startY = baseY - amp * 1.6f,
-                endY = h,
-            ),
-        )
+        drawPath(path = body, brush = lp.body)
         // Faint, wide, soft crest — enough to define the wave without reading as a hard line.
-        val crest = Path().apply {
+        val crest = s.crestPath[layer].apply {
+            reset()
             var i = 0
-            while (i <= samples) {
-                val x = i * step; val y = waveY(i.toFloat() / samples)
+            while (i <= SAMPLES) {
+                val x = i * step; val y = waveY(i.toFloat() / SAMPLES)
                 if (i == 0) moveTo(x, y) else lineTo(x, y); i++
             }
         }
-        drawPath(
-            path = crest,
-            color = base.lighten(0.62f).copy(alpha = 0.07f + 0.07f * f),
-            style = Stroke(width = size.minDimension * (0.008f + 0.004f * f), cap = StrokeCap.Round),
-        )
+        drawPath(path = crest, color = lp.crestColor, style = lp.crestStroke)
     }
 
     // 3) Drifting PlayStation glyphs — a faint, slow parallax layer, the PPSSPP "floating symbols"
     //    flavour. Fixed pseudo-random spots (deterministic, no RNG per frame) rising and looping.
-    val glyphColor = base.lighten(0.6f).copy(alpha = 0.06f)
     for (i in GLYPH_SPOTS.indices) {
-        val (sx, sy, kind, scale) = GLYPH_SPOTS[i]
-        val drift = (t * (0.012f + 0.006f * (i % 3))) + sy
+        val spot = GLYPH_SPOTS[i]
+        val drift = (t * (0.012f + 0.006f * (i % 3))) + spot.y
         val y = h * (1.1f - (drift % 1.2f))                 // rise from below, loop past the top
-        val x = w * ((sx + 0.02f * sin(t * 0.2f + i)) % 1f)
-        val r = size.minDimension * 0.04f * scale
-        drawGlyph(kind, Offset(x, y), r, glyphColor, t + i)
+        val x = w * ((spot.x + 0.02f * sin(t * 0.2f + i)) % 1f)
+        drawGlyph(spot.kind, Offset(x, y), s.glyphRadius[i], s.glyphColor, t + i,
+            s.glyphStroke[i], s.glyphPath)
     }
 }
-
-private const val WAVE_LAYERS = 4
-
-/** ~30 fps. Pairs with [XmbGlView]'s FRAME_TARGET_MS -- the two backdrops draw the same scene and
- *  should not disagree about how often it needs redrawing. */
-private const val FRAME_INTERVAL_NANOS = 33_000_000L
 
 /** (xFrac, yPhase, kind 0..3 = △○✕□, scale). Deterministic so nothing allocates per frame. */
 private val GLYPH_SPOTS: List<Glyph> = listOf(
@@ -175,8 +254,9 @@ private val GLYPH_SPOTS: List<Glyph> = listOf(
 
 private data class Glyph(val x: Float, val y: Float, val kind: Int, val scale: Float)
 
-private fun DrawScope.drawGlyph(kind: Int, c: Offset, r: Float, color: Color, spin: Float) {
-    val stroke = Stroke(width = r * 0.14f, cap = StrokeCap.Round)
+private fun DrawScope.drawGlyph(
+    kind: Int, c: Offset, r: Float, color: Color, spin: Float, stroke: Stroke, scratch: Path,
+) {
     when (kind) {
         1 -> drawCircle(color, radius = r * 0.82f, center = c, style = stroke)      // ○
         3 -> rotate(spin * 6f, pivot = c) {                                          // □
@@ -190,13 +270,12 @@ private fun DrawScope.drawGlyph(kind: Int, c: Offset, r: Float, color: Color, sp
             drawLine(color, Offset(c.x - s, c.y + s), Offset(c.x + s, c.y - s), strokeWidth = r * 0.16f, cap = StrokeCap.Round)
         }
         else -> {                                                                    // △
-            val p = Path().apply {
-                moveTo(c.x, c.y - r)
-                lineTo(c.x + r * 0.87f, c.y + r * 0.5f)
-                lineTo(c.x - r * 0.87f, c.y + r * 0.5f)
-                close()
-            }
-            drawPath(p, color, style = stroke)
+            scratch.reset()
+            scratch.moveTo(c.x, c.y - r)
+            scratch.lineTo(c.x + r * 0.87f, c.y + r * 0.5f)
+            scratch.lineTo(c.x - r * 0.87f, c.y + r * 0.5f)
+            scratch.close()
+            drawPath(scratch, color, style = stroke)
         }
     }
 }
