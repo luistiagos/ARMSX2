@@ -15,6 +15,8 @@
  "app.language": "Dil",
  "app.language.desc": "Uygulama dilini seçin. Anında uygulanır.",
  "app.language.system": "Sistem dili",
+ "app.telemetry": "Anonim telemetri ve çökme raporları gönder",
+ "app.telemetry.desc": "Uygulama, cihaz, hata ve günlük ayrıntılarını göndererek çökmelerin ve uyumluluk sorunlarının tanılanmasına yardımcı olun. Oyun ve BIOS dosyaları hiçbir zaman gönderilmez. Değişiklikler anında uygulanır.",
  "app.library.search": "Kitaplık araması",
  "app.library.search.desc": "Kitaplık ana ekranında oyun arama alanını gösterir.",
  "app.library.recents": "Son oynanan oyunlar",

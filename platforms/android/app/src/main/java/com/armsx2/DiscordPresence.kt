@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import com.armsx2.discord.DiscordIpc
 
 /**
- * Discord rich presence, and which friends are in ARMSX2 right now.
+ * Discord rich presence, and which friends are in RetroSystem PS2 right now.
  *
  * Discord carries the entire social graph — the friendships, the online status, and the "is this
  * person in the same game" grouping are all theirs. That is the whole point of doing it this way:
@@ -32,13 +32,13 @@ import com.armsx2.discord.DiscordIpc
  * except an OAuth token in this app's own prefs.
  *
  * Foreground only, by construction. The SDK stops when the app does, so friend changes are seen
- * while ARMSX2 is open and not otherwise. Background delivery would mean push infrastructure, which
- * is exactly the cost this design exists to avoid.
+ * while RetroSystem PS2 is open and not otherwise. Background delivery would mean push
+ * infrastructure, which is exactly the cost this design exists to avoid.
  *
  * Opt-in and off by default: it is an account link, so nothing happens until the user asks.
  */
 /**
- * A Discord friend who has ARMSX2 open.
+ * A Discord friend who has RetroSystem PS2 open.
  *
  * [game] and [serial] come from the rich presence they are publishing — which this same object
  * wrote on their device — so "what are they playing" needs no lookup service. A friend sitting in
@@ -50,7 +50,7 @@ data class DiscordFriend(
     val serial: String,
     val avatarUrl: String,
 ) {
-    /** In ARMSX2 but not in a game. Distinct from being in a game we could not name. */
+    /** In RetroSystem PS2 but not in a game. Distinct from being in a game we could not name. */
     val inLibrary: Boolean get() = game.isBlank() && serial.isBlank()
 
     /**
@@ -69,10 +69,32 @@ data class DiscordFriend(
     }
 }
 
+/** Keeps a stable Discord epoch timestamp while updates still refer to the same running game. */
+internal class DiscordSessionClock(
+    private val nowMillis: () -> Long = System::currentTimeMillis,
+) {
+    private var gameKey: String? = null
+    private var startedAtMillis = 0L
+
+    fun startedAtFor(currentGameKey: String?): Long {
+        if (currentGameKey == null) {
+            gameKey = null
+            startedAtMillis = 0L
+        } else if (currentGameKey != gameKey) {
+            gameKey = currentGameKey
+            startedAtMillis = nowMillis()
+        }
+        return startedAtMillis
+    }
+}
+
 object DiscordPresence {
     private const val TAG = "DiscordPresence"
     private const val PREF_ENABLED = "discord.enabled"
-    private const val PREF_TOKEN = "discord.token"
+    // Tokens belong to a Discord application. Do not reuse one issued for upstream ARMSX2 after
+    // switching client ids: the SDK rejects it and leaves reconnection stuck on a dead credential.
+    private const val PREF_TOKEN = "discord.token.retrosystem"
+    private const val PREF_UPSTREAM_TOKEN = "discord.token"
     private const val PREF_NOTIFY = "discord.notifyInGame"
 
     /** Seconds between RA rich-presence re-checks. Discord rate-limits presence updates, so this
@@ -173,6 +195,11 @@ object DiscordPresence {
     // Last RA line published, so the poll below only re-pushes when it actually changes.
     private var lastRaPresence = ""
 
+    // Epoch time is kept on the app side so a helper-process restart does not reset Discord's
+    // elapsed session timer. A new game (serial/title pair) starts a new session; RA-only updates
+    // deliberately keep the old value.
+    private val sessionClock = DiscordSessionClock()
+
     /**
      * The RetroAchievements line for Discord: the game's own rich presence, plus how many
      * achievements are unlocked and whether this is a Hardcore or Softcore run.
@@ -224,12 +251,15 @@ object DiscordPresence {
     /** Re-publish the current game; used on (re)connect and whenever the running game changes. */
     private fun pushPresence() {
         val game = MainActivityRuntime.currentGame.value
+        val gameKey = game?.let { "${it.serial}\u001f${it.displayTitle(false)}" }
+        val startedAtMillis = sessionClock.startedAtFor(gameKey)
         lastRaPresence = raPresence()
         send(DiscordIpc.MSG_SET_PLAYING, Bundle().apply {
             putString(DiscordIpc.DATA_SERIAL, game?.serial.orEmpty())
             putString(DiscordIpc.DATA_TITLE, game?.let { it.displayTitle(false) }.orEmpty())
             putString(DiscordIpc.DATA_COVER, game?.coverUrl.orEmpty())
             putString(DiscordIpc.DATA_RA, lastRaPresence)
+            putLong(DiscordIpc.DATA_STARTED_AT, startedAtMillis)
         })
     }
 
@@ -306,6 +336,9 @@ object DiscordPresence {
     fun start() {
         if (!available() || !enabled || started) return
         started = true
+        // The old key contains a bearer token scoped to ARMSX2's Discord application. It cannot be
+        // migrated; dropping it forces one clean authorization against RetroSystem PS2.
+        runCatching { MainActivityRuntime.prefs.edit().remove(PREF_UPSTREAM_TOKEN).apply() }
         notifyState.value = notifyInGame
         bindHelper()
         // Send it here TOO, not only from onServiceConnected.

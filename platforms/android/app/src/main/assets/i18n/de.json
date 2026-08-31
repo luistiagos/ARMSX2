@@ -43,6 +43,8 @@
  "app.language.desc": "App-Sprache wählen. Wird sofort übernommen.",
  "app.language.machineNote": "Alle Übersetzungen außer Englisch sind maschinell erstellt. Fehler entdeckt? Einfach melden, wir beheben ihn.",
  "app.language.system": "Systemsprache",
+ "app.telemetry": "Anonyme Telemetrie und Absturzberichte senden",
+ "app.telemetry.desc": "Hilf bei der Diagnose von Abstürzen und Kompatibilitätsproblemen, indem App-, Geräte-, Fehler- und Protokolldetails gesendet werden. Spiel- und BIOS-Dateien werden nie gesendet. Änderungen gelten sofort.",
  "app.library.recents": "Zuletzt gespielte Spiele",
  "app.library.recents.desc": "Bereich „Zuletzt gespielt“ auf der Startseite der Bibliothek anzeigen.",
  "app.library.search": "Bibliothekssuche",

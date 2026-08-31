@@ -15,6 +15,8 @@
   "app.language": "Ngôn ngữ",
   "app.language.desc": "Chọn ngôn ngữ ứng dụng. Áp dụng ngay lập tức.",
   "app.language.system": "Ngôn ngữ hệ thống",
+  "app.telemetry": "Gửi dữ liệu chẩn đoán và báo cáo sự cố ẩn danh",
+  "app.telemetry.desc": "Giúp chẩn đoán sự cố và vấn đề tương thích bằng cách gửi thông tin ứng dụng, thiết bị, lỗi và nhật ký. Tệp trò chơi và BIOS không bao giờ được gửi. Thay đổi có hiệu lực ngay lập tức.",
   "app.library.search": "Tìm kiếm thư viện",
   "app.library.search.desc": "Hiển thị ô tìm kiếm trò chơi trên màn hình chính của thư viện.",
   "app.library.recents": "Trò chơi gần đây",

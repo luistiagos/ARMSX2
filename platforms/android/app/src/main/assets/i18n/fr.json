@@ -15,6 +15,8 @@
   "app.language": "Langue",
   "app.language.desc": "Choisissez la langue de l'appli. Appliquée instantanément.",
   "app.language.system": "Langue du système",
+  "app.telemetry": "Envoyer des données anonymes et des rapports de plantage",
+  "app.telemetry.desc": "Aidez à diagnostiquer les plantages et les problèmes de compatibilité en envoyant des informations sur l'appli, l'appareil, les erreurs et les journaux. Les fichiers de jeu et de BIOS ne sont jamais envoyés. Les changements s'appliquent immédiatement.",
   "app.library.search": "Recherche dans la bibliothèque",
   "app.library.search.desc": "Affiche le champ de recherche de jeux sur l’écran d’accueil de la bibliothèque.",
   "app.library.recents": "Jeux récents",

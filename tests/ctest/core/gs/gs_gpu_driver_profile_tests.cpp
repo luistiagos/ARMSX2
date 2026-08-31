@@ -26,6 +26,12 @@ constexpr const char* kMaliR44p1GlVendor = "ARM";
 constexpr const char* kMaliR44p1GlRenderer = "Mali-G615 MC6";
 constexpr const char* kMaliR44p1GlVersion = "OpenGL ES 3.2 v1.r44p1-01eac0.030c4a3fb15fe65f485fb565f5e1b688";
 
+// Galaxy A12 -- Exynos 850 / Mali-G52, the device which exposed the OpenGL presentation
+// regression after the 1.0.23 -> 1.0.24 core transition.
+constexpr const char* kMaliG52R38p1GlRenderer = "Mali-G52";
+constexpr const char* kMaliG52R38p1GlVersion =
+	"OpenGL ES 3.2 v1.r38p1-01bet0-mbs2v41_0.6d20ec041e51b2f2d25dfc265586ebe8";
+
 // VkPhysicalDeviceDriverProperties reports Arm's revision in the packed Vulkan encoding, so an
 // r44p1 blob arrives as major 44, minor 1, patch 0. DRIVER_ID_ARM_PROPRIETARY is 9.
 constexpr u32 kArmDriverId = 9;
@@ -59,7 +65,43 @@ bool TakesTheRenderTargetCopyPath(const GpuProfileSelection& sel)
 {
 	return sel.driver.UsesWorkaround(DriverWorkaround::UseRenderTargetCopyForFeedback);
 }
+
+AutoRendererPreference AutoRendererForGL(const char* renderer, const char* version)
+{
+	return ResolveGL("ARM", renderer, version).driver.auto_renderer_preference;
+}
 } // namespace
+
+// The policy applies to every game on the affected driver, rather than naming the title which
+// happened to expose it. It remains separate from the framebuffer-fetch workaround because the
+// device stayed black with that path disabled, while Vulkan rendered the same frames correctly.
+TEST(GSGpuDriverProfile, MaliG52R38PrefersVulkanForAndroidAuto)
+{
+	const GpuProfileSelection sel =
+		ResolveGL("ARM", kMaliG52R38p1GlRenderer, kMaliG52R38p1GlVersion);
+
+	EXPECT_EQ(sel.runtime_profile, RuntimeGpuProfile::Mali);
+	EXPECT_EQ(sel.gpu.architecture, MobileGpuArchitecture::MaliBifrost);
+	EXPECT_EQ(sel.gpu.model_number, 52);
+	EXPECT_EQ(sel.driver.driver, MobileGpuDriver::ArmProprietary);
+	EXPECT_EQ(sel.driver.auto_renderer_preference, AutoRendererPreference::Vulkan);
+	EXPECT_EQ(sel.driver.auto_renderer_rule, "gl-arm-g52-r38-auto-vulkan");
+	EXPECT_FALSE(TakesTheRenderTargetCopyPath(sel));
+}
+
+// Do not turn a field observation into a blanket Mali rule. Adjacent driver revisions and GPU
+// models keep the platform default until they have their own evidence-backed rule.
+TEST(GSGpuDriverProfile, MaliG52R38AutoPreferenceIsNarrow)
+{
+	EXPECT_EQ(AutoRendererForGL("Mali-G52", "OpenGL ES 3.2 v1.r37p1-test"),
+		AutoRendererPreference::Default);
+	EXPECT_EQ(AutoRendererForGL("Mali-G52", "OpenGL ES 3.2 v1.r39p0-test"),
+		AutoRendererPreference::Default);
+	EXPECT_EQ(AutoRendererForGL("Mali-G51", "OpenGL ES 3.2 v1.r38p1-test"),
+		AutoRendererPreference::Default);
+	EXPECT_EQ(AutoRendererForGL("Mali-G57", "OpenGL ES 3.2 v1.r38p1-test"),
+		AutoRendererPreference::Default);
+}
 
 // The GL string carries the Arm driver revision in its vendor-specific tail ("v1.r44p1-..."), and
 // that tail -- not the leading GLES version -- is the ordered driver identity. Reading "3.2" out of

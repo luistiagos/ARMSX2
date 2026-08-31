@@ -46,3 +46,19 @@
 # DiscordNative's methods are bound by JNI name from libarmsx2_discord.so. R8 cannot see either
 # link, and stripping or renaming them fails at runtime rather than at build time.
 -keep class com.armsx2.discord.** { *; }
+
+# commons-compress (TASK-0048), para descompactar as ROMs que só existem em .7z / .zip.
+#
+# A biblioteca referencia codecs OPCIONAIS que não trazemos — zstd-jni, brotli e o asm do Pack200.
+# Nenhum é alcançado por um 7z/zip de ROM, mas o R8 do release vê a referência não resolvida e
+# aborta. É um erro que só existe em release: um `assembleDebug` verde não diz nada sobre isto.
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.brotli.dec.**
+-dontwarn org.objectweb.asm.**
+# O jar é multi-release e traz classes compiladas contra APIs de JDK que não existem no Android
+# (java.nio.file.FileSystems, javax.crypto de arquivos com senha). O caminho que usamos —
+# SevenZFile/ZipFile lendo um File — não passa por elas.
+-dontwarn org.apache.commons.compress.**
+-dontwarn org.apache.commons.io.**
+-dontwarn org.apache.commons.codec.**
+-dontwarn org.apache.commons.lang3.**

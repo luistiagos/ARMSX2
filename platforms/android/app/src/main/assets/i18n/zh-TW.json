@@ -15,6 +15,8 @@
  "app.language": "語言",
  "app.language.desc": "選擇應用程式語言。立即套用。",
  "app.language.system": "系統語言",
+ "app.telemetry": "傳送匿名遙測資料與當機報告",
+ "app.telemetry.desc": "傳送應用程式、裝置、錯誤與記錄詳細資料，協助診斷當機和相容性問題。絕不會傳送遊戲或 BIOS 檔案。變更會立即生效。",
  "app.library.search": "遊戲庫搜尋",
  "app.library.search.desc": "在遊戲庫主畫面顯示遊戲搜尋欄。",
  "app.library.recents": "最近遊玩的遊戲",

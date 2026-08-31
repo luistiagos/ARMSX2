@@ -124,6 +124,7 @@ class DiscordService : Service() {
                         d.getString(DiscordIpc.DATA_TITLE).orEmpty(),
                         d.getString(DiscordIpc.DATA_COVER).orEmpty(),
                         d.getString(DiscordIpc.DATA_RA).orEmpty(),
+                        d.getLong(DiscordIpc.DATA_STARTED_AT),
                     )
                 }
             }

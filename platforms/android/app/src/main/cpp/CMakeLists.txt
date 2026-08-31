@@ -249,6 +249,11 @@ if(NOT DISCORD_SDK_DIR AND DEFINED ENV{DISCORD_SDK_DIR})
 	set(DISCORD_SDK_DIR "$ENV{DISCORD_SDK_DIR}")
 endif()
 
+set(RETROSYSTEM_DISCORD_APPLICATION_ID "" CACHE STRING "RetroSystem PS2 Discord application id")
+if(NOT RETROSYSTEM_DISCORD_APPLICATION_ID AND DEFINED ENV{RETROSYSTEM_DISCORD_APPLICATION_ID})
+	set(RETROSYSTEM_DISCORD_APPLICATION_ID "$ENV{RETROSYSTEM_DISCORD_APPLICATION_ID}")
+endif()
+
 set(DISCORD_SDK_SO "${DISCORD_SDK_DIR}/${ANDROID_ABI}/libdiscord_partner_sdk.so")
 set(DISCORD_SDK_INCLUDE "${DISCORD_SDK_DIR}/include")
 
@@ -286,9 +291,15 @@ add_library(${ARMSX2_EMUCORE_LIBRARY_NAME} SHARED
 #
 # Verify after any build:  llvm-readelf -d libemucore_4k.so | grep -i discord   (must be empty)
 if(ARMSX2_HAVE_DISCORD)
+	if(NOT RETROSYSTEM_DISCORD_APPLICATION_ID MATCHES "^[0-9]{17,20}$")
+		message(FATAL_ERROR
+			"RETROSYSTEM_DISCORD_APPLICATION_ID must identify the RetroSystem PS2 Discord application")
+	endif()
 	add_library(armsx2_discord SHARED discord_bridge.cpp)
 	target_link_libraries(armsx2_discord PRIVATE discord_partner_sdk log)
-	target_compile_definitions(armsx2_discord PRIVATE ARMSX2_HAS_DISCORD=1)
+	target_compile_definitions(armsx2_discord PRIVATE
+		ARMSX2_HAS_DISCORD=1
+		RETROSYSTEM_DISCORD_APPLICATION_ID=${RETROSYSTEM_DISCORD_APPLICATION_ID})
 	set_target_properties(armsx2_discord PROPERTIES OUTPUT_NAME "armsx2_discord")
 endif()
 

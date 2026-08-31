@@ -33,7 +33,9 @@ class DownloadFormatTest {
         assertTrue(RomDownloadManager.isPlayable("chd"))
         assertTrue(RomDownloadManager.isPlayable("iso"))
         assertTrue(RomDownloadManager.isPlayable("cso"))
-        // O app não descompacta: um 7z de 2 GB no disco é 2 GB que não rodam.
+        // Comprimido nunca é "jogável", mesmo depois de a TASK-0048 passar a descompactar: quem
+        // decide o leitor do CDVD é a extensão do arquivo no disco, e nenhum leitor abre um 7z.
+        // O que mudou é que agora existe um caminho ANTES disso — ver `RomArchiveExtractorTest`.
         assertFalse(RomDownloadManager.isPlayable("7z"))
         assertFalse(RomDownloadManager.isPlayable("zip"))
         assertFalse(RomDownloadManager.isPlayable("rar"))

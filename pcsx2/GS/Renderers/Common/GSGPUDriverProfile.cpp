@@ -58,6 +58,7 @@ struct DriverRule
 	bool match_unknown_version = false;
 	u64 bugs = 0;
 	u64 workarounds = 0;
+	AutoRendererPreference auto_renderer_preference = AutoRendererPreference::Default;
 };
 
 constexpr int CompareVersion(const MobileDriverVersion& lhs, VersionBound rhs)
@@ -339,7 +340,7 @@ static bool RuleMatches(const DriverRule& rule, const GpuProfileSelection& selec
 // Sources and exact upstream revisions are mirrored in docs/gpu-driver-database.json. A known
 // driver bug is not automatically an active workaround: expensive renderer fallbacks stay disabled
 // until their PCSX2 integration has a bounded, tested condition.
-static constexpr std::array<DriverRule, 27> s_driver_rules = {{
+static constexpr std::array<DriverRule, 28> s_driver_rules = {{
 	{"gl-arm-buffer-stream", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenUnsynchronizedMapping) |
@@ -348,6 +349,15 @@ static constexpr std::array<DriverRule, 27> s_driver_rules = {{
 	{"gl-arm-g57-fifo", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenVSync), Workaround(DriverWorkaround::ForceFifoPresent)},
+	// Galaxy A12 field A/B, RetroSystem PS2 1.0.24: Mali-G52 r38p1 presents persistent black
+	// output through OpenGL in 007: Everything or Nothing while the VM, audio, FMVs and frame
+	// counter continue. Vulkan renders the same boot sequence correctly. Disabling framebuffer
+	// fetch and rebuilding the GL shader cache did not change the failure, so this is renderer
+	// steering rather than a feature workaround. Keep the first rule narrow; expanding beyond
+	// Bifrost G52/r38 needs proper testing on the affected hardware and other games.
+	{"gl-arm-g52-r38-auto-vulkan", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::MaliBifrost, 52, 52, 0,
+		{38, 0, 0}, {39, 0, 0}, 0, 0, false, 0, 0, AutoRendererPreference::Vulkan},
 	// r44p1 and the in-tile render-target self-read, on GL: there is deliberately NO rule here,
 	// and that is a product decision made on field evidence, not an oversight — read this before
 	// "completing the pair" with the Vulkan rule below.
@@ -549,6 +559,11 @@ MobileDriverProfile ResolveDriverProfile(const GpuProfileSelection& selection,
 
 		profile.bugs |= rule.bugs;
 		profile.workarounds |= rule.workarounds;
+		if (rule.auto_renderer_preference != AutoRendererPreference::Default)
+		{
+			profile.auto_renderer_preference = rule.auto_renderer_preference;
+			profile.auto_renderer_rule = rule.id;
+		}
 		profile.matched_rule_count++;
 	}
 

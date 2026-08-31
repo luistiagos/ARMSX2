@@ -15,6 +15,8 @@
  "app.language": "Lingua",
  "app.language.desc": "Scegli la lingua dell'app. Si applica all'istante.",
  "app.language.system": "Lingua di sistema",
+ "app.telemetry": "Invia telemetria anonima e rapporti sugli arresti anomali",
+ "app.telemetry.desc": "Aiuta a diagnosticare arresti anomali e problemi di compatibilità inviando dettagli su app, dispositivo, errori e registri. I file di gioco e del BIOS non vengono mai inviati. Le modifiche si applicano subito.",
  "app.library.search": "Ricerca nella libreria",
  "app.library.search.desc": "Mostra il campo di ricerca dei giochi nella schermata principale della libreria.",
  "app.library.recents": "Giochi recenti",

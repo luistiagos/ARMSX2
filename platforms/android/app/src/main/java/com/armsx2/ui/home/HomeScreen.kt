@@ -2,7 +2,9 @@ package com.armsx2.ui.home
 
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxHeight
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -157,7 +159,7 @@ fun HomeScreen(
     var overflowMenu by remember { mutableStateOf(false) }
     var showExitConfirm by remember { mutableStateOf(false) }
     var menuGame by remember { mutableStateOf<GameInfo?>(null) }
-    var showClearRecentsConfirm by remember { mutableStateOf(false) }
+    var showDeleteGameConfirm by remember { mutableStateOf<GameInfo?>(null) }
     // #9 custom library background — inert until the user picks an image.
     LaunchedEffect(Unit) { LibraryBackground.ensureLoaded(); CoverArtStyle.load() }
     // The animated background switched itself off because the last run died with it on screen
@@ -216,6 +218,20 @@ fun HomeScreen(
             onResume = viewModel::resumeDownload,
             onCancel = viewModel::cancelDownload,
             onClose = { viewModel.pendingDownload.value = null },
+        )
+    }
+
+    // A escolha da versao, quando o titulo tocado tem mais de um arquivo (TASK-0047). Escolher
+    // aqui NAO baixa: cai no painel acima, que e quem pergunta antes de gastar 1-10 GB.
+    viewModel.pendingVariants.value?.let { game ->
+        com.armsx2.ui.catalog.GameVersionsModal(
+            title = game.displayTitle(EnglishTitles.enabled.value),
+            variants = com.armsx2.catalog.CatalogLibrary.variantsFor(game.catalogGroupKey),
+            onVariantSelected = { entry ->
+                viewModel.pendingVariants.value = null
+                viewModel.pendingDownload.value = entry
+            },
+            onClose = { viewModel.pendingVariants.value = null },
         )
     }
 
@@ -352,39 +368,30 @@ fun HomeScreen(
                     }
                 }
             }
-            // The Recently-Played games shown above the grid (empty while searching);
-            // register them so the controller's Recents zone can launch them.
-            val shownRecents = if (showRecents && state.recentGames.isNotEmpty() && state.query.isBlank()) {
-                state.recentGames.take(10)
-            } else {
-                emptyList()
+            // Em Salvos não há mais prateleira duplicada de recentes, a lista é ordenada diretamente (needs proper testing)
+            LaunchedEffect(Unit) {
+                HomeInputController.setRecents(0) {}
             }
-            LaunchedEffect(shownRecents) {
-                HomeInputController.setRecents(shownRecents.size) { i ->
-                    shownRecents.getOrNull(i)?.let(viewModel::launch)
-                }
-            }
+            // Toolbar position is an App setting. At the top it's the first grid item;
+            // at the bottom it's a pinned bar (identical rounded-pill shape). The grid
+            // reserves the matching inset so nothing hides behind whichever edge it's on.
+            val toolbarBottom = ToolbarPositionPreferences.atBottom.value
+            LaunchedEffect(toolbarBottom) { HomeInputController.setToolbarAtBottom(toolbarBottom) }
+
             // Camera-follow: while browsing with a controller (Grid zone), keep the
             // selected cover on screen. The grid has leading full-span items (toolbar,
-            // search, recents section, All-Games header) before the game cells, so the
-            // selected game's lazy-grid index = leading + its row (shelf) / flat index
-            // (grid, list). Only scroll when it's actually off-screen so paging through a
-            // visible screenful doesn't jitter. (Previously this only ran while searching,
-            // so normal browsing never followed the selector.)
-            val allGamesHeaderShown = shownRecents.isNotEmpty() &&
-                state.initialized && state.visibleGames.isNotEmpty()
+            // search, active download queue) before the game cells.
             LaunchedEffect(state.selectedIndex, state.visibleGames.size, state.layout, HomeInputController.zone.value) {
                 if (HomeInputController.zone.value != HomeZone.Grid) return@LaunchedEffect
                 // Don't follow (and thus don't scroll away from the top) until the user
                 // has actually navigated — otherwise a cold open snaps the grid to the
-                // initially-selected cover and hides the toolbar/search/recents header.
+                // initially-selected cover and hides the toolbar/search header.
                 if (!HomeInputController.userNavigated) return@LaunchedEffect
                 val sel = state.selectedIndex
                 if (sel < 0 || state.visibleGames.isEmpty()) return@LaunchedEffect
-                val leading = 1 + // toolbar
+                val leading = (if (!toolbarBottom) 1 else 0) + // toolbar
                     (if (state.initialized && showSearch) 1 else 0) + // search field
-                    (if (shownRecents.isNotEmpty()) 1 else 0) + // recents section
-                    (if (allGamesHeaderShown) 1 else 0) // All Games header
+                    (if (state.currentTab == HomeTab.Saved && state.queue.isNotEmpty()) 1 else 0) // queue section
                 val cols = estimatedColumns.coerceAtLeast(1)
                 val target = leading + if (state.layout == LibraryLayout.Shelf) sel / cols else sel
                 val vis = gridState.layoutInfo.visibleItemsInfo
@@ -406,12 +413,6 @@ fun HomeScreen(
             // edge rather than bleeding under the cutout.
             val cutout = WindowInsets.displayCutout.asPaddingValues()
             val ld = LocalLayoutDirection.current
-
-            // Toolbar position is an App setting. At the top it's the first grid item;
-            // at the bottom it's a pinned bar (identical rounded-pill shape). The grid
-            // reserves the matching inset so nothing hides behind whichever edge it's on.
-            val toolbarBottom = ToolbarPositionPreferences.atBottom.value
-            LaunchedEffect(toolbarBottom) { HomeInputController.setToolbarAtBottom(toolbarBottom) }
             val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
             val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val libraryToolbar: @Composable (Boolean) -> Unit = { bottomEdge ->
@@ -429,7 +430,7 @@ fun HomeScreen(
                 val tb = HomeInputController.zone.value == HomeZone.Toolbar
                 val tbi = HomeInputController.toolbarIndex.intValue
                 ArmsTopBar(
-                    title = str("games.section.library"),
+                    title = if (state.currentTab == HomeTab.Saved) str("home.tab.saved") else str("home.tab.catalog"),
                     subtitle = if (state.scanning) {
                         str("games.scanningRoms")
                     } else {
@@ -438,14 +439,8 @@ fun HomeScreen(
                         // constante que nao informa nada, e mentiria assim que uma busca ou o
                         // filtro "so os baixados" recortasse a lista. O total so aparece quando e
                         // de fato o que se ve.
-                        //
-                        // E o filtro se anuncia. Ele e global, persiste entre sessoes e esconde
-                        // 12.627 dos 12.628 cartoes: sem dizer nada aqui, quem o liga e volta
-                        // depois ve uma biblioteca quase vazia e conclui que o app perdeu o
-                        // catalogo -- foi exatamente o que aconteceu duas vezes em teste. O
-                        // desligamento continua no mesmo lugar, no menu de tres pontos.
                         val total = "${str("games.library.totalGames")}: ${state.visibleGames.size}"
-                        if (state.onlyDownloaded) {
+                        if (state.onlyDownloaded && state.currentTab == HomeTab.Catalog) {
                             "${str("games.overflow.onlyDownloaded")} · $total"
                         } else {
                             total
@@ -467,23 +462,10 @@ fun HomeScreen(
                         // Relogio + bateria, antes dos botoes para ler como status e nao como mais
                         // um controle. Deliberadamente NAO controllerFocusable -- nao e interativo,
                         // e registra-lo poria uma parada morta no caminho do direcional pela barra.
-                        //
-                        // Escondido em RETRATO. A barra e uma linha so, e nela competem o botao de
-                        // menu, o titulo, este cluster e tres botoes redondos. Num telefone de
-                        // 384dp sobravam ~70dp para o titulo, e "Biblioteca" precisa de ~110dp --
-                        // aparecia como "Bi...". O cluster e o elemento mais largo que nao e
-                        // controle, entao e ele que cede.
-                        //
-                        // Em paisagem ele volta: e a orientacao dos handhelds, que e onde ele foi
-                        // pensado (tela larga e, muitas vezes, sem barra de status do sistema) e
-                        // onde ha espaco para os dois.
                         if (LocalConfiguration.current.orientation !=
                             android.content.res.Configuration.ORIENTATION_PORTRAIT
                         ) {
                             com.armsx2.ui.common.LibraryStatusCluster(
-                                // align(): o bloco do titulo deixa a barra mais alta que este
-                                // cluster de duas linhas; sem isto o par fica alto em relacao aos
-                                // botoes.
                                 Modifier.align(Alignment.CenterVertically).padding(end = 6.dp),
                             )
                         }
@@ -510,8 +492,6 @@ fun HomeScreen(
                         }
                         Box(
                             Modifier.onGloballyPositioned {
-                                // Bottom-left of the button: the panel hangs below it, the way
-                                // the dropdown it replaces did.
                                 val p = it.positionInRoot()
                                 overflowAnchor = androidx.compose.ui.geometry.Offset(
                                     p.x, p.y + it.size.height,
@@ -576,7 +556,7 @@ fun HomeScreen(
                     start = 8.dp + cutout.calculateStartPadding(ld),
                     end = 8.dp + cutout.calculateEndPadding(ld),
                     top = if (toolbarBottom) statusBarTop + 8.dp else 0.dp,
-                    bottom = if (toolbarBottom) navBarBottom + 72.dp else 16.dp,
+                    bottom = if (toolbarBottom) (136.dp + navBarBottom) else (78.dp + navBarBottom),
                 ),
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -596,114 +576,28 @@ fun HomeScreen(
                     }
                 }
 
-                // A fila NAO mora aqui. Ela ja morou -- empilhada neste ponto, empurrando 12.628
-                // cartoes para baixo a cada download -- e virou tela propria na TASK-0040, como a
-                // aba "Salvos" da versao anterior. O que a grade continua mostrando e a tarja de
-                // progresso na capa, o equivalente ao `updateCatalogTileProgress` de la.
-
-                if (shownRecents.isNotEmpty()) {
-                    val recentsSelected = HomeInputController.zone.value == HomeZone.Recents
-                    val recentSel = if (recentsSelected) HomeInputController.recentIndex.intValue else -1
+                // Na aba Salvos: exibe a seção de downloads ativos caso haja itens na fila
+                if (state.currentTab == HomeTab.Saved && state.queue.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // In shelf view nudge the header right so it lines up with
-                                // the first cover's left edge (the shelf's 12dp inset).
-                                SectionTitle(
-                                    str("games.section.recentlyPlayed"),
-                                    modifier = Modifier.padding(
-                                        start = if (state.layout == LibraryLayout.Shelf) 4.dp else 0.dp,
-                                    ),
+                        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+                            SectionTitle(str("home.queue.sectionHeader"))
+                            Spacer(Modifier.height(8.dp))
+                            com.armsx2.ui.catalog.DownloadQueueSection(
+                                queue = state.queue,
+                                onPause = viewModel::pauseQueued,
+                                onResume = viewModel::resumeQueued,
+                                onCancel = viewModel::cancelQueued,
+                            )
+                            if (state.visibleGames.isNotEmpty()) {
+                                Spacer(Modifier.height(10.dp))
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
                                 )
-                                Spacer(Modifier.width(10.dp))
-                                val clearAll = { showClearRecentsConfirm = true }
-                                Surface(
-                                    onClick = clearAll,
-                                    modifier = Modifier.controllerFocusable(
-                                        controllerId = "home.recents.clearAll",
-                                        shape = RoundedCornerShape(12.dp),
-                                        onConfirm = clearAll,
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                                ) {
-                                    Text(
-                                        str("games.recent.clearAll"),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(9.dp))
-                            if (state.layout == LibraryLayout.Shelf) {
-                                // Same frosted-glass plank as All Games (bagas: one
-                                // shelf design everywhere).
-                                GameShelf(
-                                    games = shownRecents,
-                                    shelfRes = R.drawable.shelf_frosted,
-                                    coverWidth = ((if (compact) 84f else 100f) * coverScale).dp,
-                                    scroll = true,
-                                    selectedIndex = recentSel,
-                                    onLaunch = { viewModel.launch(it) },
-                                    onDetails = { menuGame = it },
-                                    modifier = Modifier.layout { measurable, constraints ->
-                                        val edge = 8.dp.roundToPx()
-                                        val placeable = measurable.measure(
-                                            constraints.copy(
-                                                minWidth = constraints.maxWidth + edge * 2,
-                                                maxWidth = constraints.maxWidth + edge * 2,
-                                            ),
-                                        )
-                                        layout(constraints.maxWidth, placeable.height) { placeable.placeRelative(-edge, 0) }
-                                    },
-                                )
-                            } else {
-                                val recentsRowState = rememberLazyListState()
-                                LaunchedEffect(recentSel) {
-                                    if (recentSel >= 0) recentsRowState.animateScrollToItem(recentSel)
-                                }
-                                LazyRow(
-                                    state = recentsRowState,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .layout { measurable, constraints ->
-                                            val edge = 8.dp.roundToPx()
-                                            val placeable = measurable.measure(
-                                                constraints.copy(
-                                                    minWidth = constraints.minWidth + edge * 2,
-                                                    maxWidth = constraints.maxWidth + edge * 2,
-                                                ),
-                                            )
-                                            layout(constraints.maxWidth, placeable.height) {
-                                                placeable.placeRelative(-edge, 0)
-                                            }
-                                        },
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp),
-                                ) {
-                                    itemsIndexed(shownRecents, key = { _, g -> g.uri.toString() }) { index, game ->
-                                        RecentGameCard(
-                                            game = game,
-                                            selected = index == recentSel,
-                                            onClick = { viewModel.launch(game) },
-                                            onDetails = { menuGame = game },
-                                        )
-                                    }
-                                }
+                                Spacer(Modifier.height(4.dp))
+                                SectionTitle(str("home.saved.sectionHeader"))
                             }
                         }
-                    }
-                }
-
-                // Separate the Recently Played shelf from the full library with an
-                // "All Games" header so the two rows don't run together.
-                if (shownRecents.isNotEmpty() && state.initialized && state.visibleGames.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.34f),
-                        )
                     }
                 }
 
@@ -714,7 +608,20 @@ fun HomeScreen(
                         }
                     }
                 } else if (state.visibleGames.isEmpty()) {
-                    emptyLibrary(state.query.isBlank())
+                    if (state.currentTab == HomeTab.Saved && state.queue.isEmpty()) {
+                        emptyLibrary(
+                            blankQuery = state.query.isBlank(),
+                            isSavedTab = true,
+                            onExploreCatalog = { viewModel.setTab(HomeTab.Catalog) },
+                        )
+                    } else if (state.currentTab == HomeTab.Saved && state.queue.isNotEmpty()) {
+                        // A fila de downloads já está aparecendo no topo
+                    } else {
+                        emptyLibrary(
+                            blankQuery = state.query.isBlank(),
+                            isSavedTab = false,
+                        )
+                    }
                 } else if (state.layout == LibraryLayout.Shelf) {
                     // Fill each plank: chunk by how many covers fit the shelf width.
                     val shelfCoverW = ((if (compact) 84f else 100f) * coverScale).dp
@@ -789,11 +696,26 @@ fun HomeScreen(
                         .padding(
                             start = 8.dp + cutout.calculateStartPadding(ld),
                             end = 8.dp + cutout.calculateEndPadding(ld),
+                            bottom = 68.dp + navBarBottom + 4.dp,
                         ),
                 ) {
                     libraryToolbar(true)
                 }
             }
+
+            // Barra de rodapé ancorada na base (Catálogo / Salvos) - estilo version1 (needs proper testing)
+            val savedCount = state.allGames.count { !it.isCatalogOnly }
+            HomeBottomBar(
+                currentTab = state.currentTab,
+                savedCount = savedCount,
+                onSelectTab = { tab ->
+                    if (state.currentTab != tab) {
+                        com.armsx2.MenuSfx.play(com.armsx2.MenuSfx.Event.SUBMENU)
+                        viewModel.setTab(tab)
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
         // The keyboard is hosted once in WindowImpl, above every surface — hosting it here as
         // well would draw it twice, and a per-screen host is what made it invisible from
@@ -801,20 +723,22 @@ fun HomeScreen(
     }
     }
 
-    // Sits outside the grid so it draws over the whole library. Not an AlertDialog — a Compose
-    // dialog is its own window and would swallow the D-pad, and this has to be pad-navigable.
-    if (showClearRecentsConfirm) {
+    showDeleteGameConfirm?.let { targetGame ->
+        val title = targetGame.displayTitle(EnglishTitles.enabled.value)
+        val deleteSuccessMsg = String.format(str("home.saved.delete.success"), title)
+        val deleteFailedMsg = str("home.saved.delete.failed")
         com.armsx2.ui.common.ConfirmOverlay(
-            title = str("games.recent.clearAll.title"),
-            message = str("games.recent.clearAll.message"),
-            confirmLabel = str("games.recent.clearAll"),
+            title = str("home.saved.delete.title"),
+            message = String.format(str("home.saved.delete.message"), title),
+            confirmLabel = str("home.saved.delete.confirm"),
             destructive = true,
-            idPrefix = "clear-recents",
+            idPrefix = "delete-game",
             onConfirm = {
-                viewModel.clearRecent()
-                showClearRecentsConfirm = false
+                showDeleteGameConfirm = null
+                val ok = viewModel.deleteGame(targetGame, context)
+                Toast.makeText(context, if (ok) deleteSuccessMsg else deleteFailedMsg, Toast.LENGTH_SHORT).show()
             },
-            onDismiss = { showClearRecentsConfirm = false },
+            onDismiss = { showDeleteGameConfirm = null },
         )
     }
 
@@ -978,6 +902,14 @@ fun HomeScreen(
                     viewModel.setHidden(game, !hidden)
                     menuGame = null
                 }
+                // Excluir jogo (apenas para jogos locais/salvos no aparelho)
+                if (!game.isCatalogOnly) {
+                    GameMenuAction("🗑️", str("home.saved.delete"), "game-menu.delete", destructive = true) {
+                        val target = game
+                        menuGame = null
+                        showDeleteGameConfirm = target
+                    }
+                }
             }
           }
         }
@@ -990,29 +922,32 @@ private fun GameMenuAction(
     label: String,
     id: String,
     trailing: String? = null,
+    destructive: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val contentColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    val labelColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
     Surface(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .controllerFocusable(controllerId = id, shape = RoundedCornerShape(18.dp), onConfirm = onClick),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
+        color = if (destructive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, if (destructive) MaterialTheme.colorScheme.error.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(glyph, color = MaterialTheme.colorScheme.primary, fontSize = 20.sp)
-            Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(glyph, color = contentColor, fontSize = 20.sp)
+            Text(label, style = MaterialTheme.typography.titleMedium, color = labelColor, modifier = Modifier.weight(1f))
             trailing?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = contentColor,
                 )
             }
         }
@@ -1271,15 +1206,29 @@ private fun LibraryOverflowItem(
  * carrega o catalogo inteiro, entao uma biblioteca vazia de verdade so acontece se o manifesto nao
  * carregar -- e mandar o usuario configurar uma pasta seria o conselho errado nos dois casos.
  */
-private fun LazyGridScope.emptyLibrary(blankQuery: Boolean) {
+private fun LazyGridScope.emptyLibrary(
+    blankQuery: Boolean,
+    isSavedTab: Boolean = false,
+    onExploreCatalog: (() -> Unit)? = null,
+) {
     item(span = { GridItemSpan(maxLineSpan) }) {
-        EmptyState(
-            title = if (blankQuery) str("games.empty.noGames.title") else str("games.search.placeholder"),
-            message = if (blankQuery) str("games.empty.noGames.body") else str("games.search.hint"),
-            actionLabel = null,
-            onAction = null,
-            modifier = Modifier.fillMaxWidth().height(260.dp),
-        )
+        if (isSavedTab && blankQuery) {
+            EmptyState(
+                title = str("home.saved.empty.title"),
+                message = str("home.saved.empty.body"),
+                actionLabel = str("home.saved.exploreCatalog"),
+                onAction = onExploreCatalog,
+                modifier = Modifier.fillMaxWidth().height(260.dp),
+            )
+        } else {
+            EmptyState(
+                title = if (blankQuery) str("games.empty.noGames.title") else str("games.search.placeholder"),
+                message = if (blankQuery) str("games.empty.noGames.body") else str("games.search.hint"),
+                actionLabel = null,
+                onAction = null,
+                modifier = Modifier.fillMaxWidth().height(260.dp),
+            )
+        }
     }
 }
 
@@ -1532,18 +1481,30 @@ private fun GameCover(
                 contentScale = contentScale,
                 loading = { CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText) },
                 error = {
-                    // A regional cover that isn't in the art repo would otherwise blank a cover the
-                    // user already had — reported as "some games lose their covers when switching
-                    // regions". Retry with this disc's own serial before giving up.
                     val discUrl = custom?.let { null } ?: game.discCoverUrl
-                    if (discUrl != null && discUrl != model) {
+                    val manifestUrl = game.catalogCoverUrl?.takeIf { it.isNotBlank() }
+                    val nextUrl = if (discUrl != null && discUrl != model) discUrl else manifestUrl
+                    if (nextUrl != null && nextUrl != model) {
                         SubcomposeAsyncImage(
-                            model = discUrl,
+                            model = nextUrl,
                             contentDescription = game.displayTitle(EnglishTitles.enabled.value),
                             modifier = Modifier.fillMaxSize(),
                             contentScale = contentScale,
                             loading = { CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText) },
-                            error = { CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText) },
+                            error = {
+                                if (manifestUrl != null && manifestUrl != nextUrl) {
+                                    SubcomposeAsyncImage(
+                                        model = manifestUrl,
+                                        contentDescription = game.displayTitle(EnglishTitles.enabled.value),
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = contentScale,
+                                        loading = { CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText) },
+                                        error = { CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText) },
+                                    )
+                                } else {
+                                    CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText)
+                                }
+                            },
                         )
                     } else {
                         CoverPlaceholder(game.displayTitle(EnglishTitles.enabled.value), game.serial, showText = placeholderText)
@@ -1557,6 +1518,14 @@ private fun GameCover(
             download = download,
             modifier = Modifier.align(Alignment.BottomStart).padding(4.dp),
         )
+        // Quantos arquivos este cartao representa. So aparece acima de 1, que e onde o toque muda
+        // de significado: abre a escolha da versao em vez do painel de download.
+        if (game.hasMultipleVersions) {
+            VersionCountBadge(
+                count = game.catalogVariantCount,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+            )
+        }
     }
 }
 
@@ -1583,6 +1552,9 @@ private fun CoverStateBadge(
     val queued = download?.state
     val label = when {
         isDownloaded -> "✓"
+        // Extração do .7z/.zip (TASK-0048). Glifo próprio, e não a porcentagem: na tarja ela seria
+        // indistinguível do download e pareceria ter voltado ao começo.
+        queued == com.armsx2.catalog.DownloadQueueManager.State.EXTRACTING -> "⚙"
         queued == com.armsx2.catalog.DownloadQueueManager.State.DOWNLOADING ->
             "${(download.progress * 100).toInt()}%"
         queued == com.armsx2.catalog.DownloadQueueManager.State.QUEUED -> "⋯"
@@ -1614,6 +1586,39 @@ private fun CoverStateBadge(
     ) {
         Text(
             label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+        )
+    }
+}
+
+/**
+ * Quantos arquivos do manifesto este cartão representa (TASK-0047).
+ *
+ * A grade passou a emitir **uma célula por título**, e sem esta marca 25 arquivos de
+ * `Metal Gear Solid 3 - Subsistence` e um único `Ico` ficariam com o mesmo cartão. Ela é também o
+ * aviso de que o toque muda de significado: acima de 1, ele abre a escolha da versão em vez do
+ * painel de download.
+ *
+ * Irmã da [CoverStateBadge] — mesma forma, mesma tipografia, canto oposto. A cor sai do par
+ * `secondaryContainer`, que é justamente o que a outra tarja **não** usa: lá `primary`, `error` e
+ * `tertiary` já significam baixado, falhou e na fila, e repetir uma delas aqui diria algo sobre o
+ * estado do download que esta marca não sabe.
+ *
+ * `5×` e não `5`: um número sozinho ao lado de uma tarja que mostra `73%` se lê como mais um
+ * progresso.
+ */
+@Composable
+private fun VersionCountBadge(count: Int, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = RoundedCornerShape(7.dp),
+    ) {
+        Text(
+            "$count×",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
@@ -1890,6 +1895,15 @@ object HomeInputController {
         viewModel.setSort(next)
         return true
     }
+
+    /** Toggle between Catalog and Saved tabs. */
+    fun toggleTab(): Boolean {
+        val viewModel = owner ?: return false
+        val next = if (viewModel.state.value.currentTab == HomeTab.Catalog) HomeTab.Saved else HomeTab.Catalog
+        com.armsx2.MenuSfx.play(com.armsx2.MenuSfx.Event.SUBMENU)
+        viewModel.setTab(next)
+        return true
+    }
 }
 
 // -- vivi's shelf library layout — covers standing on vivi's plank PNGs (frosted
@@ -2034,4 +2048,130 @@ private fun ShelfGameCard(game: GameInfo, width: Dp, reflectionHeight: Dp, selec
         }
     }
 }
+
+/**
+ * Barra de navegação inferior (footer) proeminente com alternância entre Catálogo e Salvos,
+ * inspirada na barra de navegação do branch version1 (needs proper testing).
+ */
+@Composable
+private fun HomeBottomBar(
+    currentTab: HomeTab,
+    savedCount: Int,
+    onSelectTab: (HomeTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val cutout = WindowInsets.displayCutout.asPaddingValues()
+    val ld = LocalLayoutDirection.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+        tonalElevation = 6.dp,
+        shadowElevation = 12.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.30f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 16.dp + cutout.calculateStartPadding(ld),
+                    end = 16.dp + cutout.calculateEndPadding(ld),
+                    top = 6.dp,
+                    bottom = 6.dp + navBarBottom,
+                )
+                .height(56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            HomeBottomTabButton(
+                title = str("home.tab.catalog"),
+                icon = "💿",
+                selected = currentTab == HomeTab.Catalog,
+                badgeCount = 0,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelectTab(HomeTab.Catalog) },
+            )
+            HomeBottomTabButton(
+                title = str("home.tab.saved"),
+                icon = "💾",
+                selected = currentTab == HomeTab.Saved,
+                badgeCount = savedCount,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelectTab(HomeTab.Saved) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeBottomTabButton(
+    title: String,
+    icon: String,
+    selected: Boolean,
+    badgeCount: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    val bg = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    }
+    val border = if (selected) {
+        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
+    } else {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = bg,
+        border = border,
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(shape),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = icon,
+                fontSize = 20.sp,
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                color = contentColor,
+            )
+            if (badgeCount > 0) {
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(
+                        text = "$badgeCount",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
 

@@ -48,7 +48,7 @@ object DiscordIpc {
     // App -> helper.
     const val MSG_START = 1        // DATA_TOKEN: resume with a saved token, or empty to idle
     const val MSG_AUTHORIZE = 2    // begin browser sign-in
-    const val MSG_SET_PLAYING = 3  // DATA_SERIAL / DATA_TITLE / DATA_COVER
+    const val MSG_SET_PLAYING = 3  // game fields plus DATA_STARTED_AT
     const val MSG_QUERY = 4        // request one MSG_STATE; replyTo carries the answer
     const val MSG_STOP = 5         // sign out and tear the client down
 
@@ -60,6 +60,7 @@ object DiscordIpc {
     const val DATA_TITLE = "title"
     const val DATA_COVER = "cover"
     const val DATA_RA = "ra"
+    const val DATA_STARTED_AT = "startedAt"
 
     const val DATA_STATUS = "status"
     const val DATA_FRIENDS = "friends"

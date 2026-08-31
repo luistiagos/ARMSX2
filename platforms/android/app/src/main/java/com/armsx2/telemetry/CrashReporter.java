@@ -305,7 +305,7 @@ public final class CrashReporter {
     }
 
     private static void writeCrash(String kind, Thread t, Throwable e) {
-        if (sAppContext == null) return;
+        if (sAppContext == null || !TelemetryReporter.isEnabled()) return;
         String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         File out = new File(pendingDir(), PROJECT_NAME + "_" + ts + "_" + kind + ".txt");
         String logcatTail = captureLogcat();
@@ -375,11 +375,12 @@ public final class CrashReporter {
     }
 
     private static void uploadPending() {
-        if (sAppContext == null) return;
+        if (sAppContext == null || !TelemetryReporter.isEnabled()) return;
         File dir = pendingDir();
         File[] files = dir.listFiles((f, name) -> name.endsWith(".txt"));
         if (files == null || files.length == 0) return;
         for (File f : files) {
+            if (!TelemetryReporter.isEnabled()) return;
             if (postFile(f)) {
                 if (!f.delete()) Log.w(TAG, "delete failed: " + f);
             } else {
@@ -389,6 +390,7 @@ public final class CrashReporter {
     }
 
     private static boolean postFile(File f) {
+        if (!TelemetryReporter.isEnabled()) return false;
         String boundary = "----CrashReporter" + System.currentTimeMillis();
         HttpURLConnection conn = null;
         try {

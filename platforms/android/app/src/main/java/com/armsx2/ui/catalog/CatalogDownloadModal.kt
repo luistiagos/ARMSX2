@@ -63,6 +63,12 @@ fun CatalogDownloadModal(
             Triple(str("catalog.action.cancelDownload"), { onCancel(entry); onClose() }, true),
         )
 
+        // Extração não é pausável (TASK-0048). Sem este ramo o `else` ofereceria "Download" para
+        // um item que está justamente terminando de baixar.
+        DownloadQueueManager.State.EXTRACTING -> listOf(
+            Triple(str("catalog.action.cancelDownload"), { onCancel(entry); onClose() }, true),
+        )
+
         else -> listOf(
             Triple(str("catalog.confirm.start"), { onStart(entry); onClose() }, false),
         )
@@ -71,6 +77,9 @@ fun CatalogDownloadModal(
         DownloadQueueManager.State.PAUSED -> str("catalog.paused")
         DownloadQueueManager.State.QUEUED -> str("catalog.queued")
         DownloadQueueManager.State.DOWNLOADING -> "${(entry.downloadProgress * 100).toInt()}%"
+        DownloadQueueManager.State.EXTRACTING ->
+            if (entry.totalBytes <= 0L) str("catalog.queue.extracting.starting")
+            else str("catalog.queue.extracting").format((entry.downloadProgress * 100).toInt())
         else -> str("catalog.confirm")
     }
 

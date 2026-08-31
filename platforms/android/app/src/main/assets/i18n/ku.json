@@ -50,6 +50,8 @@
   "app.language": "Ziman",
   "app.language.desc": "Zimanê sepanê hilbijêrin. Yekser tê sepandin.",
   "app.language.system": "Zimanê pergalê",
+  "app.telemetry": "Telemetrî û raporên têkçûnê bi anonîmî bişîne",
+  "app.telemetry.desc": "Bi şandina hûrguliyên sepan, amûr, çewtî û rojan alîkariya teşhîsa têkçûn û pirsgirêkên lihevhatinê bike. Pelên lîstik û BIOS qet nayên şandin. Guhertin yekser tên sepandin.",
   "app.library.search": "Lêgerîna pirtûkxaneyê",
   "app.library.search.desc": "Qada lêgerîna lîstikan li ser rûpela sereke ya pirtûkxaneyê nîşan bide.",
   "app.library.recents": "Lîstikên vê dawiyê hatine lîstin",

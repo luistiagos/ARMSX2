@@ -2338,6 +2338,7 @@ open class MainActivityRuntime : ComponentActivity() {
         com.armsx2.LibraryView.load()
         com.armsx2.ui.UiScale.load()
         com.armsx2.ui.theme.ThemePreferences.load()
+        com.armsx2.utils.AppIconManager.load(applicationContext)
         com.armsx2.ui.ScreenPinning.load()
         com.armsx2.ui.QuickMenuSide.load()
         com.armsx2.ui.theme.ToolbarPositionPreferences.load()
@@ -3416,6 +3417,11 @@ open class MainActivityRuntime : ComponentActivity() {
                 if (kc == KeyEvent.KEYCODE_BUTTON_L1) {
                     if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0)
                         com.armsx2.ui.home.HomeInputController.cycleSort()
+                    return true
+                }
+                if (kc == KeyEvent.KEYCODE_BUTTON_L2 || kc == KeyEvent.KEYCODE_BUTTON_R2) {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0)
+                        com.armsx2.ui.home.HomeInputController.toggleTab()
                     return true
                 }
                 val handled = when (kc) {

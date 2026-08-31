@@ -90,9 +90,10 @@ public final class DiscordNative {
 
     /** Publish what is running. Empty title = back in the library. raPresence is
      *  RetroAchievements' own rich-presence line, or empty when RA is off. */
-    public static native void setPlaying(String serial, String title, String coverUrl, String raPresence);
+    public static native void setPlaying(
+            String serial, String title, String coverUrl, String raPresence, long startedAtMillis);
 
-    /** Friends in ARMSX2, as name/game/serial/avatar records. */
+    /** Friends in RetroSystem PS2, as name/game/serial/avatar records. */
     public static native String friends();
 
     /** The signed-in account as "name<FS>avatar". */

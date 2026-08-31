@@ -15,6 +15,8 @@
   "app.language": "Bahasa",
   "app.language.desc": "Pilih bahasa aplikasi. Berlaku seketika.",
   "app.language.system": "Bahasa sistem",
+  "app.telemetry": "Kirim telemetri anonim dan laporan kerusakan",
+  "app.telemetry.desc": "Bantu mendiagnosis kerusakan dan masalah kompatibilitas dengan mengirim detail aplikasi, perangkat, kesalahan, dan log. File game dan BIOS tidak pernah dikirim. Perubahan langsung diterapkan.",
   "app.library.search": "Pencarian pustaka",
   "app.library.search.desc": "Tampilkan kolom pencarian game di layar utama pustaka.",
   "app.library.recents": "Game yang baru dimainkan",

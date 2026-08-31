@@ -21,6 +21,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.armsx2.Pasx2Application;
 
@@ -33,6 +35,14 @@ public class RomDownloadManager {
 
     public interface DownloadCallback {
         void onProgress(long bytesDownloaded, long totalBytes);
+        /**
+         * O download acabou e o que chegou era um `.7z`/`.zip` que esta sendo aberto.
+         *
+         * Chega com {@code totalBytes == 0} na primeira vez -- o tamanho descomprimido so aparece
+         * depois de abrir o cabecalho do arquivo, e ate la a unica coisa honesta a mostrar e uma
+         * barra indeterminada. Ver a TASK-0048.
+         */
+        void onExtracting(long bytesExtracted, long totalBytes);
         void onComplete(File romFile);
         void onError(String message);
         void onCancelled();
@@ -71,11 +81,14 @@ public class RomDownloadManager {
     /**
      * Extensoes tentadas quando o nome exato do manifesto nao existe no repositorio.
      *
-     * `.7z`, `.zip` e `.rar` sairam da lista: o app nao descompacta nada. Estavam ANTES de `.chd`,
-     * o que fazia preferir o formato que nao roda mesmo quando existia um `.chd` do mesmo jogo --
-     * ver o bug `catalogo-download-entrega-formato-nao-bootavel`.
+     * `.7z` e `.zip` voltaram na TASK-0048, mas <b>no fim</b> e nao no comeco. Estavam ANTES de
+     * `.chd` originalmente, o que fazia preferir o formato que nao roda mesmo quando existia um
+     * `.chd` do mesmo jogo -- ver o bug `catalogo-download-entrega-formato-nao-bootavel`. A ordem
+     * daqui e so metade da garantia; a outra metade e {@link #resolveSource}, que so usa um
+     * comprimido depois de a cascata inteira falhar. `.rar` continua fora: nao sabemos abrir.
      */
-    private static final String[] VARIANT_EXTENSIONS = { ".chd", ".iso", ".cso", ".zso" };
+    private static final String[] VARIANT_EXTENSIONS =
+            { ".chd", ".iso", ".cso", ".zso", ".7z", ".zip" };
 
     private volatile boolean isPaused    = false;
     private volatile boolean isCancelled = false;
@@ -139,7 +152,7 @@ public class RomDownloadManager {
     private static String urlEncode(String s) {
         if (s == null) return "";
         try {
-            return java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20");
+            return java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20").replace("%2F", "/");
         } catch (java.io.UnsupportedEncodingException e) {
             return s;
         }
@@ -181,19 +194,26 @@ public class RomDownloadManager {
         return false;
     }
 
+    /** O nome do manifesto com outra extensao, preservando pontos que fazem parte do titulo. */
+    static String withExtension(String manifestName, String extension) {
+        int dot = manifestName.lastIndexOf('.');
+        String base = (dot > 0) ? manifestName.substring(0, dot) : manifestName;
+        return base + "." + extension;
+    }
+
     /**
      * O nome com que gravar o que a URL entrega: o do manifesto, com a extensao do conteudo.
      *
      * Uma linha `.iso` do manifesto resolvida para um CHD e gravada `.chd` -- so assim o emulador
-     * escolhe o leitor certo. Quando a URL nao tem extensao utilizavel, o nome do manifesto fica
-     * como esta: quem decide se aquilo presta e o chamador, com {@link #isPlayable}.
+     * escolhe o leitor certo. Um comprimido tambem e gravado com a extensao dele, para que
+     * {@link RomArchiveExtractor} saiba qual leitor de arquivo usar; a extensao final so aparece
+     * depois da extracao. Quando a URL nao tem extensao utilizavel, o nome do manifesto fica como
+     * esta: quem decide se aquilo presta e o chamador.
      */
     static String localFileName(String manifestName, String url) {
         String ext = extensionOf(url);
-        if (!isPlayable(ext)) return manifestName;
-        int dot = manifestName.lastIndexOf('.');
-        String base = (dot > 0) ? manifestName.substring(0, dot) : manifestName;
-        return base + "." + ext;
+        if (!isPlayable(ext) && !RomArchiveExtractor.isArchive(ext)) return manifestName;
+        return withExtension(manifestName, ext);
     }
 
     private static Source firstPlayable(String manifestName, List<String> links) {
@@ -205,54 +225,475 @@ public class RomDownloadManager {
         return null;
     }
 
-    /**
-     * Resolve onde baixar, na arquitetura multi-fonte do romsrepository (igual ao retrobatnew):
-     * 1. URL explicita do manifesto
-     * 2. GET /api/roms/download_sources?system=ps2&path=<fileName>
-     * 3. Variantes de extensao (.chd, .iso, .cso, .zso)
-     * 4. GET /api/roms/by_alias?system=ps2&path=<fileName>
-     * 5. Legado find_by_file?source_id=1
-     * 6. HuggingFace direto
-     *
-     * Em qualquer passo, link de formato que o emulador nao abre e descartado -- e por isso o
-     * resultado pode ser **null**: e melhor falhar aqui do que baixar 2 GB de um `.7z` que vai
-     * ficar no disco sem rodar.
-     */
-    public Source resolveSource(CatalogEntry entry) {
-        String fileName = entry.fileName;
+    /** Idem, para os formatos comprimidos. So e consultado quando nao ha formato direto nenhum. */
+    private static Source firstArchive(String manifestName, List<String> links) {
+        for (String link : links) {
+            if (RomArchiveExtractor.isArchive(extensionOf(link))) {
+                return new Source(link, localFileName(manifestName, link));
+            }
+        }
+        return null;
+    }
 
-        if (entry.downloadUrl != null && !entry.downloadUrl.isEmpty()) {
-            // URL curada a mao no manifesto: vale como esta. O formato, nao -- nem vindo do
-            // manifesto o app sabe abrir um arquivo comprimido.
-            String name = localFileName(fileName, entry.downloadUrl);
-            return isPlayable(extensionOf(name)) ? new Source(entry.downloadUrl, name) : null;
+    static class IAFileEntry {
+        final String name;
+        final boolean isOriginal;
+        final boolean isPrivate;
+        final long size;
+
+        IAFileEntry(String name, boolean isOriginal, boolean isPrivate, long size) {
+            this.name = name;
+            this.isOriginal = isOriginal;
+            this.isPrivate = isPrivate;
+            this.size = size;
+        }
+    }
+
+    private static final Map<String, List<IAFileEntry>> IA_COLLECTION_CACHE = new ConcurrentHashMap<>();
+
+    private static String getIACookieHeader() {
+        try {
+            android.content.SharedPreferences prefs = com.armsx2.runtime.MainActivityRuntime.Companion.getPrefs();
+            if (prefs != null) {
+                return prefs.getString("ia_cookie_header", null);
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static void applyArchiveOrgHeaders(HttpURLConnection conn, String url) {
+        if (conn == null || url == null) return;
+        if (url.toLowerCase().contains("archive.org")) {
+            String cookie = getIACookieHeader();
+            if (cookie != null && !cookie.trim().isEmpty()) {
+                conn.setRequestProperty("Cookie", cookie.trim());
+            }
+        }
+    }
+
+    static String cleanFileName(String path) {
+        if (path == null) return "";
+        path = path.trim();
+        if (path.contains("%")) {
+            try {
+                path = java.net.URLDecoder.decode(path, "UTF-8");
+            } catch (Throwable ignored) {}
+        }
+        int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        if (slash >= 0 && slash < path.length() - 1) {
+            path = path.substring(slash + 1).trim();
+        }
+        return path;
+    }
+
+    /**
+     * Resolve todas as fontes onde baixar, seguindo a arquitetura multi-fonte com priorização de CDN:
+     * 1. URL explícita do manifesto (se houver)
+     * 2. GET /api/roms/by_alias?system=ps2&path=<fileName> (PythonAnywhere)
+     * 3. GET /api/roms/download_sources?system=ps2&path=<fileName> (PythonAnywhere + variantes de extensão)
+     * 4. Espelhos diretos no HuggingFace (ps2chd e ps2mod)
+     * 5. IACache (Internet Archive): Coleções estruturadas e LiveSearch
+     *
+     * Prioridade de entrega:
+     * - Formatos bootáveis (.chd, .iso, .cso) no HuggingFace (CDN veloz e sem rate-limit)
+     * - Formatos bootáveis em outras fontes (Archive.org, espelhos)
+     * - Formatos compactados (.7z, .zip) no HuggingFace
+     * - Formatos compactados em outras fontes (.7z, .zip)
+     */
+    public List<Source> resolveSources(CatalogEntry entry) {
+        String rawFileName = (entry != null && entry.fileName != null) ? entry.fileName : "";
+        String fileName = cleanFileName(rawFileName);
+
+        List<Source> hfPlayable = new ArrayList<>();
+        List<Source> otherPlayable = new ArrayList<>();
+        List<Source> hfArchive = new ArrayList<>();
+        List<Source> otherArchive = new ArrayList<>();
+        java.util.Set<String> seenUrls = new java.util.HashSet<>();
+
+        java.util.List<String> directCandidates = new ArrayList<>();
+
+        if (entry != null && entry.downloadUrl != null && !entry.downloadUrl.trim().isEmpty()) {
+            directCandidates.add(entry.downloadUrl.trim());
         }
 
         String system = "ps2";
 
-        Source source = firstPlayable(fileName, queryDownloadSources(system, fileName));
-        if (source != null) return source;
+        // 2. by_alias (PythonAnywhere)
+        List<String> aliasLinks = queryByAlias(system, fileName);
+        directCandidates.addAll(aliasLinks);
+
+        // 3. download_sources (PythonAnywhere) + variantes de extensao
+        List<String> srcLinks = queryDownloadSources(system, fileName);
+        directCandidates.addAll(srcLinks);
 
         int dotIdx = fileName.lastIndexOf('.');
         String baseName = (dotIdx > 0) ? fileName.substring(0, dotIdx) : fileName;
         for (String ext : VARIANT_EXTENSIONS) {
             String variantName = baseName + ext;
             if (variantName.equalsIgnoreCase(fileName)) continue;
-            source = firstPlayable(fileName, queryDownloadSources(system, variantName));
-            if (source != null) return source;
+            List<String> vLinks = queryDownloadSources(system, variantName);
+            directCandidates.addAll(vLinks);
         }
 
-        source = firstPlayable(fileName, queryByAlias(system, fileName));
-        if (source != null) return source;
+        List<String> legacyLinks = queryLegacyFindByFile(system, fileName);
+        directCandidates.addAll(legacyLinks);
 
-        source = firstPlayable(fileName, queryLegacyFindByFile(system, fileName));
-        if (source != null) return source;
+        // 4. HuggingFace direct dataset mirrors
+        directCandidates.add("https://huggingface.co/datasets/luisluis123/ps2chd/resolve/main/" + urlEncode(baseName) + ".chd");
+        directCandidates.add("https://huggingface.co/datasets/luisluis123/ps2mod/resolve/main/" + urlEncode(fileName));
+        directCandidates.add("https://huggingface.co/datasets/luisluis123/ps2mod/resolve/main/" + urlEncode(baseName) + ".7z");
+        directCandidates.add("https://huggingface.co/datasets/luisluis123/ps2mod/resolve/main/" + urlEncode(baseName) + ".iso");
+        directCandidates.add("https://huggingface.co/luisluis123/ps2mod/resolve/main/" + urlEncode(baseName) + ".7z");
+        directCandidates.add("https://huggingface.co/luisluis123/ps2mod/resolve/main/" + urlEncode(fileName));
 
-        // HuggingFace: o dataset guarda o arquivo com o nome do manifesto, entao o formato aqui e
-        // o da propria entrada -- uma linha `.7z` do catalogo nao tem o que tentar.
-        if (!isPlayable(extensionOf(fileName))) return null;
-        return new Source(HUGGINGFACE_BASE + "/ps2/" + urlEncode(fileName), fileName);
+        // 5. Internet Archive Coleções estruturadas & LiveSearch
+        Source iaSource = queryInternetArchive(fileName);
+        if (iaSource != null && iaSource.url != null) {
+            directCandidates.add(iaSource.url);
+        }
+
+        for (String link : directCandidates) {
+            if (link == null) continue;
+            link = link.trim();
+            if (!link.startsWith("http://") && !link.startsWith("https://")) continue;
+            if (seenUrls.contains(link)) continue;
+            seenUrls.add(link);
+
+            String ext = extensionOf(link);
+            boolean playable = isPlayable(ext);
+            boolean isArch = RomArchiveExtractor.isArchive(ext);
+            if (!playable && !isArch) continue;
+
+            String name = localFileName(fileName, link);
+            Source src = new Source(link, name);
+            boolean isHf = link.toLowerCase().contains("huggingface.co");
+
+            if (playable) {
+                if (isHf) {
+                    hfPlayable.add(src);
+                } else {
+                    otherPlayable.add(src);
+                }
+            } else {
+                if (isHf) {
+                    hfArchive.add(src);
+                } else {
+                    otherArchive.add(src);
+                }
+            }
+        }
+
+        List<Source> result = new ArrayList<>();
+        result.addAll(hfPlayable);
+        result.addAll(otherPlayable);
+        result.addAll(hfArchive);
+        result.addAll(otherArchive);
+        return result;
     }
+
+    public Source resolveSource(CatalogEntry entry) {
+        List<Source> sources = resolveSources(entry);
+        return sources.isEmpty() ? null : sources.get(0);
+    }
+
+    List<String> getIACollectionsFor(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        String clean = (dot > 0) ? fileName.substring(0, dot).trim() : fileName.trim();
+        String lower = clean.toLowerCase();
+
+        List<String> res = new ArrayList<>();
+
+        // 1. Coleções regionais públicas irrestritas (Status 200/206 sem necessidade de cookie)
+        if (lower.contains("japan") || lower.contains("asia") || lower.contains("(ja") || lower.contains("taikenban")) {
+            res.add("PS2-ASIA-ROMS321COM");
+            res.add("ps2japanredumpmissing");
+            res.add("ps2japanredump1");
+            res.add("ps2japanredump2");
+            res.add("ps2japanredump3");
+        } else if (lower.contains("pt-br") || lower.contains("brasil") || lower.contains("portugues") || lower.contains("dublado") || lower.contains("legendado")) {
+            res.add("ps2_pt-br");
+        } else if (lower.contains("europe") || lower.contains("(en,") || lower.contains("(fr,") || lower.contains("(de,") || lower.contains("(es,") || lower.contains("(it,")) {
+            res.add("ps2-eu-roms321com");
+            res.add("playstation2_essentials");
+            res.add("playstation2_essentials_part2");
+            res.add("playstation-2-game-dumps");
+        } else {
+            // Default USA e geral
+            res.add("roms321-ps2redump");
+            res.add("playstation2_essentials");
+            res.add("playstation2_essentials_part2");
+            res.add("playstation-2-game-dumps");
+            res.add("ps2-eu-roms321com");
+            res.add("PS2-ASIA-ROMS321COM");
+        }
+
+        // Extrai primeiro caractere para coleções particionadas (ps2-redump-usa-chd-part-X e sony_playstation2_X)
+        char firstChar = ' ';
+        for (int i = 0; i < clean.length(); i++) {
+            char c = Character.toLowerCase(clean.charAt(i));
+            if (Character.isLetterOrDigit(c)) {
+                firstChar = c;
+                break;
+            }
+        }
+        if (firstChar >= 'a' && firstChar <= 'z') {
+            res.add("ps2-redump-usa-chd-part-" + Character.toUpperCase(firstChar));
+        } else if (Character.isDigit(firstChar)) {
+            res.add("ps2-redump-usa-chd-part-0");
+        }
+
+        // Coleções estruturadas Redump adicionais
+        if (Character.isDigit(firstChar)) {
+            res.add("sony_playstation2_numberssymbols");
+        } else if (firstChar >= 'a' && firstChar <= 'z') {
+            if (firstChar == 'd') {
+                res.add("sony_playstation2_d_part1");
+                res.add("sony_playstation2_d_part2");
+            } else if (firstChar == 'm') {
+                res.add("sony_playstation2_m_part1");
+                res.add("sony_playstation2_m_part2");
+            } else if (firstChar == 'o') {
+                res.add("sony_playstation2_o_part1");
+                res.add("sony_playstation2_o_part2");
+            } else if (firstChar == 's') {
+                res.add("sony_playstation2_s_part1");
+                res.add("sony_playstation2_s_part2");
+                res.add("sony_playstation2_s_part3");
+                res.add("sony_playstation2_s_part4");
+            } else {
+                res.add("sony_playstation2_" + firstChar);
+            }
+        }
+        return res;
+    }
+
+    private Source queryInternetArchive(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        String clean = (dot > 0) ? fileName.substring(0, dot).trim() : fileName.trim();
+        String lowerClean = clean.toLowerCase();
+
+        boolean hasCookie = (getIACookieHeader() != null);
+        Source bestArchive = null;
+
+        // 1. Varredura nas coleções estruturadas (como no PS2Companion)
+        List<String> colls = getIACollectionsFor(fileName);
+        for (String coll : colls) {
+            List<IAFileEntry> entries = IA_COLLECTION_CACHE.get(coll);
+            if (entries == null) {
+                entries = fetchIACollectionFiles(coll);
+                if (entries != null && !entries.isEmpty()) {
+                    IA_COLLECTION_CACHE.put(coll, entries);
+                }
+            }
+            if (entries == null || entries.isEmpty()) continue;
+
+            Source match = matchIAEntry(fileName, clean, lowerClean, coll, entries, hasCookie);
+            if (match != null) {
+                String ext = extensionOf(match.fileName);
+                if (isPlayable(ext)) {
+                    return match;
+                } else if (bestArchive == null && RomArchiveExtractor.isArchive(ext)) {
+                    bestArchive = match;
+                }
+            }
+        }
+
+        // 2. LiveSearch dinâmico via API do Internet Archive (para itens avulsos ou coleções fechadas)
+        Source liveMatch = liveSearchIA(fileName, clean, hasCookie);
+        if (liveMatch != null) {
+            String ext = extensionOf(liveMatch.fileName);
+            if (isPlayable(ext)) {
+                return liveMatch;
+            } else if (bestArchive == null && RomArchiveExtractor.isArchive(ext)) {
+                bestArchive = liveMatch;
+            }
+        }
+
+        return bestArchive;
+    }
+
+    Source matchIAEntry(String originalFileName, String clean, String lowerClean,
+                        String collOrIdentifier, List<IAFileEntry> entries, boolean hasCookie) {
+        String baseTarget = clean.replaceAll("[\\(\\[].*?[\\)\\]]", "").trim().toLowerCase();
+        String baseTargetPrefix = baseTarget;
+        int dashIdx = baseTarget.indexOf(" - ");
+        if (dashIdx > 0) {
+            baseTargetPrefix = baseTarget.substring(0, dashIdx).trim();
+        }
+
+        // Pass 1: Correspondência exata (mesmo título e região, considerando prefixos de pasta)
+        for (IAFileEntry entry : entries) {
+            if (entry.isPrivate && !hasCookie) continue;
+            String fName = entry.name;
+            String rawName = cleanFileName(fName);
+            int fDot = rawName.lastIndexOf('.');
+            String fClean = (fDot > 0) ? rawName.substring(0, fDot).trim().toLowerCase() : rawName.trim().toLowerCase();
+            String ext = extensionOf(rawName);
+            if (!isPlayable(ext) && !RomArchiveExtractor.isArchive(ext)) continue;
+
+            if (fClean.equals(lowerClean)) {
+                String downloadUrl = "https://archive.org/download/" + collOrIdentifier + "/" + urlEncode(fName);
+                return new Source(downloadUrl, localFileName(originalFileName, rawName));
+            }
+        }
+
+        // Pass 2: Correspondência por baseName / prefixo / subtítulo
+        for (IAFileEntry entry : entries) {
+            if (entry.isPrivate && !hasCookie) continue;
+            String fName = entry.name;
+            String rawName = cleanFileName(fName);
+            int fDot = rawName.lastIndexOf('.');
+            String fClean = (fDot > 0) ? rawName.substring(0, fDot).trim().toLowerCase() : rawName.trim().toLowerCase();
+            String ext = extensionOf(rawName);
+            if (!isPlayable(ext) && !RomArchiveExtractor.isArchive(ext)) continue;
+
+            String baseEntry = fClean.replaceAll("[\\(\\[].*?[\\)\\]]", "").trim();
+            String baseEntryPrefix = baseEntry;
+            int eDash = baseEntry.indexOf(" - ");
+            if (eDash > 0) {
+                baseEntryPrefix = baseEntry.substring(0, eDash).trim();
+            }
+
+            boolean matches = (!baseTarget.isEmpty() && (baseEntry.equals(baseTarget) || fClean.contains(lowerClean) || lowerClean.contains(fClean)))
+                    || (!baseTargetPrefix.isEmpty() && (baseEntryPrefix.equals(baseTargetPrefix) || baseEntry.startsWith(baseTargetPrefix) || baseTarget.startsWith(baseEntryPrefix)));
+
+            if (matches) {
+                String downloadUrl = "https://archive.org/download/" + collOrIdentifier + "/" + urlEncode(fName);
+                return new Source(downloadUrl, localFileName(originalFileName, rawName));
+            }
+        }
+        return null;
+    }
+
+    private Source liveSearchIA(String originalFileName, String clean, boolean hasCookie) {
+        try {
+            String cleanWithoutTags = clean.replaceAll("[\\(\\[].*?[\\)\\]]", "").trim();
+            String[] words = cleanWithoutTags.replaceAll("[^a-zA-Z0-9]+", " ").trim().split("\\s+");
+            if (words.length == 0 || (words.length == 1 && words[0].isEmpty())) return null;
+
+            StringBuilder terms = new StringBuilder();
+            int maxWords = Math.min(words.length, 5);
+            for (int i = 0; i < maxWords; i++) {
+                if (terms.length() > 0) terms.append(" ");
+                terms.append(words[i]);
+            }
+
+            String query = "mediatype:(software) AND (" + terms.toString() + ")";
+            String searchUrl = "https://archive.org/advancedsearch.php?q=" + urlEncode(query)
+                    + "&fl[]=identifier,title,mediatype&rows=6&output=json";
+
+            HttpURLConnection conn = (HttpURLConnection) new URL(searchUrl).openConnection();
+            conn.setConnectTimeout(6_000);
+            conn.setReadTimeout(10_000);
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            applyArchiveOrgHeaders(conn, searchUrl);
+            conn.connect();
+
+            if (conn.getResponseCode() == 200) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) sb.append(line);
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    JSONObject responseObj = json.optJSONObject("response");
+                    if (responseObj != null) {
+                        JSONArray docs = responseObj.optJSONArray("docs");
+                        if (docs != null) {
+                            Source bestArchive = null;
+                            for (int i = 0; i < docs.length(); i++) {
+                                JSONObject doc = docs.optJSONObject(i);
+                                if (doc == null) continue;
+                                String identifier = doc.optString("identifier", "").trim();
+                                if (identifier.isEmpty()) continue;
+
+                                List<IAFileEntry> files = fetchIACollectionFiles(identifier);
+                                if (files.isEmpty()) continue;
+
+                                Source match = matchIAEntry(originalFileName, clean, clean.toLowerCase(), identifier, files, hasCookie);
+                                if (match != null) {
+                                    String ext = extensionOf(match.fileName);
+                                    if (isPlayable(ext)) {
+                                        return match;
+                                    } else if (bestArchive == null && RomArchiveExtractor.isArchive(ext)) {
+                                        bestArchive = match;
+                                    }
+                                }
+                            }
+                            if (bestArchive != null) return bestArchive;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private List<IAFileEntry> fetchIACollectionFiles(String collectionID) {
+        List<IAFileEntry> list = new ArrayList<>();
+        String urlStr = "https://archive.org/metadata/" + urlEncode(collectionID) + "/files";
+        try {
+            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setConnectTimeout(6_000);
+            conn.setReadTimeout(10_000);
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            applyArchiveOrgHeaders(conn, urlStr);
+            conn.connect();
+            int respCode = conn.getResponseCode();
+
+            // Se o sub-endpoint /files falhar, tenta o endpoint principal de metadados
+            if (respCode != 200) {
+                conn.disconnect();
+                urlStr = "https://archive.org/metadata/" + urlEncode(collectionID);
+                conn = (HttpURLConnection) new URL(urlStr).openConnection();
+                conn.setConnectTimeout(6_000);
+                conn.setReadTimeout(10_000);
+                conn.setRequestProperty("User-Agent", USER_AGENT);
+                applyArchiveOrgHeaders(conn, urlStr);
+                conn.connect();
+                respCode = conn.getResponseCode();
+            }
+
+            if (respCode == 200) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) sb.append(line);
+                    JSONObject json = new JSONObject(sb.toString());
+                    JSONArray result = json.optJSONArray("result");
+                    if (result == null) {
+                        result = json.optJSONArray("files");
+                    }
+                    if (result != null) {
+                        for (int i = 0; i < result.length(); i++) {
+                            JSONObject item = result.optJSONObject(i);
+                            if (item != null) {
+                                String name = item.optString("name", "").trim();
+                                if (name.isEmpty()) continue;
+                                String lower = name.toLowerCase();
+                                if (lower.endsWith("_meta.xml") || lower.endsWith("_files.xml")
+                                        || lower.endsWith("_archive.torrent") || lower.endsWith("_thumb.jpg")
+                                        || lower.endsWith(".sqlite")) {
+                                    continue;
+                                }
+                                String source = item.optString("source", "");
+                                boolean isOriginal = "original".equalsIgnoreCase(source);
+                                boolean isPrivate = item.optBoolean("private", false)
+                                        || "true".equalsIgnoreCase(item.optString("private", "false"));
+                                long size = 0;
+                                try {
+                                    size = Long.parseLong(item.optString("size", "0"));
+                                } catch (Throwable ignored) {}
+                                list.add(new IAFileEntry(name, isOriginal, isPrivate, size));
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return list;
+    }
+
 
     /** Todos os links da resposta, na ordem em que vieram. Lista vazia quando nao ha resposta. */
     private List<String> queryDownloadSources(String system, String path) {
@@ -407,181 +848,265 @@ public class RomDownloadManager {
     private void doDownloadLocked(CatalogEntry entry, File destDir, DownloadCallback callback) {
         if (!destDir.exists()) destDir.mkdirs();
 
-        // O `.part` conserva o nome do manifesto mesmo quando o arquivo final muda de extensao:
-        // e ele que o resume procura e que `DownloadQueueManager.remove` apaga. A troca de nome
-        // acontece so no rename final.
-        File partFile = entry.getPartFile(destDir);
-
-        Source source = resolveSource(entry);
-        if (source == null) {
-            notifyError(callback, "Sem fonte compativel: o emulador nao abre o formato disponivel");
+        List<Source> candidateSources = resolveSources(entry);
+        if (candidateSources.isEmpty()) {
+            notifyError(callback, "Sem fonte compatível: o emulador não abre o formato disponível");
             return;
         }
 
-        File finalFile = new File(destDir, source.fileName);
-        String downloadUrl = source.url;
+        File partFile = entry.getPartFile(destDir);
+        String lastErrorMessage = null;
 
-        // So retoma o que veio da MESMA URL -- ver sourceMarker.
-        if (partFile.exists() && !downloadUrl.equals(readSourceMarker(partFile))) {
-            partFile.delete();
-        }
-        writeSourceMarker(partFile, downloadUrl);
+        for (int srcIdx = 0; srcIdx < candidateSources.size(); srcIdx++) {
+            if (isCancelled || Thread.currentThread().isInterrupted()) {
+                notifyCancelled(callback);
+                return;
+            }
 
-        int attempt = 0;
-        while (attempt < MAX_RETRIES) {
-            attempt++;
-            try {
-                long existingBytes = partFile.exists() ? partFile.length() : 0;
-                String currentUrl = downloadUrl;
-                HttpURLConnection conn = null;
-                int responseCode = 0;
-                int redirectCount = 0;
-                final int MAX_REDIRECTS = 10;
+            Source source = candidateSources.get(srcIdx);
+            File finalFile = new File(destDir, source.fileName);
+            String downloadUrl = source.url;
+            final boolean isArchiveSource =
+                    RomArchiveExtractor.isArchive(extensionOf(source.fileName));
 
-                while (redirectCount < MAX_REDIRECTS) {
-                    URL url = new URL(currentUrl);
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-                    conn.setReadTimeout(READ_TIMEOUT_MS);
-                    conn.setInstanceFollowRedirects(false);
-                    conn.setRequestMethod("GET");
-                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) RetroSystemPS2/1.0");
+            // So retoma o que veio da MESMA URL -- ver sourceMarker
+            if (partFile.exists() && !downloadUrl.equals(readSourceMarker(partFile))) {
+                partFile.delete();
+            }
+            writeSourceMarker(partFile, downloadUrl);
 
-                    // Resume support
-                    if (existingBytes > 0) {
-                        conn.setRequestProperty("Range", "bytes=" + existingBytes + "-");
-                    }
+            int attempt = 0;
+            while (attempt < MAX_RETRIES) {
+                attempt++;
+                try {
+                    long existingBytes = partFile.exists() ? partFile.length() : 0;
+                    String currentUrl = downloadUrl;
+                    HttpURLConnection conn = null;
+                    int responseCode = 0;
+                    int redirectCount = 0;
+                    final int MAX_REDIRECTS = 10;
 
-                    conn.connect();
-                    responseCode = conn.getResponseCode();
+                    while (redirectCount < MAX_REDIRECTS) {
+                        URL url = new URL(currentUrl);
+                        conn = (HttpURLConnection) url.openConnection();
+                        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                        conn.setReadTimeout(READ_TIMEOUT_MS);
+                        conn.setInstanceFollowRedirects(false);
+                        conn.setRequestMethod("GET");
+                        conn.setRequestProperty("User-Agent", USER_AGENT);
+                        conn.setRequestProperty("Accept-Encoding", "identity");
+                        applyArchiveOrgHeaders(conn, currentUrl);
 
-                    // Check for redirect (301, 302, 303, 307, 308)
-                    if (responseCode == HttpURLConnection.HTTP_MOVED_PERM
-                            || responseCode == HttpURLConnection.HTTP_MOVED_TEMP
-                            || responseCode == HttpURLConnection.HTTP_SEE_OTHER
-                            || responseCode == 307
-                            || responseCode == 308) {
-                        String location = conn.getHeaderField("Location");
-                        conn.disconnect();
-                        if (location == null || location.isEmpty()) {
-                            break;
+                        // Resume support
+                        if (existingBytes > 0) {
+                            conn.setRequestProperty("Range", "bytes=" + existingBytes + "-");
                         }
-                        URL base = new URL(currentUrl);
-                        currentUrl = new URL(base, location).toExternalForm();
-                        redirectCount++;
-                        continue;
+
+                        conn.connect();
+                        responseCode = conn.getResponseCode();
+
+                        // Check for redirect (301, 302, 303, 307, 308)
+                        if (responseCode == HttpURLConnection.HTTP_MOVED_PERM
+                                || responseCode == HttpURLConnection.HTTP_MOVED_TEMP
+                                || responseCode == HttpURLConnection.HTTP_SEE_OTHER
+                                || responseCode == 307
+                                || responseCode == 308) {
+                            String location = conn.getHeaderField("Location");
+                            conn.disconnect();
+                            if (location == null || location.isEmpty()) {
+                                break;
+                            }
+                            URL base = new URL(currentUrl);
+                            currentUrl = new URL(base, location).toExternalForm();
+                            redirectCount++;
+                            continue;
+                        }
+                        break;
                     }
-                    break;
-                }
 
-                if (conn == null) {
-                    throw new IOException("Failed to establish connection");
-                }
+                    if (conn == null) {
+                        throw new IOException("Falha ao conectar com " + currentUrl);
+                    }
 
-                long contentLength = conn.getContentLengthLong();
-                long totalBytes = 0;
-                long startOffset = 0;
-                boolean resuming = false;
+                    long contentLength = conn.getContentLengthLong();
+                    long totalBytes = 0;
+                    long startOffset = 0;
+                    boolean resuming = false;
 
-                if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
-                    // Servidor aceitou resume (206)
-                    startOffset = existingBytes;
-                    resuming    = true;
-                    String cr = conn.getHeaderField("Content-Range");
-                    if (cr != null && cr.contains("/")) {
-                        String totalStr = cr.substring(cr.lastIndexOf('/') + 1).trim();
-                        try {
-                            totalBytes = Long.parseLong(totalStr);
-                        } catch (NumberFormatException ignored) {
+                    if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
+                        // Servidor aceitou resume (206)
+                        startOffset = existingBytes;
+                        resuming    = true;
+                        String cr = conn.getHeaderField("Content-Range");
+                        if (cr != null && cr.contains("/")) {
+                            String totalStr = cr.substring(cr.lastIndexOf('/') + 1).trim();
+                            try {
+                                totalBytes = Long.parseLong(totalStr);
+                            } catch (NumberFormatException ignored) {
+                                totalBytes = existingBytes + (contentLength > 0 ? contentLength : 0);
+                            }
+                        } else {
                             totalBytes = existingBytes + (contentLength > 0 ? contentLength : 0);
                         }
+                    } else if (responseCode == HttpURLConnection.HTTP_OK) {
+                        startOffset = 0;
+                        totalBytes  = contentLength > 0 ? contentLength : 0;
+                        if (partFile.exists()) partFile.delete();
                     } else {
-                        totalBytes = existingBytes + (contentLength > 0 ? contentLength : 0);
-                    }
-                } else if (responseCode == HttpURLConnection.HTTP_OK) {
-                    // Servidor ignorou Range ou início do zero
-                    startOffset = 0;
-                    totalBytes  = contentLength > 0 ? contentLength : 0;
-                    if (partFile.exists()) partFile.delete();
-                } else {
-                    conn.disconnect();
-                    // 404 e resposta definitiva: o arquivo nao existe naquela fonte, e insistir tres
-                    // vezes so faz o usuario esperar. E o caso comum das entradas que so existem em
-                    // formato comprimido -- recusadas na resolucao, elas caem no HuggingFace, que
-                    // nao as tem.
-                    if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                        notifyError(callback, "Sem fonte disponivel para este arquivo (404)");
-                        return;
-                    }
-                    if (attempt >= MAX_RETRIES) {
-                        notifyError(callback, "HTTP " + responseCode);
-                        return;
-                    }
-                    sleepBeforeRetry(attempt);
-                    continue;
-                }
-
-                try (InputStream in = conn.getInputStream();
-                     FileOutputStream out = new FileOutputStream(partFile, resuming)) {
-
-                    byte[] buf       = new byte[BUFFER_SIZE];
-                    long bytesWritten = startOffset;
-                    int read;
-
-                    while ((read = in.read(buf)) != -1) {
-                        // Pause: bloqueia até resume ou cancel
-                        while (isPaused && !isCancelled) {
-                            try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+                        conn.disconnect();
+                        lastErrorMessage = "HTTP " + responseCode;
+                        if (responseCode == HttpURLConnection.HTTP_NOT_FOUND
+                                || responseCode == HttpURLConnection.HTTP_FORBIDDEN
+                                || responseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                            break;
                         }
+                        if (attempt >= MAX_RETRIES) {
+                            break;
+                        }
+                        sleepBeforeRetry(attempt);
+                        continue;
+                    }
 
-                        if (isCancelled || Thread.currentThread().isInterrupted()) {
+                    String contentType = conn.getContentType();
+                    if (contentType != null) {
+                        String ctLower = contentType.toLowerCase();
+                        if (ctLower.startsWith("image/") || ctLower.startsWith("text/html")) {
                             conn.disconnect();
-                            notifyCancelled(callback);
+                            lastErrorMessage = "Fonte retornou formato inválido (" + contentType + ")";
+                            break;
+                        }
+                    }
+
+                    if (totalBytes > 0) {
+                        long needed = (totalBytes - startOffset)
+                                + (isArchiveSource ? totalBytes : 0);
+                        String shortfall = RomArchiveExtractor.spaceShortfall(destDir, needed);
+                        if (shortfall != null) {
+                            conn.disconnect();
+                            notifyError(callback, shortfall);
                             return;
                         }
+                    }
 
-                        out.write(buf, 0, read);
-                        bytesWritten += read;
+                    try (InputStream in = conn.getInputStream();
+                         FileOutputStream out = new FileOutputStream(partFile, resuming)) {
 
-                        long now = System.currentTimeMillis();
-                        if (now - lastProgressMs >= PROGRESS_THROTTLE_MS) {
-                            lastProgressMs = now;
-                            final long bw = bytesWritten;
-                            final long tb = totalBytes;
-                            postToMain(() -> callback.onProgress(bw, tb));
+                        byte[] buf       = new byte[BUFFER_SIZE];
+                        long bytesWritten = startOffset;
+                        int read;
+
+                        while ((read = in.read(buf)) != -1) {
+                            while (isPaused && !isCancelled) {
+                                try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+                            }
+
+                            if (isCancelled || Thread.currentThread().isInterrupted()) {
+                                conn.disconnect();
+                                notifyCancelled(callback);
+                                return;
+                            }
+
+                            out.write(buf, 0, read);
+                            bytesWritten += read;
+
+                            long now = System.currentTimeMillis();
+                            if (now - lastProgressMs >= PROGRESS_THROTTLE_MS) {
+                                lastProgressMs = now;
+                                final long bw = bytesWritten;
+                                final long tb = totalBytes;
+                                postToMain(() -> callback.onProgress(bw, tb));
+                            }
+                        }
+
+                        out.flush();
+                    }
+
+                    conn.disconnect();
+
+                    // Move .part → arquivo final
+                    if (finalFile.exists()) finalFile.delete();
+                    if (!partFile.renameTo(finalFile)) {
+                        copyAndDelete(partFile, finalFile);
+                    }
+                    sourceMarker(partFile).delete();
+
+                    File ready = finalFile;
+                    if (isArchiveSource) {
+                        ready = extractOrFail(finalFile, destDir, entry, partFile, callback);
+                        if (ready == null) {
+                            lastErrorMessage = "Falha ao extrair arquivo compactado";
+                            break;
                         }
                     }
 
-                    out.flush();
-                }
-
-                conn.disconnect();
-
-                // Move .part → arquivo final, com a extensao do conteudo que chegou
-                if (finalFile.exists()) finalFile.delete();
-                if (!partFile.renameTo(finalFile)) {
-                    // Fallback: copia manualmente se rename falhar (cross-device)
-                    copyAndDelete(partFile, finalFile);
-                }
-                sourceMarker(partFile).delete();
-
-                notifyComplete(callback, finalFile);
-                return;
-
-            } catch (IOException e) {
-                if (isCancelled || Thread.currentThread().isInterrupted()) {
-                    notifyCancelled(callback);
+                    notifyComplete(callback, ready);
                     return;
+
+                } catch (IOException e) {
+                    if (isCancelled || Thread.currentThread().isInterrupted()) {
+                        notifyCancelled(callback);
+                        return;
+                    }
+                    lastErrorMessage = e.getMessage();
+                    if (attempt >= MAX_RETRIES) {
+                        break;
+                    }
+                    sleepBeforeRetry(attempt);
                 }
-                if (attempt >= MAX_RETRIES) {
-                    notifyError(callback, e.getMessage());
-                    return;
-                }
-                sleepBeforeRetry(attempt);
             }
+
+            discardPart(partFile);
         }
 
-        notifyError(callback, "Falha após " + MAX_RETRIES + " tentativas");
+        notifyError(callback, lastErrorMessage != null ? lastErrorMessage : "Falha após tentativas em todas as fontes disponíveis");
+    }
+
+    /**
+     * Abre o comprimido que acabou de chegar. Devolve o arquivo pronto, ou {@code null} depois de
+     * ja ter notificado erro/cancelamento.
+     *
+     * Roda na thread do download, entre o fim da transferencia e o {@code onComplete} -- por isso
+     * `isCancelled` continua sendo a mesma flag do laco de cima.
+     *
+     * <b>Falha apaga o comprimido.</b> Um `.7z` deixado no disco e contado por
+     * {@link CatalogParser#markDownloaded} como jogo baixado -- ele casa por nome sem extensao --
+     * e o emulador nao abre aquilo: e o defeito da TASK-0045 de volta por outra porta. O usuario
+     * perde a transferencia, mas nao ganha uma linha "baixada" que nao roda.
+     */
+    private File extractOrFail(File archive, File destDir, CatalogEntry entry, File tempFile,
+                               DownloadCallback callback) {
+        // Antes de abrir o arquivo: o tamanho descomprimido ainda e desconhecido, e este zero e o
+        // que faz a tela trocar para a barra indeterminada de "Extracting…".
+        postToMain(() -> callback.onExtracting(0, 0));
+        try {
+            return RomArchiveExtractor.extract(archive, destDir, entry.fileName, tempFile,
+                    new RomArchiveExtractor.Progress() {
+                        @Override
+                        public void onProgress(long bytesExtracted, long totalBytes) {
+                            postToMain(() -> callback.onExtracting(bytesExtracted, totalBytes));
+                        }
+
+                        @Override
+                        public boolean isCancelled() {
+                            return isCancelled || Thread.currentThread().isInterrupted();
+                        }
+                    });
+        } catch (RomArchiveExtractor.CancelledException e) {
+            archive.delete();
+            discardPart(tempFile);
+            notifyCancelled(callback);
+            return null;
+        } catch (IOException | RuntimeException | OutOfMemoryError e) {
+            // RuntimeException tambem: um cabecalho corrompido faz o commons-compress estourar
+            // IllegalArgumentException/IndexOutOfBounds em vez de IOException. E OutOfMemoryError
+            // porque o dicionario do LZMA2 e alocado no heap Java e pode passar de 64 MB. Deixar
+            // qualquer um dos tres subir mata a thread do download SEM callback nenhum: a entrada
+            // fica DOWNLOADING para sempre, porque so `onError`/`onCancelled` a tiram desse estado.
+            archive.delete();
+            discardPart(tempFile);
+            notifyError(callback, e.getMessage());
+            return null;
+        }
     }
 
     private void sleepBeforeRetry(int attempt) {

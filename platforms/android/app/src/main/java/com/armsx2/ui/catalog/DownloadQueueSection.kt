@@ -24,7 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.armsx2.catalog.DownloadQueueManager
 import com.armsx2.i18n.str
 import com.armsx2.ui.common.RoundAction
@@ -67,18 +67,22 @@ private fun DownloadQueueRow(
 ) {
     // Enquanto o downloader resolve a URL (até cinco consultas encadeadas) ainda não há tamanho
     // total. Barra indeterminada nesse trecho: um "0%" parado por quarenta segundos é exatamente a
-    // leitura de "não aconteceu nada" que abriu este bug.
-    val resolving = item.state == DownloadQueueManager.State.DOWNLOADING && item.totalBytes <= 0L
+    // leitura de "não aconteceu nada" que abriu este bug. O mesmo vale para o instante inicial da
+    // extração, antes de o cabeçalho do .7z dizer quanto tem lá dentro (TASK-0048).
+    val extracting = item.state == DownloadQueueManager.State.EXTRACTING
+    val indeterminate =
+        (item.state == DownloadQueueManager.State.DOWNLOADING || extracting) && item.totalBytes <= 0L
     val percent = (item.progress * 100).toInt()
 
-    val status = when (item.state) {
-        DownloadQueueManager.State.QUEUED -> str("catalog.queue.waiting")
-        DownloadQueueManager.State.PAUSED -> str("catalog.paused.short")
-        DownloadQueueManager.State.ERROR -> str("catalog.queue.failed")
-        else ->
-            if (resolving) str("catalog.queue.resolving")
-            else str("catalog.queue.progress")
-                .format(megabytes(item.downloadedBytes), megabytes(item.totalBytes), percent)
+    val status = when {
+        item.state == DownloadQueueManager.State.QUEUED -> str("catalog.queue.waiting")
+        item.state == DownloadQueueManager.State.PAUSED -> str("catalog.paused.short")
+        item.state == DownloadQueueManager.State.ERROR -> str("catalog.queue.failed")
+        extracting && indeterminate -> str("catalog.queue.extracting.starting")
+        extracting -> str("catalog.queue.extracting").format(percent)
+        indeterminate -> str("catalog.queue.resolving")
+        else -> str("catalog.queue.progress")
+            .format(megabytes(item.downloadedBytes), megabytes(item.totalBytes), percent)
     }
 
     Surface(
@@ -113,7 +117,7 @@ private fun DownloadQueueRow(
                 // Sem barra em QUEUED, como no layout antigo: o item ainda não começou.
                 if (item.state != DownloadQueueManager.State.QUEUED) {
                     Spacer(Modifier.height(6.dp))
-                    if (resolving) {
+                    if (indeterminate) {
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                         )
@@ -127,7 +131,8 @@ private fun DownloadQueueRow(
             }
             Spacer(Modifier.width(4.dp))
             // Botão primário: pausar quando baixa, retomar quando pausado, ausente quando só
-            // espera. Mesma matriz do `btn_queue_action`.
+            // espera — e ausente também durante a extração, que não é pausável (TASK-0048): ali
+            // sobra o cancelar, que sempre existe. Mesma matriz do `btn_queue_action`.
             //
             // UM só `RoundAction`, com o rótulo trocando — e não dois ramos de `when`. Dois ramos
             // são dois pontos de composição distintos com o MESMO `controllerId`: ao pausar, o
@@ -163,6 +168,17 @@ private fun DownloadQueueRow(
     }
 }
 
+/**
+ * A capa da linha da fila — a mesma que a grade mostra, e pelo mesmo caminho.
+ *
+ * Esta perna do fluxo era a que perdia a arte: renderizava `item.coverUrl` cru, sem `error`, então
+ * uma URL do manifesto que respondesse 404 virava o glifo "↓" enquanto o cartão do mesmo jogo, na
+ * grade ao lado, continuava mostrando a capa pela rede de proteção do serial. A cadeia aqui é a de
+ * [com.armsx2.ui.common.GameCoverArt]: manifesto primeiro, arte curada do repositório depois.
+ *
+ * `catalogRepoCoverUrl` lê `CoverArtStyle.use3d` por dentro, o que também inscreve esta linha na
+ * troca 2D↔3D — sem isso a fila ficaria no estilo antigo até o próximo `republish`.
+ */
 @Composable
 private fun QueueCover(item: DownloadQueueItem) {
     Box(
@@ -172,18 +188,38 @@ private fun QueueCover(item: DownloadQueueItem) {
             .background(MaterialTheme.colorScheme.surface),
         contentAlignment = Alignment.Center,
     ) {
-        if (item.coverUrl != null) {
-            AsyncImage(
-                model = item.coverUrl,
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
+        val repoUrl = com.armsx2.catalogRepoCoverUrl(item.fileName)
+        val primary = item.coverUrl ?: repoUrl
+        val glyph: @Composable () -> Unit = {
             Text(
                 "↓",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (primary == null) {
+            glyph()
+        } else {
+            SubcomposeAsyncImage(
+                model = primary,
+                contentDescription = item.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {},
+                error = {
+                    if (repoUrl != null && repoUrl != primary) {
+                        SubcomposeAsyncImage(
+                            model = repoUrl,
+                            contentDescription = item.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            loading = {},
+                            error = { glyph() },
+                        )
+                    } else {
+                        glyph()
+                    }
+                },
             )
         }
     }

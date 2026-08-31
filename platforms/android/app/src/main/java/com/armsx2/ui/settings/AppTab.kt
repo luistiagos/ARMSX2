@@ -1,6 +1,7 @@
 package com.armsx2.ui.settings
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,12 +16,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import com.armsx2.utils.AppIcon
+import com.armsx2.utils.AppIconManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -191,6 +196,67 @@ fun AppTab() {
                             ThemePreferences.setCustomColor(cleared or (channel shl shift) or (0xFF shl 24))
                         },
                     )
+                }
+            }
+        }
+
+        // App Icon picker (AppIconManager / MIG-0002). Allows switching launcher icons
+        // dynamically via activity-aliases and PackageManager.
+        Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+            Text(str("app.icon"), style = MaterialTheme.typography.titleMedium)
+            Text(
+                str("app.icon.desc"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AppIcon.entries.forEach { icon ->
+                    val isSelected = AppIconManager.currentIcon.value == icon
+                    val selectIcon = {
+                        val applied = AppIconManager.setAppIcon(appContext, icon)
+                        if (applied) {
+                            Toast.makeText(appContext, I18n.get("app.icon.applied"), Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    Surface(
+                        onClick = selectIcon,
+                        modifier = Modifier
+                            .controllerFocusable(
+                                "app.icon.${icon.id}",
+                                RoundedCornerShape(12.dp),
+                                onConfirm = selectIcon,
+                            ),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        border = BorderStroke(
+                            if (isSelected) 2.dp else 1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Image(
+                                painter = painterResource(icon.previewRes),
+                                contentDescription = str(icon.titleKey),
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = str(icon.titleKey),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
                 }
             }
         }

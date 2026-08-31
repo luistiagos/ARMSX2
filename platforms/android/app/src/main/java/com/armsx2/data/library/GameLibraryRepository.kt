@@ -94,14 +94,21 @@ class GameLibraryRepository(private val context: Context) {
         collected.values.sortedBy { it.title.lowercase() }.also { saveCache(directories, it) }
     }
 
-    fun recentGames(allGames: List<GameInfo>): List<GameInfo> {
+    /**
+     * As URIs de Recentes, na ordem gravada -- a lista crua, sem resolver para [GameInfo].
+     *
+     * Antes esta funcao recebia `allGames` e devolvia os jogos, o que a obrigava a montar um
+     * `associateBy` sobre a biblioteca inteira **a cada chamada**. Quem chama e `buildState`, que
+     * roda uma vez por tecla digitada na busca: um `HashMap` de doze mil entradas por tecla, para
+     * uma lista de no maximo doze recentes que nem depende da busca. O indice passou para o
+     * HomeViewModel, que o memoriza pela identidade de `allGames`; aqui fica so a leitura.
+     */
+    fun recentUris(): List<String> {
         val raw = MainActivityRuntime.prefs.getString("recentGameUris", null) ?: return emptyList()
-        val order = runCatching {
+        return runCatching {
             val array = JSONArray(raw)
             List(array.length()) { array.getString(it) }
         }.getOrDefault(emptyList())
-        val byUri = allGames.associateBy { it.uri.toString() }
-        return order.mapNotNull(byUri::get)
     }
 
     fun markPlayed(game: GameInfo) {

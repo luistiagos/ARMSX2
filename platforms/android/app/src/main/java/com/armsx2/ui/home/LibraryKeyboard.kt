@@ -1,13 +1,23 @@
 package com.armsx2.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,18 +31,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,7 +62,7 @@ import androidx.compose.ui.unit.sp
  * reliable controller text entry is our own key grid. Touch still uses the normal
  * system keyboard when you tap the search field; this is the CONTROLLER path, opened by
  * A on the Search zone and driven from dispatchKeyEvent while [visible]. The keys are
- * also tappable (52dp tall, weight-filled), so touch works here too.
+ * also tappable (50dp tall, weight-filled), so touch works here too.
  */
 object LibraryKeyboard {
     val visible = mutableStateOf(false)
@@ -60,6 +77,11 @@ object LibraryKeyboard {
     private var onChange: (String) -> Unit = {}
     /** Empty-buffer hint; caller-set so the same keyboard serves library + settings search. */
     private val placeholder = mutableStateOf("Search games…")
+
+    // Cached strings to avoid querying I18n on every composition pass
+    private var cachedSpace: String? = null
+    private var cachedClear: String? = null
+    private var cachedDone: String? = null
 
     // Special keys carry multi-char labels; letter keys are single chars.
     const val SPACE = "space"
@@ -98,6 +120,12 @@ object LibraryKeyboard {
         return useSystemIme.value
     }
 
+    private fun refreshCachedStrings() {
+        cachedSpace = runCatching { com.armsx2.i18n.I18n.get("keyboard.space") }.getOrDefault("Space")
+        cachedClear = runCatching { com.armsx2.i18n.I18n.get("keyboard.clear") }.getOrDefault("Clear")
+        cachedDone = runCatching { com.armsx2.i18n.I18n.get("keyboard.done") }.getOrDefault("Done")
+    }
+
     fun open(initial: String, onChange: (String) -> Unit, placeholder: String = "Search games…") {
         text.value = initial
         this.onChange = onChange
@@ -105,6 +133,7 @@ object LibraryKeyboard {
         // Re-read on every open so the preference needs no wiring into app startup, and so a
         // change made in Settings takes effect the next time the keyboard is summoned.
         refreshUseSystemIme()
+        refreshCachedStrings()
         row.intValue = 0
         col.intValue = 0
         shifted.value = false
@@ -155,72 +184,137 @@ object LibraryKeyboard {
         else -> 1f
     }
 
-    // I18n.get e nao a `str` composable: esta funcao nao e @Composable. O teclado e montado a cada
-    // abertura, entao pega o idioma corrente; trocar de idioma com ele ABERTO nao e um caso real.
-    private fun glyphOf(key: String): String = when (key) {
-        SPACE -> com.armsx2.i18n.I18n.get("keyboard.space")
+    private fun glyphOf(key: String, isShifted: Boolean): String = when (key) {
+        SPACE -> cachedSpace ?: "Space"
         BACKSPACE -> "⌫"
-        CLEAR -> com.armsx2.i18n.I18n.get("keyboard.clear")
-        DONE -> com.armsx2.i18n.I18n.get("keyboard.done")
+        CLEAR -> cachedClear ?: "Clear"
+        DONE -> cachedDone ?: "Done"
         SHIFT -> "⇧"
-        else -> if (shifted.value) key.uppercase() else key
+        else -> if (isShifted) key.uppercase() else key
     }
 
     @Composable
     fun Overlay(scope: BoxScope) {
-        if (!visible.value) return
+        val isVisible = visible.value
+        val isShifted = shifted.value
+        val curRow = row.intValue
+        val curCol = col.intValue
+
         with(scope) {
-        // Dim the library behind, and swallow stray taps so they don't hit covers.
-        Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)).clickable(enabled = false) {})
-        Surface(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(10.dp),
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 18.dp,
-        ) {
-            Column(
-                Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (useSystemIme.value) {
-                    SystemImeField()
-                    return@Column
-                }
-                Text(
-                    text = text.value.ifEmpty { placeholder.value },
-                    color = if (text.value.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.onSurface,
-                    fontSize = 18.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            // Tap-catcher behind the panel: a tap anywhere outside closes the keyboard, the same
+            // exit as Done and BACK. Transparent, and deliberately NOT inside AnimatedVisibility.
+            //
+            // 1. WHY NOT AnimatedVisibility + matchParentSize(). That is what this was, and it did
+            //    nothing at all. matchParentSize() is parent data, and the only thing that reads it
+            //    is Box's own MeasurePolicy; the parent inside AnimatedVisibility is not that Box
+            //    but a Layout running AnimatedEnterExitMeasurePolicy, which measures each child
+            //    with the incoming constraints and never looks at parentData (verified against
+            //    animation-android 1.11.4). The parent data was dropped in silence, the Box wrapped
+            //    its empty content, and it measured 0 x 0 — no touch target, so "tap outside to
+            //    close" was written but never existed. Bug:
+            //    docs/bugs/open/teclado-virtual-scrim-de-tamanho-zero. fillMaxSize() takes the max
+            //    constraints, which get passed straight through, so it does not care who the parent
+            //    is. Plain `if` rather than AnimatedVisibility so the catcher disappears with the
+            //    state instead of outliving it through the 90 ms exit — otherwise the tap that
+            //    dismissed the keyboard would be followed by a second, dead one.
+            //
+            // 2. WHY NO DIM. The 0.5 black this used to ask for never rendered (see 1), so no build
+            //    has ever shown it. Meanwhile the two hosts that hand text entry over — the
+            //    settings search and a PadModal naming a preset — draw their own veil under their
+            //    own panel, and this host is composed ABOVE both. A scrim here would dim the very
+            //    list the user is typing to filter. A host that wants the room dark darkens it.
+            if (isVisible) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { close() },
+                        ),
                 )
-                rows.forEachIndexed { r, keys ->
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+            }
+
+            // Keyboard panel with slide & fade (needs proper testing)
+            AnimatedVisibility(
+                visible = isVisible,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn(tween(140)) + slideInVertically(tween(140)) { it / 3 },
+                exit = fadeOut(tween(90)) + slideOutVertically(tween(90)) { it / 3 },
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 6.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                ) {
+                    Column(
+                        Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
-                        keys.forEachIndexed { c, key ->
-                            KeyCap(
-                                label = glyphOf(key),
-                                selected = (row.intValue == r && col.intValue == c) ||
-                                    (key == SHIFT && shifted.value),
-                                weight = weightOf(key),
-                                onClick = {
-                                    row.intValue = r
-                                    col.intValue = c
-                                    pressKey(key)
-                                },
-                            )
+                        if (useSystemIme.value) {
+                            SystemImeField()
+                            return@Column
+                        }
+                        TypedPreview()
+                        rows.forEachIndexed { r, keys ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                keys.forEachIndexed { c, key ->
+                                    val isSelected = (curRow == r && curCol == c) || (key == SHIFT && isShifted)
+                                    val label = glyphOf(key, isShifted)
+                                    key(r, c) {
+                                        KeyCap(
+                                            label = label,
+                                            selected = isSelected,
+                                            weight = weightOf(key),
+                                            onPress = {
+                                                row.intValue = r
+                                                col.intValue = c
+                                                pressKey(key)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-        }
+    }
+
+    /**
+     * The line of text typed so far, as its OWN composable.
+     *
+     * It reads [text] here rather than in [Overlay] on purpose. Compose invalidates the nearest
+     * enclosing restartable scope of a state read, and in [Overlay] that scope is Surface's content
+     * lambda -- the one holding all five rows. Every single keystroke therefore recomposed ~40
+     * KeyCaps to redraw one string. Pulling the read down here means a keystroke invalidates this
+     * function and nothing else; the grid only recomposes when the highlight or Shift moves.
+     */
+    @Composable
+    private fun TypedPreview() {
+        val typed = text.value
+        Text(
+            text = typed.ifEmpty { placeholder.value },
+            color = if (typed.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.onSurface,
+            fontSize = 18.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 
     /**
@@ -255,18 +349,40 @@ object LibraryKeyboard {
         DisposableEffect(Unit) { onDispose { ime?.hide() } }
     }
 
+    /**
+     * One key. Types on the finger going DOWN, not on it coming back up.
+     *
+     * `clickable` fires on release, so every character waited out however long the finger stayed on
+     * the key — 60–120 ms of human timing, plus a frame — before anything at all happened on
+     * screen, highlight included. That delay is most of what "the keyboard is slow" means here, and
+     * it is why the system IME feels instant by comparison: Android soft keyboards commit on down.
+     * There is nothing to disambiguate against — the panel does not scroll and the keys are not
+     * draggable — so a down IS the press.
+     *
+     * [detectTapGestures] consumes the down, keeping it off the panel's no-op click absorber, and
+     * the semantics block puts back the button role and click action that `clickable` used to
+     * provide for TalkBack.
+     */
     @Composable
-    private fun RowScope.KeyCap(label: String, selected: Boolean, weight: Float, onClick: () -> Unit) {
+    private fun RowScope.KeyCap(label: String, selected: Boolean, weight: Float, onPress: () -> Unit) {
+        // pointerInput(Unit) never restarts, so it would hold the FIRST lambda it was given for the
+        // life of the key. Read through rememberUpdatedState instead, or a future layout change
+        // (a symbols page, another row set) would have this cap typing the character it used to be.
+        val press by rememberUpdatedState(onPress)
         Box(
             modifier = Modifier
                 .weight(weight)
-                .height(52.dp)
-                .clip(RoundedCornerShape(11.dp))
+                .height(50.dp)
+                .clip(RoundedCornerShape(10.dp))
                 .background(
                     if (selected) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.surfaceVariant,
                 )
-                .clickable(onClick = onClick),
+                .pointerInput(Unit) { detectTapGestures(onPress = { press() }) }
+                .semantics {
+                    role = Role.Button
+                    onClick(label) { press(); true }
+                },
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -274,7 +390,7 @@ object LibraryKeyboard {
                 color = if (selected) MaterialTheme.colorScheme.onPrimary
                 else MaterialTheme.colorScheme.onSurface,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                fontSize = if (label.length > 1) 14.sp else 18.sp,
+                fontSize = if (label.length > 1) 13.sp else 18.sp,
                 maxLines = 1,
             )
         }

@@ -15,6 +15,8 @@
  "app.language": "Język",
  "app.language.desc": "Wybierz język aplikacji. Zastosowuje się natychmiast.",
  "app.language.system": "Język systemu",
+ "app.telemetry": "Wysyłaj anonimową telemetrię i raporty o awariach",
+ "app.telemetry.desc": "Pomóż diagnozować awarie i problemy ze zgodnością, wysyłając szczegóły aplikacji, urządzenia, błędów i dzienników. Pliki gier i BIOS-u nigdy nie są wysyłane. Zmiany obowiązują natychmiast.",
  "app.library.search": "Wyszukiwanie w bibliotece",
  "app.library.search.desc": "Pokazuje pole wyszukiwania gier na ekranie głównym biblioteki.",
  "app.library.recents": "Ostatnio uruchamiane gry",

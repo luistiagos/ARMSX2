@@ -90,6 +90,22 @@ tasks.matching { t ->
 val armsx2DiscordSdkDir: String? =
     (System.getenv("DISCORD_SDK_DIR") ?: providers.gradleProperty("DISCORD_SDK_DIR").orNull)
         ?.takeIf { File(it, "include/discordpp.h").isFile }
+// The Discord application owns the name and artwork shown above Rich Presence. Never fall back to
+// the upstream ARMSX2 application: doing so would silently publish the wrong product identity.
+val retrosystemDiscordApplicationId =
+    (System.getenv("RETROSYSTEM_DISCORD_APPLICATION_ID")
+        ?: providers.gradleProperty("retrosystem.discordApplicationId").orNull)
+        ?.trim()
+        .orEmpty()
+
+if (armsx2DiscordSdkDir != null &&
+    !retrosystemDiscordApplicationId.matches(Regex("[0-9]{17,20}"))
+) {
+    throw GradleException(
+        "Discord SDK builds require RETROSYSTEM_DISCORD_APPLICATION_ID (or " +
+            "-Pretrosystem.discordApplicationId) for the RetroSystem PS2 Discord application."
+    )
+}
 
 android {
     namespace = "com.armsx2"
@@ -102,6 +118,10 @@ android {
         targetSdk = 37
         versionCode = providers.gradleProperty("armsx2.versionCode").orNull?.toInt() ?: 1088
         versionName = providers.gradleProperty("armsx2.versionName").orNull ?: "2.6.1"
+        // A build without the private SDK never launches this activity; zero keeps its otherwise
+        // inert intent filter free of the upstream application's OAuth scheme.
+        manifestPlaceholders["discordApplicationId"] =
+            retrosystemDiscordApplicationId.ifEmpty { "0" }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -132,6 +152,12 @@ android {
             // either is correct — without this the merger fails on the duplicate.
             pickFirsts += "**/libdiscord_partner_sdk.so"
         }
+        resources {
+            // commons-compress (TASK-0048) is a multi-release jar and carries a JPMS descriptor
+            // under META-INF/versions/9. There is no module system in an APK, and the entry is not
+            // a class the dexer has any use for.
+            excludes += "META-INF/versions/9/module-info.class"
+        }
     }
 
     buildTypes {
@@ -158,7 +184,11 @@ android {
                     // Passed explicitly rather than relying on the environment leaking through to
                     // the CMake invocation, so a build is reproducible from the Gradle property
                     // alone. Absent = Discord compiles out.
-                    armsx2DiscordSdkDir?.let { arguments += "-DDISCORD_SDK_DIR=$it" }
+                    armsx2DiscordSdkDir?.let {
+                        arguments += "-DDISCORD_SDK_DIR=$it"
+                        arguments +=
+                            "-DRETROSYSTEM_DISCORD_APPLICATION_ID=$retrosystemDiscordApplicationId"
+                    }
                     arguments += "-DCMAKE_BUILD_TYPE=Release"
                     if (armsx2RecTestHooks.get() == "true")
                         arguments += "-DENABLE_RECOMPILER_TEST_HOOKS=ON"
@@ -203,7 +233,11 @@ android {
                     // Passed explicitly rather than relying on the environment leaking through to
                     // the CMake invocation, so a build is reproducible from the Gradle property
                     // alone. Absent = Discord compiles out.
-                    armsx2DiscordSdkDir?.let { arguments += "-DDISCORD_SDK_DIR=$it" }
+                    armsx2DiscordSdkDir?.let {
+                        arguments += "-DDISCORD_SDK_DIR=$it"
+                        arguments +=
+                            "-DRETROSYSTEM_DISCORD_APPLICATION_ID=$retrosystemDiscordApplicationId"
+                    }
                     arguments += "-DCMAKE_BUILD_TYPE=Debug"
                     arguments += "-DARMSX2_EMUCORE_LIBRARY_NAME=${armsx2NativeLibName.get()}"
                     arguments += "-DARMSX2_ANDROID_HOST_PAGE_SIZE=${armsx2HostPageSize.get()}"
@@ -434,6 +468,15 @@ dependencies {
     implementation(libs.coil.gif) // animated GIF / WebP / APNG (library background)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // Descompactação das ROMs que só existem em .7z / .zip (TASK-0048).
+    //
+    // O xz é declarado à parte porque no POM do commons-compress ele é `optional` — não vem
+    // sozinho — e LZMA/LZMA2 é o codec de praticamente todo .7z real. Sem ele o container abre e a
+    // leitura do conteúdo falha, que é a pior forma de faltar uma dependência: só em runtime, e só
+    // no arquivo do usuário.
+    implementation(libs.commons.compress)
+    implementation(libs.tukaani.xz)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -17,7 +17,7 @@ Este diretório contém os itens pendentes de migração da versão customizada 
 | [MIG-0005](MIG-0005-descompactacao-roms-7z-zip.md) | Descompactação Automática de ROMs `.7z` e `.zip` no Catálogo | 🟡 Média | Implementado ([TASK-0048](../../task/TASK-0048-descompactar-7z-e-zip-no-download.md)) | Catálogo de ROMs / Download |
 | [MIG-0006](MIG-0006-controles-stick-invert-antidz-rumble.md) | Inversão de Eixos Analógicos, Anti-Deadzone e Rumble | 🟢 Baixa | Aberto | Controles Físicos / Gamepad |
 | [MIG-0007](MIG-0007-toggle-opt-out-telemetria-ui.md) | Toggle de Opt-Out de Telemetria na UI de Configurações | 🟢 Baixa | Concluído | UI Compose / Privacidade |
-| [MIG-0008](MIG-0008-discord-rich-presence-retrosystem.md) | Reconciliação do Discord Rich Presence com a Identidade RetroSystem PS2 | 🟢 Baixa | Aberto | Presença Social / RPC |
+| [MIG-0008](MIG-0008-discord-rich-presence-retrosystem.md) | Reconciliação do Discord Rich Presence com a Identidade RetroSystem PS2 | 🟢 Baixa | Implementado; aguardando portal Discord | Presença Social / RPC |
 
 ---
 

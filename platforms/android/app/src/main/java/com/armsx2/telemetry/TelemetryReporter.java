@@ -43,7 +43,7 @@ import java.util.Set;
  * try/catch, network failures are swallowed, timeouts are short, and the same error is not re-sent
  * within a session. Offline is tolerated (the report is simply lost, like the reference client).</p>
  *
- * <p>Kill-switch: SharedPreferences {@code "armsx2"} / {@code "telemetry_error_reporting"} (bool,
+ * <p>Kill-switch: SharedPreferences {@code "ARMSX2"} / {@code "telemetry_error_reporting"} (bool,
  * default {@code true}); optional endpoint override in {@code "telemetry_endpoint"}.</p>
  */
 public final class TelemetryReporter {
@@ -112,6 +112,21 @@ public final class TelemetryReporter {
 
     public static boolean isEnabled() {
         return sEnabled;
+    }
+
+    /** Updates and persists the kill-switch. The in-memory value changes before disk I/O. */
+    public static void setEnabled(boolean enabled) {
+        sEnabled = enabled;
+        try {
+            Context context = sAppContext;
+            if (context == null) return;
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_ENABLED, enabled)
+                    .apply();
+        } catch (Throwable ignored) {
+            // Keep the requested in-memory privacy state even if persistence fails.
+        }
     }
 
     /**
@@ -204,8 +219,17 @@ public final class TelemetryReporter {
     }
 
     private static void send(JSONObject body) {
+        // Needs proper device testing: a request already inside HttpURLConnection cannot be revoked.
+        if (!sEnabled) return;
+        try {
+            // Keep adapter enumeration off the caller thread for non-terminal reports.
+            body.put("network_adapters", NetworkAdapterCollector.collect(sAppContext));
+        } catch (Throwable ignored) {
+            // The report remains useful even when a vendor network stack rejects the query.
+        }
+        if (!sEnabled) return;
         if (postJson(body)) return;
-        getFallback(body); // POST failed (proxy/old server); retry via GET without logs
+        if (sEnabled) getFallback(body); // POST failed (proxy/old server); retry via GET without logs
     }
 
     private static boolean postJson(JSONObject body) {

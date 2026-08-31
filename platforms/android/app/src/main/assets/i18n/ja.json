@@ -15,6 +15,8 @@
   "app.language": "言語",
   "app.language.desc": "アプリの言語を選択します。即座に適用されます。",
   "app.language.system": "システムの言語",
+  "app.telemetry": "匿名のテレメトリとクラッシュレポートを送信",
+  "app.telemetry.desc": "アプリ、端末、エラー、ログの詳細を送信し、クラッシュや互換性問題の診断に役立てます。ゲームやBIOSのファイルは送信されません。変更はすぐに反映されます。",
   "app.library.search": "ライブラリ検索",
   "app.library.search.desc": "ライブラリのホーム画面にゲーム検索欄を表示します。",
   "app.library.recents": "最近プレイしたゲーム",

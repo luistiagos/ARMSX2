@@ -15,6 +15,8 @@
  "app.language": "언어",
  "app.language.desc": "앱 언어를 선택합니다. 즉시 적용됩니다.",
  "app.language.system": "시스템 언어",
+ "app.telemetry": "익명 원격 측정 및 비정상 종료 보고서 보내기",
+ "app.telemetry.desc": "앱, 기기, 오류 및 로그 정보를 보내 비정상 종료와 호환성 문제 진단에 도움을 줍니다. 게임 및 BIOS 파일은 전송되지 않습니다. 변경 사항은 즉시 적용됩니다.",
  "app.library.search": "라이브러리 검색",
  "app.library.search.desc": "라이브러리 홈 화면에 게임 검색창을 표시합니다.",
  "app.library.recents": "최근 플레이한 게임",

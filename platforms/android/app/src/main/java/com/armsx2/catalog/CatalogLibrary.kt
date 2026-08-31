@@ -24,10 +24,27 @@ object CatalogLibrary {
 
     private var byFileName: Map<String, CatalogEntry> = emptyMap()
 
+    /**
+     * As versoes de cada titulo, por [CatalogParser.groupKey].
+     *
+     * O manifesto tem uma linha por ARQUIVO: "007 - Nightfire" sao cinco entradas (USA, duas
+     * europeias, Japan, Korea) com a mesma arte. Este indice e o que permite a biblioteca mostrar
+     * uma celula por jogo e abrir a escolha da versao no toque (TASK-0047).
+     *
+     * A ordem dentro de cada grupo e a do manifesto, que e curada a mao (TASK-0015): e ela que
+     * decide qual versao empresta capa e titulo para a celula.
+     */
+    private var byGroupKey: Map<String, List<CatalogEntry>> = emptyMap()
+
     fun install(list: List<CatalogEntry>) {
         entries = list
         byFileName = list.associateBy { it.fileName }
+        byGroupKey = list.groupBy { CatalogParser.groupKey(it.fileName) }
     }
+
+    /** As versoes de um titulo, na ordem do manifesto. Vazia se a chave nao existe. */
+    fun variantsFor(groupKey: String?): List<CatalogEntry> =
+        groupKey?.let { byGroupKey[it] }.orEmpty()
 
     /** A entrada de catálogo por trás de uma linha da biblioteca, ou null se é um arquivo local. */
     fun entryFor(game: GameInfo): CatalogEntry? = game.catalogFileName?.let { byFileName[it] }

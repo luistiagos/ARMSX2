@@ -96,6 +96,16 @@ enum class DriverProfileConfidence : u8
 	DriverVersion,
 };
 
+/// Renderer steering for the Android Auto setting. This is deliberately separate from driver
+/// workarounds: choosing a safer backend is a policy decision, not evidence that one particular
+/// rendering feature is broken. Explicit renderer selections never consult this value.
+enum class AutoRendererPreference : u8
+{
+	Default,
+	OpenGL,
+	Vulkan,
+};
+
 /// Observed driver defects. Naming is descriptive of the DEFECT, not of the fix, so one bug can
 /// drive several workarounds and the table stays readable.
 enum class DriverBug : u8
@@ -189,7 +199,7 @@ struct MobileDriverContext
 
 struct MobileDriverProfile
 {
-	static constexpr u32 DATABASE_VERSION = 1;
+	static constexpr u32 DATABASE_VERSION = 2;
 
 	MobileGpuApi api = MobileGpuApi::Unknown;
 	MobileGpuDriver driver = MobileGpuDriver::Unknown;
@@ -198,6 +208,9 @@ struct MobileDriverProfile
 	u64 workarounds = 0;
 	u32 matched_rule_count = 0;
 	DriverProfileConfidence confidence = DriverProfileConfidence::Unknown;
+	AutoRendererPreference auto_renderer_preference = AutoRendererPreference::Default;
+	/// Rule responsible for [auto_renderer_preference], empty when the platform default is used.
+	std::string auto_renderer_rule;
 	/// True when nothing in the table matched and the safe defaults are in force.
 	bool conservative_fallback = true;
 	std::string driver_name;

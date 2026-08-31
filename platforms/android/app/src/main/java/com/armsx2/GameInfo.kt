@@ -290,9 +290,29 @@ data class GameInfo(
      * (que respeita 2D/3D e a regiao escolhida) volta a mandar.
      */
     val catalogCoverUrl: String? = null,
+    /**
+     * A chave de agrupamento desta linha ([com.armsx2.catalog.CatalogParser.groupKey]), quando ela
+     * representa um titulo do catalogo e nao um arquivo.
+     *
+     * O manifesto tem uma linha por arquivo, entao "007 - Nightfire" eram cinco celulas com a
+     * mesma arte. A grade agora emite UMA linha por titulo e guarda aqui a chave que devolve as
+     * versoes (`CatalogLibrary.variantsFor`) quando o usuario toca (TASK-0047).
+     */
+    val catalogGroupKey: String? = null,
+    /**
+     * Quantos arquivos do manifesto esta linha representa. 1 = a linha e o arquivo, e o toque
+     * segue direto para o painel de download; acima disso o toque abre a escolha da versao.
+     *
+     * So linhas [needsDownload] passam de 1: um jogo que ja esta no aparelho e um arquivo
+     * concreto e ganha celula propria, senao a grade esconderia qual deles da boot.
+     */
+    val catalogVariantCount: Int = 1,
 ) {
     /** Esta linha existe so no catalogo: nao ha arquivo, e portanto nao ha o que lancar. */
     val isCatalogOnly: Boolean get() = needsDownload
+
+    /** Esta linha representa mais de um arquivo: o toque escolhe a versao antes de baixar. */
+    val hasMultipleVersions: Boolean get() = catalogVariantCount > 1
 
     /** The title to show. Mirrors GameList.h's `GetTitle(force_en)`: the original unless
      *  English is asked for AND a separate English title exists. */
@@ -305,40 +325,49 @@ data class GameInfo(
     /** The key to sort by. Mirrors GameList.h's `GetTitleSort(force_en)`, including the
      *  subtlety it documents: when a separate English title exists, [titleSort] is in the
      *  WRONG language for an English list, so the English title has to sort itself. */
-    fun sortKey(forceEn: Boolean): String = when {
+    fun sortKey(forceEn: Boolean): String {
         // A renamed game sorts under the name the user actually sees; otherwise it files
         // itself under the garbage title they renamed it to get away from ("UN6 A35" landing
         // under U instead of N for Naruto).
-        !CustomNames.nameFor(settingsKey).isNullOrBlank() -> CustomNames.nameFor(settingsKey)!!
-        forceEn && titleEn.isNotEmpty() -> titleEn
-        titleSort.isNotEmpty() -> titleSort
-        else -> title
+        //
+        // Resolved into a local instead of the `when` that called nameFor() twice (once to test,
+        // once to unwrap): each call is a SharedPreferences.getString on a concatenated key, taken
+        // under the same lock the UI holds while drawing, and this runs once per game on every
+        // library sort.
+        val custom = CustomNames.nameFor(settingsKey)
+        if (!custom.isNullOrBlank()) return custom
+        return when {
+            forceEn && titleEn.isNotEmpty() -> titleEn
+            titleSort.isNotEmpty() -> titleSort
+            else -> title
+        }
     }
-    val coverUrl: String? get() = serial?.let { rawSerial ->
-        // Cover Region: swap in the equivalent release's serial when the user asked for another
-        // region's artwork. Falls back to this disc's own serial whenever there's no counterpart,
-        // so an unmatched game looks exactly as it does today.
-        coverUrlFor(CoverRegionIndex.coverSerialFor(rawSerial) ?: rawSerial)
-    } ?: catalogCoverUrl?.takeIf { it.isNotBlank() }
+    val effectiveSerial: String? get() = serial?.takeIf { it.isNotBlank() }
+        ?: catalogFileName?.let { com.armsx2.catalog.CatalogSerialIndex.serialFor(it) }
+
+    val coverUrl: String? get() {
+        val manifest = catalogCoverUrl?.takeIf { it.isNotBlank() }
+        val serialUrl = effectiveSerial?.let { rawSerial ->
+            // Cover Region: swap in the equivalent release's serial when the user asked for another
+            // region's artwork. Falls back to this disc's own serial whenever there's no counterpart,
+            // so an unmatched game looks exactly as it does today.
+            coverUrlFor(CoverRegionIndex.coverSerialFor(rawSerial) ?: rawSerial)
+        }
+        // Modo 3D: 1ª Opção é a funcionalidade nativa 3D do app (ps2-covers/covers/3d/*.png); fallback é o manifesto.
+        // Modo 2D (Padrão): 1ª Opção é o catalog_manifest_ps2.txt; fallback é a funcionalidade nativa 2D do app.
+        return if (CoverArtStyle.use3d.value) {
+            serialUrl ?: manifest
+        } else {
+            manifest ?: serialUrl
+        }
+    }
 
     /** This disc's OWN cover, ignoring the Cover Region choice. The card falls back to it when the
      *  regional cover 404s — not every game has art for every region in the cover repo, and losing
      *  a cover you previously had is worse than simply not getting the regional one. */
-    val discCoverUrl: String? get() = serial?.let { coverUrlFor(it) }
+    val discCoverUrl: String? get() = effectiveSerial?.let { coverUrlFor(it) }
 
-    private fun coverUrlFor(s: String): String {
-        val repo = when (platform) {
-            GamePlatform.PS2 -> "ps2-covers"
-            GamePlatform.PS1 -> "psx-covers"
-        }
-        // 3D cases live under covers/3d/*.png; flat 2D scans under
-        // covers/default/*.jpg. Coil decodes by content, so the extension
-        // mismatch on the cached file is fine.
-        return if (CoverArtStyle.use3d.value)
-            "https://raw.githubusercontent.com/xlenore/$repo/main/covers/3d/$s.png"
-        else
-            "https://raw.githubusercontent.com/xlenore/$repo/main/covers/default/$s.jpg"
-    }
+    private fun coverUrlFor(s: String): String = repoCoverUrlFor(s, platform)
 
     /** Human-readable region (USA / Europe / Japan / India / China / …). Prefers the
      *  curated GameDB region (so India/China/Korea/HK releases that share a serial PREFIX
@@ -372,6 +401,33 @@ data class GameInfo(
         ?: uri.lastPathSegment?.substringAfterLast('/')?.substringAfterLast(':')
             ?.substringBeforeLast('.')?.trim()?.takeIf { it.isNotEmpty() }
 }
+
+/**
+ * A arte curada de [serial] no repositório de capas, no estilo (2D/3D) escolhido agora.
+ *
+ * O caso 3D mora sob `covers/3d` em PNG, o scan 2D sob `covers/default` em JPG. O Coil decodifica
+ * pelo conteúdo, então a extensão trocada no arquivo em cache não incomoda.
+ *
+ * **Existe como função de topo porque a capa tem de sobreviver às três pernas do fluxo** — a
+ * célula do catálogo, a linha da fila de download e o jogo já salvo. Cada uma dessas telas
+ * remontava esta URL à mão, e a que esquecia ficava sem a rede de proteção do serial: era assim
+ * que a fila de download mostrava "↓" para um jogo cuja capa a grade estava exibindo ao lado.
+ */
+fun repoCoverUrlFor(serial: String, platform: GamePlatform = GamePlatform.PS2): String {
+    val repo = when (platform) {
+        GamePlatform.PS2 -> "ps2-covers"
+        GamePlatform.PS1 -> "psx-covers"
+    }
+    return if (CoverArtStyle.use3d.value)
+        "https://raw.githubusercontent.com/xlenore/$repo/main/covers/3d/$serial.png"
+    else
+        "https://raw.githubusercontent.com/xlenore/$repo/main/covers/default/$serial.jpg"
+}
+
+/** A capa do repositório para uma linha do catálogo, resolvida pelo serial que o índice conhece.
+ *  Nula quando o índice não sabe o serial daquele nome de arquivo — aí só resta o manifesto. */
+fun catalogRepoCoverUrl(fileName: String?): String? =
+    com.armsx2.catalog.CatalogSerialIndex.serialFor(fileName)?.let { repoCoverUrlFor(it) }
 
 /**
  * User-supplied cover overrides for games the online repo can't match — homebrew,

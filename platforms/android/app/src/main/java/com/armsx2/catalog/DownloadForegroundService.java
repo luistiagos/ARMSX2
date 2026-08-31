@@ -96,8 +96,9 @@ public class DownloadForegroundService extends Service implements DownloadQueueM
         }
         // Update notification immediately to reflect current state (paused, queued, etc.)
         for (CatalogEntry e : DownloadQueueManager.get().getActiveQueue()) {
-            if (e.queueState == DownloadQueueManager.State.DOWNLOADING) {
-                notify(e.title, (int) (e.downloadProgress * 100), true);
+            if (e.queueState == DownloadQueueManager.State.DOWNLOADING
+                    || e.queueState == DownloadQueueManager.State.EXTRACTING) {
+                notify(contentTextFor(e), (int) (e.downloadProgress * 100), true);
                 return;
             }
         }
@@ -106,7 +107,19 @@ public class DownloadForegroundService extends Service implements DownloadQueueM
 
     @Override
     public void onProgress(CatalogEntry entry) {
-        notify(entry.title, (int) (entry.downloadProgress * 100), false);
+        notify(contentTextFor(entry), (int) (entry.downloadProgress * 100), false);
+    }
+
+    /**
+     * Descompactar um `.7z` de ROM leva minutos (TASK-0048). Sem esta distincao a notificacao
+     * ficaria mostrando o titulo do jogo e uma porcentagem que recomeca do zero, como se o download
+     * tivesse voltado ao inicio.
+     */
+    private static String contentTextFor(CatalogEntry entry) {
+        if (entry.queueState == DownloadQueueManager.State.EXTRACTING) {
+            return I18n.INSTANCE.get("catalog.queue.notification.extracting");
+        }
+        return entry.title;
     }
 
     // -------------------------------------------------------------------------

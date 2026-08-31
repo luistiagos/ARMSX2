@@ -30,7 +30,7 @@
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
 //
-// Discord Social SDK bridge: rich presence, and which friends are in ARMSX2 right now.
+// Discord Social SDK bridge: rich presence, and which friends are in RetroSystem PS2 right now.
 //
 // DELIBERATELY FREE-STANDING. This file includes no PCSX2 header and links against no PCSX2 code:
 // only JNI and the Discord SDK. That is a licensing constraint, not a style preference — ARMSX2 is
@@ -96,7 +96,7 @@ namespace
 	void PumpSdkCallbacks()
 	{
 		using RunCallbacksFn = void (*)();
-		static RunCallbacksFn fn = [] () -> RunCallbacksFn {
+		static RunCallbacksFn fn = []() -> RunCallbacksFn {
 			void* handle = dlopen("libdiscord_partner_sdk.so", RTLD_NOW | RTLD_NOLOAD);
 			if (!handle)
 			{
@@ -140,7 +140,7 @@ namespace
 	struct Friend
 	{
 		std::string name;
-		std::string game;   // title they are playing; empty means sitting in the library
+		std::string game; // title they are playing; empty means sitting in the library
 		std::string serial; // for cover art on our side; empty when they are in the library
 		std::string avatar; // their Discord avatar
 	};
@@ -181,6 +181,7 @@ namespace
 		// updates as you play ("Exploring Ivalice, Lv 34"). Empty when RA is off or the game has
 		// no set. Suggested by Tanos.
 		std::string want_ra;
+		uint64_t want_started_at_ms = 0;
 	};
 
 	State& S()
@@ -189,10 +190,15 @@ namespace
 		return s;
 	}
 
-	constexpr uint64_t kApplicationId = 1531447040435814411ull;
+	constexpr uint64_t kApplicationId = static_cast<uint64_t>(RETROSYSTEM_DISCORD_APPLICATION_ID);
+#define RETROSYSTEM_STRINGIFY_IMPL(value) #value
+#define RETROSYSTEM_STRINGIFY(value) RETROSYSTEM_STRINGIFY_IMPL(value)
 	// Must match the intent filter in AndroidManifest.xml, and the redirect registered in the
 	// Discord developer portal. The SDK does not derive it for us.
-	const char* kRedirectUri = "discord-1531447040435814411:/authorize/callback";
+	constexpr char kRedirectUri[] =
+		"discord-" RETROSYSTEM_STRINGIFY(RETROSYSTEM_DISCORD_APPLICATION_ID) ":/authorize/callback";
+#undef RETROSYSTEM_STRINGIFY
+#undef RETROSYSTEM_STRINGIFY_IMPL
 	// Presence and the friends list. Deliberately no voice scopes: we do not ship voice, and the
 	// consent screen should not ask for anything we cannot use.
 	const char* kScopes = "sdk.social_layer_presence sdk.social_layer";
@@ -203,18 +209,25 @@ namespace
 	// is the OLD mark, so the presence quietly showed outdated branding. The portal upload is the
 	// one that gets refreshed when the logo changes, so the key is the correct reference and the
 	// artwork can be updated without shipping a build.
-	const char* kIdleImageKey = "armsx2";
+	constexpr char kProductName[] = "RetroSystem PS2";
+	constexpr char kIdleImageKey[] = "retrosystem_ps2";
 
 	const char* StatusName(BridgeStatus s)
 	{
 		switch (s)
 		{
-			case BridgeStatus::Disabled: return "Disabled";
-			case BridgeStatus::Disconnected: return "Disconnected";
-			case BridgeStatus::Authorizing: return "Authorizing";
-			case BridgeStatus::Connecting: return "Connecting";
-			case BridgeStatus::Connected: return "Connected";
-			case BridgeStatus::Failed: return "Failed";
+			case BridgeStatus::Disabled:
+				return "Disabled";
+			case BridgeStatus::Disconnected:
+				return "Disconnected";
+			case BridgeStatus::Authorizing:
+				return "Authorizing";
+			case BridgeStatus::Connecting:
+				return "Connecting";
+			case BridgeStatus::Connected:
+				return "Connected";
+			case BridgeStatus::Failed:
+				return "Failed";
 		}
 		return "?";
 	}
@@ -231,6 +244,7 @@ namespace
 	{
 		std::shared_ptr<discordpp::Client> client;
 		std::string serial, title, cover, ra;
+		uint64_t started_at_ms;
 		{
 			std::lock_guard<std::mutex> lock(S().mutex);
 			client = S().client;
@@ -238,14 +252,15 @@ namespace
 			title = S().want_title;
 			cover = S().want_cover;
 			ra = S().want_ra;
+			started_at_ms = S().want_started_at_ms;
 		}
 		if (!client)
 			return;
 
 		discordpp::Activity activity;
 		// Name and applicationId are overwritten by the SDK — the header says so, and it is why
-		// Discord will read "Playing ARMSX2" with the game underneath rather than the other way
-		// round. Details is therefore where the game has to go.
+		// Discord will read "Playing RetroSystem PS2" with the game underneath rather than the
+		// other way round. Details is therefore where the game has to go.
 		activity.SetType(discordpp::ActivityTypes::Playing);
 		if (!title.empty())
 		{
@@ -256,6 +271,15 @@ namespace
 			// the in-a-game marker: a friend's client decides "library or game" purely from whether
 			// State is set, so a game with no serial AND no RA still has to set something.
 			activity.SetState(!ra.empty() ? ra : (serial.empty() ? std::string("-") : serial));
+
+			// Needs proper testing on the Android Discord client: the Social SDK accepts epoch
+			// milliseconds and renders this as the elapsed time for the current game session.
+			if (started_at_ms != 0)
+			{
+				discordpp::ActivityTimestamps timestamps;
+				timestamps.SetStart(started_at_ms);
+				activity.SetTimestamps(std::move(timestamps));
+			}
 		}
 		else
 		{
@@ -274,12 +298,12 @@ namespace
 		// LargeText now carries the SERIAL, because State no longer can -- a friend's client reads
 		// this to look up cover art. Nothing else may be appended: it is parsed, not just shown.
 		// (Hover text on the cover is a reasonable home for a serial anyway.)
-		assets.SetLargeText(serial.empty() ? (title.empty() ? std::string("ARMSX2") : title) : serial);
+		assets.SetLargeText(serial.empty() ? (title.empty() ? std::string(kProductName) : title) : serial);
 		if (!cover.empty())
 		{
-			// Small badge in the corner keeps ARMSX2 identifiable when the big image is a cover.
+			// Small badge in the corner keeps RetroSystem PS2 identifiable with a game cover.
 			assets.SetSmallImage(std::string(kIdleImageKey));
-			assets.SetSmallText(std::string("ARMSX2"));
+			assets.SetSmallText(std::string(kProductName));
 		}
 		activity.SetAssets(std::move(assets));
 
@@ -333,7 +357,8 @@ namespace
 					if (const auto a = activity->Assets(); a.has_value())
 						large = a->LargeText().value_or(std::string());
 					const std::string candidate = !large.empty() ? large : *state;
-					if (candidate != "-" && candidate != f.game && candidate != "ARMSX2")
+					if (candidate != "-" && candidate != f.game && candidate != kProductName &&
+						candidate != "ARMSX2")
 						f.serial = candidate;
 				}
 			}
@@ -434,7 +459,7 @@ namespace
 		// no finer-grained "this friend changed" for the group query, and the list is tiny.
 		client->SetRelationshipCreatedCallback([](uint64_t, bool) { RefreshFriends(); });
 		client->SetRelationshipDeletedCallback([](uint64_t, bool) { RefreshFriends(); });
-			client->SetRelationshipGroupsUpdatedCallback([](uint64_t) { RefreshFriends(); });
+		client->SetRelationshipGroupsUpdatedCallback([](uint64_t) { RefreshFriends(); });
 	}
 
 	void ConnectWithToken(const std::string& token)
@@ -500,7 +525,8 @@ Java_com_armsx2_discord_DiscordNative_start(JNIEnv* env, jclass, jstring saved_t
 			// the UI sitting on "Connecting" forever, which is exactly where this landed.
 			S().client->AddLogCallback([](std::string message, discordpp::LoggingSeverity severity) {
 				DLOGI("[sdk sev=%d] %s", static_cast<int>(severity), message.c_str());
-			}, discordpp::LoggingSeverity::Verbose);
+			},
+				discordpp::LoggingSeverity::Verbose);
 			DLOGI("client created for application %llu", (unsigned long long)kApplicationId);
 		}
 	}
@@ -544,7 +570,7 @@ Java_com_armsx2_discord_DiscordNative_authorize(JNIEnv*, jclass)
 	args.SetCodeChallenge(verifier.Challenge());
 
 	client->Authorize(args, [client, verifier = verifier.Verifier()](
-							 discordpp::ClientResult result, std::string code, std::string /*redirect*/) {
+								discordpp::ClientResult result, std::string code, std::string /*redirect*/) {
 		DLOGI("authorize callback: ok=%d code_len=%zu", result.Successful() ? 1 : 0, code.size());
 		if (!result.Successful() || code.empty())
 		{
@@ -608,7 +634,7 @@ Java_com_armsx2_discord_DiscordNative_error(JNIEnv* env, jclass)
 /// Remember and publish what is being played. Empty title = back in the library.
 JNIEXPORT void JNICALL
 Java_com_armsx2_discord_DiscordNative_setPlaying(
-	JNIEnv* env, jclass, jstring serial, jstring title, jstring cover, jstring ra)
+	JNIEnv* env, jclass, jstring serial, jstring title, jstring cover, jstring ra, jlong started_at_ms)
 {
 	{
 		std::lock_guard<std::mutex> lock(S().mutex);
@@ -616,6 +642,8 @@ Java_com_armsx2_discord_DiscordNative_setPlaying(
 		S().want_title = JStr(env, title);
 		S().want_cover = JStr(env, cover);
 		S().want_ra = JStr(env, ra);
+		S().want_started_at_ms =
+			started_at_ms > 0 ? static_cast<uint64_t>(started_at_ms) : 0;
 	}
 	if (S().status.load(std::memory_order_acquire) == static_cast<int>(BridgeStatus::Connected))
 		PushPresence();
@@ -641,7 +669,7 @@ Java_com_armsx2_discord_DiscordNative_self(JNIEnv* env, jclass)
 	return env->NewStringUTF(joined.c_str());
 }
 
-/// Friends currently in ARMSX2, newline-separated. Empty string is a legitimate answer and means
+/// Friends currently in RetroSystem PS2, newline-separated. Empty is a legitimate answer and means
 /// nobody is on — distinct from not-connected, which the caller reads from discordStatus().
 JNIEXPORT jstring JNICALL
 Java_com_armsx2_discord_DiscordNative_friends(JNIEnv* env, jclass)
@@ -702,7 +730,8 @@ JNIEXPORT void JNICALL Java_com_armsx2_discord_DiscordNative_authorize(JNIEnv*, 
 JNIEXPORT jstring JNICALL Java_com_armsx2_discord_DiscordNative_takeToken(JNIEnv*, jclass) { return nullptr; }
 JNIEXPORT jint JNICALL Java_com_armsx2_discord_DiscordNative_status(JNIEnv*, jclass) { return 0; }
 JNIEXPORT jstring JNICALL Java_com_armsx2_discord_DiscordNative_error(JNIEnv*, jclass) { return nullptr; }
-JNIEXPORT void JNICALL Java_com_armsx2_discord_DiscordNative_setPlaying(JNIEnv*, jclass, jstring, jstring, jstring, jstring) {}
+JNIEXPORT void JNICALL Java_com_armsx2_discord_DiscordNative_setPlaying(
+	JNIEnv*, jclass, jstring, jstring, jstring, jstring, jlong) {}
 JNIEXPORT jstring JNICALL Java_com_armsx2_discord_DiscordNative_friends(JNIEnv* env, jclass) { return env->NewStringUTF(""); }
 JNIEXPORT jstring JNICALL Java_com_armsx2_discord_DiscordNative_self(JNIEnv* env, jclass) { return env->NewStringUTF(""); }
 JNIEXPORT void JNICALL Java_com_armsx2_discord_DiscordNative_pump(JNIEnv*, jclass) {}

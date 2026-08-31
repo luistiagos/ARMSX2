@@ -15,6 +15,8 @@
  "app.language": "语言",
  "app.language.desc": "选择应用语言，立即生效。",
  "app.language.system": "系统语言",
+ "app.telemetry": "发送匿名遥测数据和崩溃报告",
+ "app.telemetry.desc": "发送应用、设备、错误和日志详情，帮助诊断崩溃和兼容性问题。绝不会发送游戏或 BIOS 文件。更改立即生效。",
  "app.library.search": "游戏库搜索",
  "app.library.search.desc": "在游戏库主屏幕上显示游戏搜索框。",
  "app.library.recents": "最近游玩的游戏",

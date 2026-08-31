@@ -16,7 +16,12 @@ import com.armsx2.Pasx2Application;
  */
 public class DownloadQueueManager {
 
-    public enum State { QUEUED, DOWNLOADING, PAUSED, DONE, ERROR }
+    /**
+     * EXTRACTING (TASK-0048) e o trecho entre o fim da transferencia e o arquivo pronto, quando a
+     * fonte so existia em `.7z`/`.zip`. Nao e pausavel: nao ha como parar um decodificador LZMA no
+     * meio sem guardar o estado dele, entao neste estado a tela oferece so cancelar.
+     */
+    public enum State { QUEUED, DOWNLOADING, EXTRACTING, PAUSED, DONE, ERROR }
 
     public interface QueueListener {
         void onQueueChanged();
@@ -52,9 +57,10 @@ public class DownloadQueueManager {
     /** Adds entry to queue (QUEUED state). No-op if already queued/downloading/paused/done. */
     public void enqueue(CatalogEntry entry) {
         if (entry.queueState == State.DOWNLOADING
+                || entry.queueState == State.EXTRACTING
                 || entry.queueState == State.QUEUED
-                || entry.queueState == State.PAUSED
-                || entry.queueState == State.DONE) return;
+                || entry.queueState == State.PAUSED) return;
+        if (entry.isDownloaded) return;
 
         entry.queueState = State.QUEUED;
         entry.downloadProgress = 0f;
@@ -67,6 +73,9 @@ public class DownloadQueueManager {
 
     /** Pause active download (no-op if not downloading). */
     public void pause(CatalogEntry entry) {
+        // `isRunning()` continua verdadeiro durante a extracao -- e a mesma thread. Sem esta
+        // guarda, pausar ali marcaria PAUSED enquanto a extracao segue correndo por baixo.
+        if (entry.queueState == State.EXTRACTING) return;
         if (entry == activeEntry && romDownloadManager.isRunning()) {
             romDownloadManager.pause();
             entry.queueState = State.PAUSED;
@@ -157,10 +166,26 @@ public class DownloadQueueManager {
             }
 
             @Override
+            public void onExtracting(long bytesExtracted, long totalBytes) {
+                boolean firstTick = current.queueState != State.EXTRACTING;
+                current.queueState = State.EXTRACTING;
+                current.isPaused = false;
+                current.downloadedBytes = bytesExtracted;
+                current.totalBytes = totalBytes;
+                current.downloadProgress = totalBytes > 0
+                        ? (float) bytesExtracted / totalBytes : 0f;
+                notifyProgress(current);
+                // Só na transição: `onQueueChanged` faz o serviço reavaliar a fila inteira, e a
+                // cada 500 ms de extração isso seria trabalho repetido — a tela já se redesenha
+                // por `onProgress`, que republica os itens com o estado novo.
+                if (firstTick) notifyQueueChanged();
+            }
+
+            @Override
             public void onComplete(File romFile) {
                 current.isDownloaded = true;
                 current.isDownloading = false;
-                current.queueState = State.DONE;
+                current.queueState = null;
                 current.downloadProgress = 1f;
                 synchronized (queue) { queue.remove(current); }
                 activeEntry = null;
