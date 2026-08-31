@@ -107,49 +107,52 @@ o Skia entregar um shader novo ao driver. Junto com eles, oito `Path` e catorze 
 | o portão de **25 ms segura em 30 fps** | 454 quadros / 15,1 s |
 | o desenho é **visualmente idêntico** | captura de tela antes/depois |
 
-**NÃO medido — e uma afirmação anterior desta task estava errada:**
+**O A/B rodou, e o ganho é pequeno.** Dois APKs diferindo **só** no `WaveScratch`, ambos limitados
+a 30 fps, instalados alternadamente na mesma sessão, com o aparelho ocioso (3 KB de rede em 20 s) e
+a mesma grade nos dois braços. Cada braço: 40 s de assentamento, 20 s de amostra.
 
-Uma versão anterior deste texto apresentou como prova do ganho do cache uma tabela de `gfxinfo`:
-`Janky frames` de 99,70% → 0,16% e `Number Slow issue draw commands` de 100% → 0,16%.
+| | `RenderThread` | main | `hwuiTask0/1` | `mali-cmar` | total | fps |
+|---|---|---|---|---|---|---|
+| rodada 2, **sem** cache | 41 | 28 | 10 / 10 | 8 | **97** | 30 (363 quadros) |
+| rodada 2, **com** cache | 41 | 25 | 10 / 10 | 8 | **94** | 30 (363 quadros) |
+| rodada 3, **com** cache | 41 | 25 | 10 / 10 | 8 | **94** | 30 (363 quadros) |
+| rodada 3, **sem** cache | 41 | 28 | 9 / 9 | 7 | **94** | 30 (363 quadros) |
+
+O único sinal repetível é a **main thread: 25% com cache contra 28% sem**, nas duas rodadas. É
+exatamente onde os `Brush` são alocados (a fase de draw do Compose roda na UI thread; a
+`RenderThread` só rasteriza). **~3 pontos de um núcleo.** O total oscila dentro do ruído.
+
+Ou seja: a análise do desperdício estava certa e o ganho é real, mas é **pequeno**, e
+**o item 2 continua sem solução**. O custo que resta — `RenderThread` 41 + `hwui` 20 + `mali` 8 —
+é rasterização e preenchimento das quatro faixas em alpha, não criação de objetos.
+
+**E o limite de taxa não entrega ganho neste aparelho**, só evita uma regressão: sem o cache a tela
+não passava de 30 fps de qualquer modo; com o cache ela alcançaria 60 e gastaria a folga
+(medido: 111% de um núcleo). O portão a segura nos mesmos 30.
+
+### Uma afirmação anterior desta task estava errada
+
+Uma versão anterior deste texto apresentou como prova do ganho uma tabela de `gfxinfo`:
+`Janky frames` 99,70% → 0,16% e `Number Slow issue draw commands` 100% → 0,16%.
 
 **Essas duas métricas não servem para esta comparação.** Ambas são medidas contra o orçamento de
 16,7 ms de um vsync de 60 Hz, então **um app que desenha a 30 fps é 100% "janky" por definição**,
-por mais barato que cada quadro seja. A "melhora" que li foi o app ter passado a desenhar a 60 fps,
-não o quadro ter ficado mais barato. Com o limite reintroduzido — mesmo custo por quadro, 30 fps de
-novo — as duas voltam a ~100%, como tinham de voltar.
+por mais barato que cada quadro seja. O que elas mostraram foi o app ter passado a 60 fps, não o
+quadro ter ficado mais barato — e com o limite de volta as duas voltam a ~100% (medido: 603 de 605
+quadros).
 
-A única métrica que compara os dois estados é **CPU por segundo em taxa igual**, e essa medição
-**não foi obtida**: o A/B ficou pronto (dois APKs diferindo só no cache, ambos limitados a 30 fps)
-mas a rodada foi invalidada porque **outra sessão iniciou um download no mesmo aparelho** no meio
-dela — o painel "Downloads em Andamento" mudou o layout da tela sob teste, apareceram
-`RenderThread` extras, e o `wlan0` mostrou 44 MB em 20 s de tráfego concorrente.
+## O que resta fazer, e por que não fiz
 
-Portanto: **o cache é mantido por argumento de código, não por medição.** O argumento é forte e
-verificável sem aparelho — `baseY`, `amp`, `startY` e `endY` não são função de `t`, logo os cinco
-`Brush` eram reconstruídos 30×/s para produzir o objeto idêntico —, mas "faz menos trabalho" e
-"custa menos CPU medida" são coisas diferentes, e só a primeira está estabelecida.
+O que sobrou é preenchimento de GPU, e as três opções que o backlog lista para ele **mudam o que o
+usuário vê**, então são decisão de produto e não de otimização:
 
-## Como fechar esta task
-
-Os dois APKs do A/B estão prontos e a diferença entre eles é **só** o `WaveScratch`; os dois
-limitam a 30 fps, então qualquer diferença de CPU é custo por quadro. Repetir com o aparelho
-exclusivo:
-
-```bash
-# para cada braço: instalar, abrir a biblioteca, deixar assentar 40 s, amostrar 20 s
-adb install -r apk_B.apk   # sem cache
-adb shell "sleep 40; sh /data/local/tmp/tsample.sh 20"
-adb install -r apk_A.apk   # com cache
-adb shell "sleep 40; sh /data/local/tmp/tsample.sh 20"
-```
-
-**Pré-condições que a rodada invalidada ensinou:** nenhum download em andamento (o painel muda o
-layout da tela sob teste), a mesma quantidade de jogos na grade nos dois braços, e conferir por
-captura de tela que os dois braços estão na mesma tela antes de comparar número com número.
-
-Critério: o braço com cache abaixo do braço sem cache, na mesma taxa de quadros. Se a diferença for
-pequena, a alavanca seguinte é o preenchimento de GPU (`WAVE_LAYERS` de 4 para 2), que é decisão de
-produto porque muda o que o usuário vê.
+1. **`WAVE_LAYERS` de 4 para 2.** As faixas se sobrepõem em quase toda a tela e cada uma é um
+   `drawPath` em alpha de ~50% do painel. É a alavanca mais direta contra os 41% da `RenderThread`.
+2. **Cortar a faixa onde o gradiente já é invisível.** Cada banda preenche até o rodapé enquanto o
+   próprio gradiente a leva a `alpha = 0` no caminho — a parte de baixo custa preenchimento cheio e
+   não aparece. Invisível de verdade, mas mexe na geometria.
+3. **Não animar quando ninguém está interagindo**, ou desligar o fundo por padrão em aparelho sem
+   núcleo grande.
 
 ## Como validar
 

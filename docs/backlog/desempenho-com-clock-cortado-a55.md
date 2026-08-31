@@ -261,15 +261,18 @@ padrão em aparelho sem núcleo grande.
 > desenha a 30 fps é 100% "janky" por definição** — o que elas mostraram foi o app ter passado a
 > 60 fps, não o quadro ter ficado mais barato. Com o limite de volta, as duas voltam a ~100%.
 >
-> O A/B que decide (dois APKs diferindo só no cache, ambos a 30 fps) ficou pronto e foi invalidado
-> por outra sessão iniciar um download no mesmo aparelho no meio da rodada. Está descrito em "Como
-> fechar esta task", com as pré-condições que a rodada perdida ensinou.
+> **O A/B rodou** (dois APKs diferindo só no cache, ambos a 30 fps, alternados na mesma sessão com
+> o aparelho ocioso) e o ganho é **~3 pontos de um núcleo, todos na main thread** — 25% com cache
+> contra 28% sem, repetível em duas rodadas, com a `RenderThread` idêntica a 41% nas quatro
+> amostras. O total fica em ~94% de um núcleo.
 >
-> **Medido e sólido:** a tela desenhava a exatos 30,0 fps antes de tudo (logo o portão de 33 ms era
-> no-op), o custo por quadro caiu o bastante para ela alcançar 60 fps, e o portão de 25 ms a segura
-> em 30. O cache fica por **argumento de código** — `baseY`, `amp`, `startY` e `endY` não são função
-> de `t`, logo os cinco `Brush` eram reconstruídos 30×/s para produzir o objeto idêntico —, e
-> "faz menos trabalho" não é o mesmo que "custa menos CPU medida".
+> **Portanto o item 2 continua sem solução.** O desperdício que o cache remove era real e a análise
+> estava certa, mas ele é pequeno: o que resta é rasterização e preenchimento das quatro faixas em
+> alpha, não criação de objetos. E o limite de taxa não entrega ganho aqui — só evita a regressão de
+> a tela passar a desenhar 60 fps depois do cache.
+>
+> As três alavancas que sobram (menos camadas, cortar a faixa onde o gradiente já é invisível, ou
+> não animar sem interação) **mudam o que o usuário vê** e são decisão de produto.
 
 **Validar:** mesma amostragem de threads na tela "Salvos" parada — o total deve cair para bem abaixo
 de meio núcleo, e o jank do `gfxinfo` deve desabar.
