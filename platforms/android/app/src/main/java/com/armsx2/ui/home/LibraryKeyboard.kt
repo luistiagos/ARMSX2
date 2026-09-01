@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -197,8 +198,9 @@ object LibraryKeyboard {
     fun Overlay(scope: BoxScope) {
         val isVisible = visible.value
         val isShifted = shifted.value
-        val curRow = row.intValue
-        val curCol = col.intValue
+        // row/col NAO sao lidos aqui de proposito -- ver KeyCap. Uma leitura neste corpo invalida o
+        // escopo reiniciavel mais proximo, que contem as cinco linhas: as quarenta teclas
+        // recomporiam para trocar a cor de uma. Medido em ~32 ms por tecla no A12 (TASK-0068).
 
         with(scope) {
             // Tap-catcher behind the panel: a tap anywhere outside closes the keyboard, the same
@@ -271,12 +273,15 @@ object LibraryKeyboard {
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 keys.forEachIndexed { c, key ->
-                                    val isSelected = (curRow == r && curCol == c) || (key == SHIFT && isShifted)
                                     val label = glyphOf(key, isShifted)
                                     key(r, c) {
                                         KeyCap(
                                             label = label,
-                                            selected = isSelected,
+                                            row = r,
+                                            col = c,
+                                            // O SHIFT acende por estar travado, nao por posicao --
+                                            // e `shifted` ja e lido aqui em cima para os rotulos.
+                                            forceSelected = key == SHIFT && isShifted,
                                             weight = weightOf(key),
                                             onPress = {
                                                 row.intValue = r
@@ -364,7 +369,31 @@ object LibraryKeyboard {
      * provide for TalkBack.
      */
     @Composable
-    private fun RowScope.KeyCap(label: String, selected: Boolean, weight: Float, onPress: () -> Unit) {
+    private fun RowScope.KeyCap(
+        label: String,
+        row: Int,
+        col: Int,
+        forceSelected: Boolean,
+        weight: Float,
+        onPress: () -> Unit,
+    ) {
+        // A selecao e DERIVADA aqui dentro, e nao recebida pronta de [Overlay]. As duas coisas que
+        // fazem isso funcionar:
+        //
+        // 1. `derivedStateOf` recalcula para as quarenta teclas (duas comparacoes de inteiro) mas
+        //    so notifica quem o observa quando o VALOR muda. Movendo o realce de uma tecla para
+        //    outra, dois booleanos mudam -- entao duas teclas recompoem, nao quarenta.
+        // 2. KeyCap e uma `@Composable` normal, logo tem escopo reiniciavel proprio, e a
+        //    invalidacao para nela. Ler o mesmo estado la fora nao serviria: nem no corpo de
+        //    Overlay (escopo das cinco linhas) nem dentro de `key(r, c)`, que e `inline` e portanto
+        //    atribui a leitura ao escopo de fora.
+        //
+        // Medido: mover o realce custava ~32 ms por tecla no A12 (braco A x braco B, TASK-0068).
+        val selected by remember(row, col, forceSelected) {
+            derivedStateOf {
+                forceSelected || (LibraryKeyboard.row.intValue == row && LibraryKeyboard.col.intValue == col)
+            }
+        }
         // pointerInput(Unit) never restarts, so it would hold the FIRST lambda it was given for the
         // life of the key. Read through rememberUpdatedState instead, or a future layout change
         // (a symbols page, another row set) would have this cap typing the character it used to be.

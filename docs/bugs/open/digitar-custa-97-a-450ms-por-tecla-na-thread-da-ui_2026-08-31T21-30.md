@@ -88,6 +88,11 @@ invalidado e só o texto recompõe. Tocar teclas *diferentes* invalida o `Overla
 **Mover o realce de uma tecla custa ~32 ms**: recompor e regravar quarenta `KeyCap` para mudar a
 cor de uma. Sobra um piso de ~61 ms mesmo sem isso.
 
+> **Correção de 2026-09-01:** esses ~32 ms vinham de 6 toques numa rodada só. Refeito com 12 toques
+> e três rodadas, o custo do realce é **~24 ms**, não 32. A [TASK-0068](../../task/TASK-0068-realce-do-teclado-sem-recompor-o-grid.md)
+> derruba ~8 desses (braço B de 85 para 77 ms) e **os outros ~16 continuam sem causa identificada** —
+> recompor duas `KeyCap` não explica esse tempo.
+
 ## Onde o custo está, ao fim das medições
 
 | parcela | custo | evidência |
