@@ -142,18 +142,44 @@ O ganho é do pacote inteiro. `githubRelease` difere de `githubDebug` em:
 
 | variável | evidência |
 |---|---|
-| **`-DNDEBUG`** | `build.ninja`: **2045** linhas com `-DNDEBUG` no Release, **0** no Debug |
+| **`PCSX2_DEBUG`** | `build.ninja`: **391** linhas com `-DPCSX2_DEBUG` no Debug, **0** no Release |
 | **`LTO_PCSX2_CORE`** | `ON` no Release, `OFF` no Debug |
+| `NDEBUG` | 2045 linhas no Release, 0 no Debug |
 | R8 | `minifyGithubReleaseWithR8` roda só no release |
 | `debuggable` | `false` no release |
 
-**A suspeita principal é o `-DNDEBUG`**, e o argumento é o próprio resultado: o ganho está
+> 🔴 **Correção de 2026-09-01 — eu tinha nomeado o flag errado.** A versão anterior desta tabela
+> dizia que o `-DNDEBUG` era quem compilava as asserções fora, e que ele era a suspeita principal.
+> **Não é.** As asserções do emulador são `pxAssert` / `pxAssertMsg` / `pxFail`, e
+> `common/Assertions.h:28` as gateia por `PCSX2_DEBUG` **ou** `PCSX2_DEVBUILD` — não por `NDEBUG`:
+>
+> ```cpp
+> #if defined(PCSX2_DEBUG) || defined(PCSX2_DEVBUILD)
+> #define pxAssertMsg(cond, msg) pxAssertRel(cond, msg)   // verificação viva
+> #else
+> #define pxAssertMsg(cond, msg) ((void)0)                // some
+> #define pxAssumeMsg(cond, msg) ASSUME(cond)             // e ainda AJUDA o otimizador
+> #endif
+> ```
+>
+> `cmake/BuildParameters.cmake:355` define `$<$<CONFIG:Debug>:PCSX2_DEVBUILD;PCSX2_DEBUG;_DEBUG>`, e
+> o `build.ninja` confirma: **391 unidades de compilação com `-DPCSX2_DEBUG` no debug, zero no
+> release**. O `NDEBUG` continua diferindo, mas ele governa o `assert()` da libc, não o nosso.
+>
+> A conclusão de antes sobrevive — asserções vivas no núcleo do emulador —, mas pelo flag certo. E
+> ela ficou **mais forte**: no release o `pxAssumeMsg` não só desaparece como vira `ASSUME(cond)`,
+> uma dica que o compilador usa para otimizar melhor. Não é só deixar de gastar; é passar a ganhar.
+
+**A suspeita principal é o `PCSX2_DEBUG`**, e o argumento é o próprio resultado: o ganho está
 concentrado na **EE** (−19%) e não aparece em GS nem GPU. R8 e `debuggable` mexem no lado
 Java/Kotlin, que durante o jogo não é o gargalo. Sobram as duas nativas, e asserções vivas dentro do
 recompilador do EE são o tipo de custo que bate no EE e em mais nada.
 
-**Não está isolado, e a task não finge que está.** Separar `NDEBUG` de LTO exige um terceiro build
-(debug + `NDEBUG`, sem LTO), e isso é a próxima task, não esta.
+**Não está isolado, e a task não finge que está.** Separar as asserções do LTO exige um terceiro
+build — release com `LTO_PCSX2_CORE=OFF`, que isola o LTO com tudo o mais igual. O
+`build.gradle.kts` já tem meio caminho: `-Parmsx2.pgo=generate` produz release com LTO OFF, mas
+acrescenta instrumentação de PGO, que custa por si e sujaria a comparação. Falta uma alavanca limpa,
+e ela é a próxima task, não esta.
 
 ## O que isso faz com o resto do backlog
 

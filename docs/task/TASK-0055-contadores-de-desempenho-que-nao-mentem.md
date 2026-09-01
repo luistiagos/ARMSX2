@@ -149,6 +149,31 @@ nunca `0%` para "não sei medir".
   outra decisão de produto.
 - Os itens 1, 2 e 3 do backlog — TASK-0056, TASK-0057 e TASK-0058.
 
+## O campo `GPU`: resolvido em 2026-09-01, e ele ERA um defeito
+
+Ficou em aberto porque a leitura estava confundida por trabalho não commitado de outra sessão. Com a
+árvore limpa, a resposta é clara — e o instrumento desta task é o que a tornou visível:
+
+| renderizador | campo `GPU` | o que significa |
+|---|---|---|
+| Vulkan | `4%`, `15%`, `73%` conforme o jogo | mede de verdade |
+| **OpenGL (Android)** | **omitido** | o backend nunca produz leitura |
+
+Antes desta task o caminho OpenGL imprimia `GPU 0%` — um número que se lê como "a GPU não está
+fazendo nada" quando o correto era "não há medição". Agora o campo **some**, e um campo que some é
+uma pergunta.
+
+A pergunta virou registro próprio:
+[`gpu-timing-do-opengl-no-android-nunca-produz-leitura`](../bugs/open/gpu-timing-do-opengl-no-android-nunca-produz-leitura_2026-09-01T10-50.md).
+Resumo: a extensão `GL_EXT_disjoint_timer_query` **existe** neste aparelho, o ciclo begin/end está
+correto, e mesmo assim o acumulador fica em zero. A hipótese (não confirmada) é que o código usa os
+entry points do **core** (`glBeginQuery`, `glGetQueryObjectuiv`) com um alvo que em GLES pertence
+só à extensão — `grep -c "QueryEXT"` no arquivo devolve zero.
+
+**Isto é o argumento inteiro desta task, demonstrado:** a regra "um contador que não existe não é
+impresso" não é preciosismo de log. Foi ela que transformou um `0%` que ninguém questionava num
+defeito nomeado.
+
 ## Como validar
 
 Com um jogo rodando, no `emulog.txt`:
