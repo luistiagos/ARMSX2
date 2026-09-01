@@ -168,6 +168,29 @@ no *down* (um toque humano inteiro, 60–120 ms) e o de cortar as leituras de pr
 reais, mas o piso de resposta continua sendo o fundo animado. Enquanto a decisão de produto da
 TASK-0057 não for tomada, é este piso que sobra.
 
+### Remedição em 2026-08-31 21:30, e ela corrige a conclusão acima
+
+Com a [TASK-0063](TASK-0063-fundo-da-biblioteca-para-de-animar.md) o fundo parou de animar, e a
+medição foi refeita no mesmo aparelho. **O parágrafo anterior está errado, e o erro é de método.**
+
+Os 42 ms eram a mediana de ~280 quadros *baratos* de fundo diluindo os caros — o 99º percentil da
+mesma amostra já era 300 ms, e ninguém olhou. O fundo **mascarava** o custo da digitação nas
+estatísticas; não era o teto dele. Sem ele, o quadro mediano passa a ser um quadro de digitação:
+
+| cenário | quadros | 50º | 90º |
+|---|---|---|---|
+| Catálogo (12.305), 8 teclas | 24 | **150 ms** | 450 ms |
+| Salvos (7 jogos), 4 teclas | 9 | **97 ms** | 125 ms |
+
+Nenhum quadro abaixo de 53 ms, e um pico de 318 ms na fase de gravar a display list. Há um piso de
+~97 ms por tecla que **não depende do tamanho da biblioteca** — logo não é o filtro nem a ordenação,
+que é o que esta task atacou. Registrado em
+[`digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui`](../bugs/open/digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui_2026-08-31T21-30.md),
+com as duas hipóteses e o teste que decide entre elas.
+
+**O que esta task entregou continua de pé** — toque fora, emitir na descida, menos leituras de
+prefs por tecla — **e não basta.** A digitação segue lenta por uma causa que esta task não tocou.
+
 **Não medido:** o custo de `buildState` antes/depois. O APK anterior foi sobrescrito pelo novo, não
 há A/B, e sem os dois braços o número não prova nada — o ganho de ordenação segue sendo raciocínio
 sobre o código (n chamadas em vez de O(n log n), cada uma com duas leituras de `SharedPreferences`),
