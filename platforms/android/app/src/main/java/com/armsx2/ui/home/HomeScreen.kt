@@ -66,6 +66,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -355,7 +356,29 @@ fun HomeScreen(
 
             val gridState = rememberLazyGridState()
             val density = LocalDensity.current
-            LaunchedEffect(gridState) {
+            // Analogue-stick scrolling, integrated per frame.
+            //
+            // The gate is the whole point (TASK-0069). This used to be `LaunchedEffect(gridState)`
+            // with an unconditional `while (true) { withFrameNanos { … } }`, which asks the
+            // choreographer for a callback every vsync FOREVER while the library is on screen —
+            // with no controller attached, with the stick centred, with nothing scrolling. The
+            // `if` inside decided whether to do WORK; it could not decide whether to WAKE UP, and
+            // the wake-up is what costs.
+            //
+            // Measured on a Galaxy A12, library idle and untouched: 618 voluntary context switches
+            // in 10 s on the main thread — 62/s, i.e. exactly vsync — and ~15% of a core, with
+            // ZERO frames drawn. That was the whole remaining cost of the screen after TASK-0063
+            // stopped the animated background.
+            //
+            // `scrollVelocity` is set to exactly 0f below the dead zone (see HomeInputController),
+            // so this derived flag is false whenever the stick is centred, the effect is cancelled,
+            // and nothing asks for frames. Deflect the stick and the effect restarts. While it
+            // runs, the loop is byte-for-byte the old one: same rate, same dt, same feel.
+            val stickScrolling by remember {
+                derivedStateOf { abs(HomeInputController.scrollVelocity.floatValue) > 0.08f }
+            }
+            LaunchedEffect(gridState, stickScrolling) {
+                if (!stickScrolling) return@LaunchedEffect
                 var lastFrame = withFrameNanos { it }
                 while (true) {
                     val frame = withFrameNanos { it }
