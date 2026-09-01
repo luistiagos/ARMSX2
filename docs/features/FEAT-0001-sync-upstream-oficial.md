@@ -71,6 +71,7 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 | [TASK-0041](../task/TASK-0041-permissao-de-notificacao-do-download.md) | concluída | **Notificação de download visível** — a permissão passa a ser pedida, e o texto deixa de dizer "ARMSX2" |
 | [TASK-0043](../task/TASK-0043-aviso-anti-revenda-do-upstream.md) | concluída | **Boot sem faixas sobrepostas** — sai o aviso anti-revenda do upstream e os três nags de configuração do GameDB |
 | [TASK-0044](../task/TASK-0044-telemetria-de-boot-e-de-assets.md) | concluída | **Telemetria de boot e de assets** — `armsx2/boot` e `armsx2/assets`, os dois pontos de captura sem crash que faltavam da TASK-0018 |
+| [TASK-0067](../task/TASK-0067-merge-com-o-upstream.md) | em andamento | **Merge com o upstream** — 72 commits que não tínhamos, 5 conflitos; todo o GS em auto-merge. É a operação para a qual o fork foi desenhado, feita pela primeira vez |
 
 A troca automática de renderer saiu na própria TASK-0005. ANGLE e `AndroidGpuProfileOverride` exposto
 nas Configurações continuam por numerar, e agora dependem menos de log de campo do que da decisão de

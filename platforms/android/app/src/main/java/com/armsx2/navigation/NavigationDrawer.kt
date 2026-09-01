@@ -152,6 +152,13 @@ private fun DrawerContent(selected: AppRoute, onNavigate: (AppRoute) -> Unit, on
         // Logo abaixo da Biblioteca: é para onde se vai depois de tocar em "Baixar", e é onde se
         // volta para ver como está. Na versão anterior era a segunda aba da barra inferior.
         DrawerItem("catalog.queue.title", "⬇️", AppRoute.Downloads),
+        // Boot straight into the PS2 system BIOS with no disc — distinct from "BIOS Location"
+        // below, which only points the emulator at your BIOS file.
+        DrawerItem("bios.boot.title", "▶️", onAction = { MainActivityRuntime.startBios(); onDismiss() }),
+        // Pick a file and run it, without it joining the library. Sits next to Boot BIOS because
+        // both are "start something that is not a library entry".
+        DrawerItem("action.launchGame", "📂", onAction = { MainActivityRuntime.promptLaunchGame(); onDismiss() }),
+
         DrawerItem("ra.title", "🏆", AppRoute.Achievements, iconRes = com.armsx2.R.drawable.ic_trophy,
             iconTint = TrophyGold),
         DrawerItem("action.settings", "⚙️", AppRoute.Settings()),
