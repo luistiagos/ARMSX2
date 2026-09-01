@@ -75,8 +75,18 @@ todo aparelho.
   do A/B na mão, não com a suposição desta.
 - **Mexer na regra `gl-arm-g52-r38-auto-vulkan`.** Ela é o defeito nº 2 do encadeamento e precisa do
   seu próprio registro e do seu próprio A/B. Tirá-la agora devolve a tela preta.
-- **Ligar os `DRIVER_*` mortos** (`DRIVER_SCALARIZE_VECTOR_BITWISE_AND` e os outros três são
-  emitidos no header do shader e nenhum shader os lê). É um defeito real e separado.
+- ~~**Ligar os `DRIVER_*` mortos**~~ — **esta linha estava errada e fica registrada em vez de
+  apagada.** Eu afirmei que `DRIVER_SCALARIZE_VECTOR_BITWISE_AND` e os outros três eram emitidos no
+  header do shader e nenhum shader os lia. Não é verdade: os helpers (`gpu_bitwise_and`,
+  `gpu_boolean_not`, `gpu_bitwise_not`) são emitidos como GLSL **inline pelo próprio C++**
+  ([GSDeviceOGL.cpp:2206-2261](../../pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L2206-L2261),
+  [GSDeviceVK.cpp:5300-5330](../../pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L5300-L5330)), e os
+  shaders os chamam em **39 lugares** (`convert.glsl` 8+8, `tfx_fs.glsl` 14, `tfx.glsl` 9). O
+  workaround está ligado e funcionando.
+
+  A conclusão errada veio de um `grep` em `bin/resources/shaders/` — o lugar errado — sem abrir a
+  função que monta o header. É exatamente o que o `CLAUDE.md` proíbe: *"`grep` que mostra a linha
+  não é verificação"*.
 - **Reimplementar o watchdog de frame apresentado** (`auto_renderer_boot.tmp`), que a linha anterior
   tinha e o fork aposentou sem substituto.
 
