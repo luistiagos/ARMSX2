@@ -11,7 +11,12 @@
 
 #if defined(__ANDROID__)
 #include "GS/Renderers/Common/GSGPUProfile.h"
+#include "Host.h"
 #include "common/Console.h"
+#include "common/FileSystem.h"
+#include "common/Path.h"
+#include "pcsx2/Config.h"
+#include <optional>
 #endif
 
 #ifdef ENABLE_VULKAN
@@ -299,6 +304,77 @@ static std::string s_android_gl_renderer;
 static std::string s_android_gl_version;
 static std::string s_android_auto_renderer_reason;
 
+// ---------------------------------------------------------------------------------------------
+// Safety net for the AUTOMATIC renderer choice.
+//
+// A crash is not a return value: when the renderer takes the process with it while opening a game,
+// GSopen() never returns false, no exception is thrown, and the next launch makes the identical
+// choice and dies the identical way. The previous product line shipped this after a Motorola field
+// report (Vulkan crashed on game open, manual OpenGL worked); the fork retired it and never
+// replaced it. Registered in docs/bugs/open/renderer-automatico-sem-rede-de-seguranca-no-fork.
+//
+// Two pieces of state, deliberately separate:
+//
+//   boot marker  - names the renderer Auto picked, armed before it is ever used, retired once
+//                  frames are presenting or on a clean shutdown. Surviving to the next launch
+//                  means that run never got there.
+//   blocked flag - written when a stale marker is found. Persistent on purpose: cleared, the next
+//                  launch would retry the same renderer and crash again, and the user would
+//                  alternate between a working session and a crash forever. Cleared when the user
+//                  picks a renderer by hand -- an explicit choice is not ours to override.
+//
+// ⚠️ WHAT THIS DOES NOT CATCH: output that is black while frames present normally. Host::
+// BeginPresentFrame is called either way, so from in here a black session is indistinguishable
+// from a good one. Telling them apart would mean sampling pixels, which this project has measured
+// and forbidden (38 false positives across 6 models, docs/plano-grafico-mali-convergencia-upstream).
+// Do not "improve" this by adding a pixel probe.
+//
+// Files under Cache, not keys in the ini: this is transient state that has to survive the process
+// dying. Cache and not Settings because EmuFolders::Settings is never assigned on Android.
+namespace
+{
+	std::string GetRendererStatePath(const char* filename)
+	{
+		if (EmuFolders::Cache.empty())
+			return std::string();
+
+		return Path::Combine(EmuFolders::Cache, filename);
+	}
+
+	std::string GetBootMarkerPath() { return GetRendererStatePath("auto_renderer_boot.tmp"); }
+	std::string GetBlockedRendererPath() { return GetRendererStatePath("auto_renderer_blocked.tmp"); }
+
+	std::optional<GSRendererType> ReadRendererFile(const std::string& path)
+	{
+		if (path.empty())
+			return std::nullopt;
+
+		const std::optional<std::string> contents = FileSystem::ReadFileToString(path.c_str());
+		if (!contents.has_value())
+			return std::nullopt;
+
+		const std::optional<int> value =
+			StringUtil::FromChars<int>(StringUtil::StripWhitespace(contents.value()));
+		if (!value.has_value())
+			return std::nullopt;
+
+		// Only the two hardware backends are ever armed, so anything else on disk is a corrupt or
+		// hand-edited file. Ignoring it beats blocking a renderer nobody chose.
+		const GSRendererType renderer = static_cast<GSRendererType>(value.value());
+		if (renderer != GSRendererType::VK && renderer != GSRendererType::OGL)
+			return std::nullopt;
+
+		return renderer;
+	}
+
+	void WriteBootMarker(GSRendererType renderer)
+	{
+		const std::string path = GetBootMarkerPath();
+		if (!path.empty())
+			FileSystem::WriteStringToFile(path.c_str(), std::to_string(static_cast<int>(renderer)));
+	}
+} // namespace
+
 bool GSUtil::AndroidAutoPrefersVulkan(
 	std::string_view gl_vendor, std::string_view gl_renderer, std::string_view gl_version)
 {
@@ -360,6 +436,22 @@ const std::string& GSUtil::AndroidAutoRendererReason()
 {
 	return s_android_auto_renderer_reason;
 }
+
+void GSUtil::ClearAutomaticRendererSafeMarker()
+{
+	const std::string path = GetBootMarkerPath();
+	if (!path.empty())
+		FileSystem::DeleteFilePath(path.c_str());
+}
+
+void GSUtil::ClearAutomaticRendererBlocks()
+{
+	ClearAutomaticRendererSafeMarker();
+
+	const std::string path = GetBlockedRendererPath();
+	if (!path.empty())
+		FileSystem::DeleteFilePath(path.c_str());
+}
 #endif
 
 GSRendererType GSUtil::GetPreferredRenderer()
@@ -386,11 +478,61 @@ GSRendererType GSUtil::GetPreferredRenderer()
 		// Vulkan/OpenGL/SW pick still wins.
 #if defined(ENABLE_VULKAN) && defined(ENABLE_OPENGL)
 		preferred_renderer = g_gs_android_prefer_vk ? GSRendererType::VK : GSRendererType::OGL;
+
+		// A marker surviving from the previous launch means that run never presented a frame with
+		// the renderer it names. Promote it to a persistent block the first time we see it.
+		//
+		// Symmetric in the two backends, unlike the previous product line's version, which could
+		// only ever block Vulkan. That asymmetry was true when Vulkan was the risky one and OpenGL
+		// the safe harbour; it is not true here. On the Galaxy A12 it is OPENGL that fails and the
+		// gl-arm-g52-r38-auto-vulkan rule that steers to Vulkan, so a literal port would have
+		// guarded the wrong direction. Storing WHICH renderer was armed costs nothing and covers
+		// both without knowing which device is which.
+		const std::optional<GSRendererType> blocked_before = ReadRendererFile(GetBlockedRendererPath());
+		const std::optional<GSRendererType> stale_marker = ReadRendererFile(GetBootMarkerPath());
+		const bool newly_blocked = !blocked_before.has_value() && stale_marker.has_value();
+		if (newly_blocked)
+		{
+			const std::string path = GetBlockedRendererPath();
+			if (!path.empty())
+			{
+				FileSystem::WriteStringToFile(
+					path.c_str(), std::to_string(static_cast<int>(stale_marker.value())));
+			}
+		}
+
+		// The marker has said what it had to say for this launch; a stale one must not outlive it.
+		ClearAutomaticRendererSafeMarker();
+
+		const std::optional<GSRendererType> blocked = newly_blocked ? stale_marker : blocked_before;
+		if (blocked.has_value() && blocked.value() == preferred_renderer)
+		{
+			// The block beats the driver database on purpose. A rule is a prior we wrote from some
+			// other device; the marker is evidence from THIS one.
+			preferred_renderer =
+				(preferred_renderer == GSRendererType::VK) ? GSRendererType::OGL : GSRendererType::VK;
+			s_android_auto_renderer_reason.insert(0, "blocked-after-no-frame -> ");
+		}
+
 		// Logged here rather than where it was decided: the decision happens at app startup, before
 		// the log file exists. A renderer chosen silently is one nobody can diagnose from a report.
 		Console.WriteLn("Android: Auto renderer -> %s reason='%s' (GL_RENDERER='%s' GL_VERSION='%s').",
-			g_gs_android_prefer_vk ? "Vulkan" : "OpenGL", s_android_auto_renderer_reason.c_str(),
+			(preferred_renderer == GSRendererType::VK) ? "Vulkan" : "OpenGL",
+			s_android_auto_renderer_reason.c_str(),
 			s_android_gl_renderer.c_str(), s_android_gl_version.c_str());
+
+		// Arm for THIS run, before the renderer is ever used.
+		WriteBootMarker(preferred_renderer);
+
+		// Only on the transition, so a device that has settled on the fallback is not nagged every
+		// launch.
+		if (newly_blocked)
+		{
+			Host::ReportErrorAsync("Renderer",
+				"O aplicativo fechou sozinho na ultima vez em que abriu um jogo, entao o "
+				"renderizador foi trocado automaticamente. Para escolher outro, va em "
+				"Configuracoes > Renderer.");
+		}
 #elif defined(ENABLE_OPENGL)
 		preferred_renderer = GSRendererType::OGL;
 #elif defined(ENABLE_VULKAN)

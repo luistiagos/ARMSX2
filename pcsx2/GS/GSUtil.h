@@ -55,6 +55,15 @@ public:
 	/// CRASH report carries, and the failures this steering causes (black output, corrupted image)
 	/// are not crashes; the app attaches this to the GS boot summary instead.
 	static const std::string& AndroidAutoRendererReason();
+
+	/// Retires the boot marker: the automatic renderer has proven it can present. Called from
+	/// Host::BeginPresentFrame once enough frames are through, and from Host::OnVMDestroyed, since
+	/// reaching an orderly shutdown means the renderer did not take the process with it.
+	static void ClearAutomaticRendererSafeMarker();
+
+	/// Retires the marker AND the persistent block. This is the user's way out, so it is called
+	/// when a renderer is picked by hand -- an explicit choice outranks anything we inferred.
+	static void ClearAutomaticRendererBlocks();
 #endif
 
 	static constexpr GS_PRIM_CLASS GetPrimClass(u32 prim)

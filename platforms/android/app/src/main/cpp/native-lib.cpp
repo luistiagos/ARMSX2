@@ -2301,6 +2301,10 @@ Java_kr_co_iefriends_pcsx2_NativeApp_renderAuto(JNIEnv *env, jclass clazz) {
 extern "C"
 JNIEXPORT void JNICALL
 Java_kr_co_iefriends_pcsx2_NativeApp_renderOpenGL(JNIEnv *env, jclass clazz) {
+    // An explicit pick outranks the automatic safety net, so it is also the way out of it: drop
+    // any renderer the net had blocked. Deliberately NOT done in renderAuto -- Auto is the mode
+    // the block exists to protect, and clearing it there would re-arm a crash loop with one tap.
+    GSUtil::ClearAutomaticRendererBlocks();
     Host::SetBaseIntSettingValue("EmuCore/GS", "Renderer",
         static_cast<int>(GSRendererType::OGL));
     // See renderSoftware: EmuConfig write + ring push both belong to the CPU thread.
@@ -2382,6 +2386,8 @@ Java_kr_co_iefriends_pcsx2_NativeApp_renderVulkan(JNIEnv *env, jclass clazz) {
     // Vulkan, (b) without it SW couldn't get the VK display backend, and
     // (c) the AccBlendLevel default in the wizard is Full and the in-game
     // overlay has the toggle if the user hits the regression.
+    // See renderOpenGL: an explicit pick is the user's way out of the automatic safety net.
+    GSUtil::ClearAutomaticRendererBlocks();
     Host::SetBaseIntSettingValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::VK));
     // See renderSoftware: EmuConfig write + ring push both belong to the CPU thread.
     Host::RunOnCPUThread([]() {
@@ -2576,6 +2582,16 @@ void Host::BeginPresentFrame() {
             s_total_drawn_frames++;
 
         s_total_frames++;
+
+        // The automatic renderer has now survived long enough to be considered good: past device
+        // creation, past shader compilation, past the game's first draws. Retire the safe-mode
+        // marker so a later unrelated crash (or the user swiping the app away) doesn't switch the
+        // renderer on the next launch. Deliberately generous, because a clean shutdown clears the
+        // marker anyway -- the cost of waiting is a missed catch, the cost of clearing early is a
+        // driver crash that keeps surviving restarts.
+        static constexpr u32 RENDERER_CONSIDERED_GOOD_AFTER_FRAMES = 600;
+        if (s_total_frames == RENDERER_CONSIDERED_GOOD_AFTER_FRAMES)
+            GSUtil::ClearAutomaticRendererSafeMarker();
 
         std::atomic_thread_fence(std::memory_order_release);
     }
@@ -3568,6 +3584,10 @@ void Host::OnVMStarted()
 
 void Host::OnVMDestroyed()
 {
+    // Reaching here at all means the VM shut down in an orderly way, so whatever the renderer did
+    // it did not take the process with it. Without this, quitting during the first seconds of a
+    // session would look identical to a driver crash on the next launch.
+    GSUtil::ClearAutomaticRendererSafeMarker();
 }
 
 void Host::OnVMPaused()
