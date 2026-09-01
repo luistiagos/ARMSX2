@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -502,7 +503,24 @@ internal fun Modifier.controllerFocusable(
             onDispose { SettingsControllerNav.unregister(controllerId) }
         }
     }
-    val selected = controllerId != null && SettingsControllerNav.isSelected(controllerId)
+    // Subscribe to THIS row's own boolean, not to the shared selection.
+    //
+    // isSelected() reads selectedId — one global mutableStateOf — so reading it straight from
+    // composition made every registered row a subscriber of it: moving the highlight one step
+    // invalidated all 57 rows of the App tab, when exactly two of them changed colour. Measured on
+    // an SM-A127M (see TASK-0066): 57 ms p90 per D-pad step with 10 rows on screen, 117 ms with 57,
+    // against 13 ms of GPU — recomposition, not drawing.
+    //
+    // derivedStateOf still recomputes when selectedId (or the layer stack) changes, but it only
+    // invalidates its readers when the RESULT changes, which is the two rows that actually flipped.
+    val selected = if (controllerId == null) {
+        false
+    } else {
+        val isSelected = remember(controllerId) {
+            derivedStateOf { SettingsControllerNav.isSelected(controllerId) }
+        }
+        isSelected.value
+    }
     if (controllerId != null) {
         // Scroll the selected row just into view using its real measured bounds.
         LaunchedEffect(selected) {

@@ -117,7 +117,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0064](TASK-0064-devolver-o-controle-do-piso-de-z.md) — devolver o controle do piso de Z do PS2, que o Mali no Vulkan tira sem volta | em andamento | — | mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta | — |
 | [TASK-0065](TASK-0065-veredito-do-renderer-em-todo-relato.md) — o veredito do renderer automático em todo relato, e a regra `auto-vulkan` registrada | em andamento | — | veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash | — |
 | [TASK-0066](TASK-0066-rede-de-seguranca-do-renderer-automatico.md) — rede de segurança do renderer automático, que a linha anterior tinha e o fork perdeu | em andamento | — | renderer-automatico-sem-rede-de-seguranca-no-fork | — |
-| [TASK-0066](TASK-0066-passo-do-direcional-nao-recompoe-a-pagina.md) — um passo do direcional recompõe duas linhas, não a página inteira | em andamento | — | configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread | — |
+| [TASK-0071](TASK-0071-passo-do-direcional-nao-recompoe-a-pagina.md) — um passo do direcional recompõe duas linhas, não a página inteira | em andamento | — | configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`

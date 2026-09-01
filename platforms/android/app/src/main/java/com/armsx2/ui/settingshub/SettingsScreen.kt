@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.armsx2.GameInfo
 import com.armsx2.i18n.str
@@ -144,14 +145,30 @@ fun SettingsScreen(
     // away the offset SettingsScrollMemory had just restored. That is the reported "menu reopens at
     // the topmost setting instead of where you left it" (confirmed by bmdhacks). Only an actual
     // selection CHANGE, once the screen is up, should pull the header back into view.
-    val chipSnapArmed = remember { mutableStateOf(false) }
-    LaunchedEffect(com.armsx2.ui.settings.SettingsControllerNav.selectedIndex.intValue) {
-        if (!chipSnapArmed.value) {
-            chipSnapArmed.value = true
-            return@LaunchedEffect
-        }
-        if (com.armsx2.ui.settings.SettingsControllerNav.currentSelectedId()?.startsWith("settings.chip.") == true) {
-            screenScroll.animateScrollTo(0)
+    // ★★ The selection is read INSIDE the effect, via snapshotFlow — never as a LaunchedEffect key.
+    // A key expression is evaluated during composition, so keying this on selectedIndex subscribed
+    // THIS WHOLE SCREEN (top bar, scope switch, the 12 category chips, the panel) to it: every
+    // single D-pad step recomposed the lot. That is the ~57 ms floor measured on an SM-A127M even
+    // with only 10 rows on screen (TASK-0066). snapshotFlow moves the read off the composition and
+    // into the coroutine, where it costs nobody a recomposition.
+    //
+    // collectLatest, not collect: LaunchedEffect(key) used to CANCEL the previous run on each
+    // change, and the body suspends in animateScrollTo. With plain collect the in-flight animation
+    // would survive and the collector would block on it — a behaviour change, not a refactor.
+    LaunchedEffect(screenScroll) {
+        // Skips the FIRST emission, exactly as the old chipSnapArmed did — snapshotFlow emits the
+        // current value as soon as it is collected, so the ★ case above still applies.
+        var armed = false
+        androidx.compose.runtime.snapshotFlow {
+            com.armsx2.ui.settings.SettingsControllerNav.selectedIndex.intValue
+        }.collectLatest {
+            if (!armed) {
+                armed = true
+                return@collectLatest
+            }
+            if (com.armsx2.ui.settings.SettingsControllerNav.currentSelectedId()?.startsWith("settings.chip.") == true) {
+                screenScroll.animateScrollTo(0)
+            }
         }
     }
     // Search-jump: after selectCategory swaps the tab, retry selecting the target row until its
