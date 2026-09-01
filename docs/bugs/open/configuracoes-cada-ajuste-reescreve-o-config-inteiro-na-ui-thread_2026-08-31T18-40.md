@@ -8,7 +8,7 @@
 - **Classe:** fail (desempenho)
 - **Reincidência:** primeira vez registrada
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** — preencher ao corrigir
+- **Tasks que o resolvem:** [TASK-0066](../../task/TASK-0066-passo-do-direcional-nao-recompoe-a-pagina.md) — **item 2 apenas**; itens 1 e 3 seguem abertos
 
 ## Sintoma
 

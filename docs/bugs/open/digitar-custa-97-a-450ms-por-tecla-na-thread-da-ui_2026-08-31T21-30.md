@@ -61,7 +61,52 @@ digitação nas estatísticas; não era o teto dele.
    jogos. Não é o filtro nem a grade.
 2. **Um acréscimo que depende do catálogo** — 150 ms de mediana e cauda de 450 ms com 12.305 linhas.
 
-## Hipóteses para o piso, NÃO verificadas
+## As hipóteses abaixo foram testadas no aparelho e as DUAS estão refutadas
+
+Medido em 2026-08-31 21:45, mesmo aparelho e mesmo roteiro.
+
+**Teste 1 — o piso não é a tela da biblioteca.** `ArmsBackdrop` com `backgroundLayer` é usado
+**só** pela `HomeScreen` (uma ocorrência em todo o app), então a busca de Configurações abre o
+mesmo `LibraryKeyboard` sem onda e sem grade:
+
+| cenário | quadros | 50º | 90º |
+|---|---|---|---|
+| busca de Configurações (sem onda, sem grade) | 6 | **117 ms** | 250 ms |
+
+Igual ou pior que os 97 ms da biblioteca com 7 jogos. **Nem o fundo nem a grade explicam o piso.**
+
+**Teste 2 — um terço do piso é o próprio grid do teclado.** Tocar a *mesma* tecla não muda
+`row`/`col`, e `mutableIntStateOf` não notifica em escrita de valor igual: o `Overlay` não é
+invalidado e só o texto recompõe. Tocar teclas *diferentes* invalida o `Overlay` inteiro, com as
+~40 `KeyCap`. Os dois braços, na busca de Configurações, 6 toques cada:
+
+| braço | quadros | 50º | 90º |
+|---|---|---|---|
+| A — sempre a MESMA tecla (grid não invalida) | 8 | **61 ms** | 150 ms |
+| B — 6 teclas DIFERENTES (grid invalida) | 8 | **93 ms** | 150 ms |
+
+**Mover o realce de uma tecla custa ~32 ms**: recompor e regravar quarenta `KeyCap` para mudar a
+cor de uma. Sobra um piso de ~61 ms mesmo sem isso.
+
+## Onde o custo está, ao fim das medições
+
+| parcela | custo | evidência |
+|---|---|---|
+| realce do teclado (40 `KeyCap` por tecla) | ~32 ms | braço A contra braço B |
+| piso residual (texto + o que a tela do host refaz) | ~61 ms | braço A |
+| acréscimo do catálogo de 12.305 linhas | +~55 ms na mediana, cauda a 450 ms | catálogo contra Salvos |
+
+## Correção candidata para a parcela do realce
+
+Ler a seleção na **fase de desenho** em vez da de composição — `Modifier.drawBehind` sobre um
+`State`, em vez de `selected: Boolean` como parâmetro. Uma leitura de estado em `drawBehind`
+invalida só o desenho daquele nó, não a composição. Hoje as quarenta teclas leem `row`/`col`
+através do `Overlay`, então todas recompõem para que uma mude de cor. A
+[TASK-0062](../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md) considerou e descartou
+isso como "marginal, ~1 ms" — **estimativa errada por mais de trinta vezes**, e o que a corrigiu foi
+medir no aparelho, não reler o código.
+
+## Hipóteses originais, mantidas aqui porque a refutação é o resultado
 
 Nenhuma das duas abaixo foi provada; ambas são compatíveis com o pico de 318 ms na fase de desenho:
 
@@ -76,5 +121,6 @@ Nenhuma das duas abaixo foi provada; ambas são compatíveis com o pico de 318 m
   núcleo. Isto é uma troca possível de custo contínuo por custo por interação, e precisa ser
   medida antes de ser afirmada.
 
-**Como decidir entre elas:** desligar o fundo 2D (escolher uma imagem fixa em Aparência) e repetir a
-medição. Se o piso de 97 ms cair, é o fundo; se não cair, é a recomposição da `HomeScreen`.
+**Este era o teste proposto**, e ele foi executado de forma equivalente e mais barata: em vez de
+trocar o fundo por uma imagem fixa (que exigiria o seletor SAF), bastou digitar numa tela que não
+desenha o fundo. O piso **não** caiu — logo não é nenhuma das duas.
