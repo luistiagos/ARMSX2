@@ -705,6 +705,13 @@ public class NativeApp {
 	 *  instead of OpenGL. The decision needs the driver-bug database (keyed on a parsed driver
 	 *  revision), which lives natively, so the app supplies the strings rather than the verdict. */
 	public static native void setAutoRendererGpuStrings(String vendor, String renderer, String version);
+	/** What {@link #setAutoRendererGpuStrings} decided, e.g. {@code "Vulkan reason=driver-rule:gl-arm-g52-r38-auto-vulkan"}.
+	 *  Attached to the GS boot summary so every report carries it: until now the verdict reached a
+	 *  report only through the logcat a CRASH report includes, and black output / corrupted image —
+	 *  the failures this steering causes — are not crashes. {@code reason=not-resolved} means the
+	 *  decision has not run yet. Its own method rather than a return value on the setter: JNI binds
+	 *  by NAME, so changing that signature would compile, link, run and return garbage. */
+	public static native String getAutoRendererVerdict();
 	/** Affinity Control Mode: 0 off (scheduler decides), 1-6 EE/VU/GS priority orders,
 	 *  7 Performance Cores. Read when the VM boots — set it before runVMThread. */
 	public static native void setAffinityMode(int mode);

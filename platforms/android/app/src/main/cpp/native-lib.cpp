@@ -2335,6 +2335,28 @@ Java_kr_co_iefriends_pcsx2_NativeApp_setAutoRendererGpuStrings(
     g_gs_android_prefer_vk = GSUtil::AndroidAutoPrefersVulkan(vendor_str, renderer_str, version_str);
 }
 
+// The verdict above, as a short string for the GS boot summary that goes into every report.
+//
+// A NEW method rather than a return value bolted onto setAutoRendererGpuStrings: JNI binds by
+// NAME, not by signature, so changing that one from void to jstring would compile, link, run and
+// hand back garbage against any Java side still declaring void.
+//
+// It exists because the verdict currently reaches a bug report through exactly one channel -- the
+// logcat that CrashReporter attaches -- and that channel only fires on a CRASH. The failures this
+// steering produces (persistent black output, corrupted image) are not crashes, so for the one
+// class of defect where the renderer choice is the question, the answer was unreachable. Safe to
+// call any time after setAutoRendererGpuStrings; empty before that.
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getAutoRendererVerdict(JNIEnv* env, jclass) {
+    const std::string verdict = std::string(g_gs_android_prefer_vk ? "Vulkan" : "OpenGL")
+                                    .append(" reason=")
+                                    .append(GSUtil::AndroidAutoRendererReason().empty()
+                                                ? "not-resolved"
+                                                : GSUtil::AndroidAutoRendererReason());
+    return env->NewStringUTF(verdict.c_str());
+}
+
 // Affinity Control Mode (VMManager.cpp). 0 = Disabled/scheduler-decides (default), 1-6 = explicit
 // EE/VU/GS priority orders, 7 = Performance Cores. Read by SetEmuThreadAffinities when the VM
 // boots, so the app sets it before runVMThread; changing it takes effect on the next boot.

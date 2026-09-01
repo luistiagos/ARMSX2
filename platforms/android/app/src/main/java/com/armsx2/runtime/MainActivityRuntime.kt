@@ -1959,9 +1959,19 @@ open class MainActivityRuntime : ComponentActivity() {
             // nativo), e o CrashReporter ja captura o logcat. Por isso NAO ha gancho nosso dentro
             // de pcsx2/: o core do upstream ja e observavel, ao contrario do da linha anterior,
             // onde todos os sinks nasciam em NONE.
+            // ... e o VEREDITO, que a identidade sozinha nao da. Ele existia so no
+            // `Console.WriteLn` do core, ou seja, chegava a um relato apenas pelo logcat que o
+            // CrashReporter anexa -- e esse caminho so dispara em CRASH. Tela preta e imagem
+            // corrompida, que sao exatamente o que essa decisao provoca quando erra, nao sao
+            // crash. Sem esta linha, um relato de "ficou preto" nao distingue "a regra do banco
+            // mandou para o Vulkan" de "a regra nao casou e ficou no OpenGL" de "o usuario
+            // escolheu na mao". As tres produzem relatos identicos.
+            val verdict = runCatching { kr.co.iefriends.pcsx2.NativeApp.getAutoRendererVerdict() }
+                .getOrNull().orEmpty()
             com.armsx2.telemetry.TelemetryReporter.setGraphicsBootSummary(
                 "gl_vendor=\"${gl.vendor.orEmpty()}\" gl_renderer=\"${gl.renderer.orEmpty()}\" " +
-                    "gl_version=\"${gl.version.orEmpty()}\"",
+                    "gl_version=\"${gl.version.orEmpty()}\"" +
+                    if (verdict.isEmpty()) "" else " auto_renderer=\"$verdict\"",
             )
         }
 

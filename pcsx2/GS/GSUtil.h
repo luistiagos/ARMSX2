@@ -48,6 +48,13 @@ public:
 	/// answer into g_gs_android_prefer_vk before the GS starts.
 	static bool AndroidAutoPrefersVulkan(
 		std::string_view gl_vendor, std::string_view gl_renderer, std::string_view gl_version);
+
+	/// Why AndroidAutoPrefersVulkan answered the way it did -- "driver-rule:<rule id>",
+	/// "adreno-default", "gl-feedback-copy-workaround" or "platform-default". Empty until it has
+	/// run. Exists because the verdict otherwise reaches a bug report only through the logcat a
+	/// CRASH report carries, and the failures this steering causes (black output, corrupted image)
+	/// are not crashes; the app attaches this to the GS boot summary instead.
+	static const std::string& AndroidAutoRendererReason();
 #endif
 
 	static constexpr GS_PRIM_CLASS GetPrimClass(u32 prim)

@@ -355,6 +355,11 @@ bool GSUtil::AndroidAutoPrefersVulkan(
 	s_android_auto_renderer_reason = "platform-default";
 	return false;
 }
+
+const std::string& GSUtil::AndroidAutoRendererReason()
+{
+	return s_android_auto_renderer_reason;
+}
 #endif
 
 GSRendererType GSUtil::GetPreferredRenderer()
