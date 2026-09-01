@@ -10,7 +10,7 @@
 |---|---|---|
 | 0 — contadores zerados | [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) | ✅ **corrigido e medido** — `EE 0%` → `EE 100%` |
 | 1 — MTVU queima um núcleo | [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) | ✅ **corrigido e medido** — `R`/90% → `S`/0% |
-| 2 — biblioteca parada | [TASK-0057](../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md) | em andamento — custo por quadro corrigido e medido |
+| 2 — biblioteca parada | [TASK-0063](../task/TASK-0063-fundo-da-biblioteca-para-de-animar.md) | ✅ **resolvido** — 0,94 → 0,15 de um núcleo |
 | 3 — release contra debug | [TASK-0058](../task/TASK-0058-medir-release-contra-debug.md) | ✅ **medido** — EE 61% → 50% |
 
 > ## Os itens 0 e 1 eram o mesmo defeito, e nenhuma das duas hipóteses de escritório acertou
@@ -271,13 +271,30 @@ padrão em aparelho sem núcleo grande.
 > contra 28% sem, repetível em duas rodadas, com a `RenderThread` idêntica a 41% nas quatro
 > amostras. O total fica em ~94% de um núcleo.
 >
-> **Portanto o item 2 continua sem solução.** O desperdício que o cache remove era real e a análise
-> estava certa, mas ele é pequeno: o que resta é rasterização e preenchimento das quatro faixas em
-> alpha, não criação de objetos. E o limite de taxa não entrega ganho aqui — só evita a regressão de
-> a tela passar a desenhar 60 fps depois do cache.
+> **O cache sozinho não resolveu o item**, e as três alavancas que sobravam (menos camadas, cortar
+> a faixa invisível, não animar sem interação) mudavam o que o usuário vê, portanto eram decisão de
+> produto.
 >
-> As três alavancas que sobram (menos camadas, cortar a faixa onde o gradiente já é invisível, ou
-> não animar sem interação) **mudam o que o usuário vê** e são decisão de produto.
+> ## ✅ A decisão veio, e foi mais simples que as três: **a animação sai inteira**
+>
+> Do dono do produto, em 2026-08-31: *"Essa animação de ondas apenas eleva o processamento
+> inutilmente em dispositivos fracos. (…) não seja útil para nós, sacrificar desempenho por algo de
+> enfeite apenas."* Feito na
+> [TASK-0063](../task/TASK-0063-fundo-da-biblioteca-para-de-animar.md), e medido:
+>
+> | biblioteca parada | antes | depois |
+> |---|---|---|
+> | quadros desenhados em 15 s | 453 (30 fps) | **0** |
+> | `RenderThread` | 41 | **ausente** |
+> | `hwuiTask0/1` + `mali` | 10+10+8 | **ausentes** |
+> | **total** | **~0,94 núcleo** | **~0,15 núcleo** |
+>
+> E **sem inventar visual novo**: o HWUI só produz quadro quando algo invalida a árvore de desenho,
+> então basta parar o relógio para a cena ser desenhada uma vez e o display list ser reaproveitado.
+> Mesma paleta, mesmo gradiente, mesmas faixas, mesmos glifos — parados.
+>
+> **Sobram 15% na main thread com zero quadros desenhados**, o que já não é o fundo. Fica como o
+> próximo alvo de quem quiser esta tela a custo zero.
 
 **Validar:** mesma amostragem de threads na tela "Salvos" parada — o total deve cair para bem abaixo
 de meio núcleo, e o jank do `gfxinfo` deve desabar.

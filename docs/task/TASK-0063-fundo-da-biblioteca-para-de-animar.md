@@ -1,8 +1,8 @@
 # TASK-0063: o fundo 2D da biblioteca para de animar
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-31
-- **Concluída em:** —
+- **Concluída em:** 2026-08-31 (medida no A12: 0,94 → 0,15 de um núcleo)
 - **Feature:** nenhuma
 - **Bugs que resolve:** nenhum
 - **Backlog:** item 2 de [`desempenho-com-clock-cortado-a55`](../backlog/desempenho-com-clock-cortado-a55.md) — **fecha o item**
@@ -80,10 +80,34 @@ Não é regressão silenciosa por acaso — é consequência direta da decisão,
 ninguém a descubra como bug. Se incomodar, as saídas são desligar a chave na tela de ajustes quando
 o caminho 2D está ativo, ou aceitar a cor fixa.
 
+## O resultado
+
+Galaxy A12, biblioteca aberta e parada, sem jogo, GOS morto, duas amostras com 30 s de
+assentamento entre elas:
+
+| | antes | depois |
+|---|---|---|
+| quadros desenhados em 15 s | 453 (**30 fps**) | **0** e **14** (≈0 fps) |
+| `RenderThread` | 41 | **ausente da amostra** |
+| main | 25 | 15 |
+| `hwuiTask0` / `hwuiTask1` | 10 / 10 | **ausentes** |
+| `mali-cmar-backend` | 8 | **ausente** |
+| **total** | **~0,94 núcleo** | **~0,15 núcleo** |
+
+**`RenderThread`, `hwui` e `mali` somem inteiramente da lista.** É o mecanismo previsto: sem nada
+invalidando a árvore de desenho, nenhum quadro é pedido, e o caminho de rasterização inteiro fica
+ocioso. O critério (1) — quadros ≈ 0 — é o que prova isso, e ele passou nas duas amostras.
+
+Visualmente a cena está igual: mesmo gradiente, mesmas faixas, mesmos glifos, só parada.
+
+### Os 15% que sobram na main **não** são o fundo
+
+Com zero quadros desenhados, o `Canvas` não está sendo redesenhado — logo esses 15% de um núcleo na
+UI thread são outra coisa, contínua, numa tela parada. Não foi investigado aqui porque está fora do
+escopo desta task, mas **fica registrado**: é o próximo alvo se alguém quiser levar esta tela a
+custo zero de verdade.
+
 ## Como validar
-> ⏳ **Validação no aparelho pendente.** O código está escrito e compila
-> (`:app:assembleGithubDebug`, BUILD SUCCESSFUL), mas o A12 caiu do ADB antes de eu medir e
-> precisa de reconexão física. Os critérios abaixo é que fecham a task; compilar não é validar.
 
 
 Com o app aberto **na biblioteca**, parado, sem jogo, e o GOS morto:
