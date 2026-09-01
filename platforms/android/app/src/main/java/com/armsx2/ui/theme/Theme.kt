@@ -248,6 +248,19 @@ object LibraryBackgroundColorPreferences {
     @Volatile var rgbCycleGl = false
         private set
 
+    /**
+     * Asks the live GL wave for one more frame (TASK-0070).
+     *
+     * The wave no longer redraws on a timer — it draws once and parks — so "applies live on the
+     * next GL frame" would otherwise become "applies next time the window resizes". XmbGlView's
+     * render thread installs this while it is alive and clears it on teardown; null means no GL
+     * wave is up, and the 2D backdrop recomposes on its own.
+     */
+    @Volatile private var glRedrawRequest: (() -> Unit)? = null
+
+    /** Installed by XmbGlView's GL thread while it is alive; null clears it. */
+    fun setGlRedrawRequest(request: (() -> Unit)?) { glRedrawRequest = request }
+
     fun load() {
         val stored = MainActivityRuntime.prefs.getInt(Key, 0)
         color.value = stored
@@ -277,16 +290,22 @@ object LibraryBackgroundColorPreferences {
         rgbCycle.value = on
         rgbCycleGl = on
         MainActivityRuntime.prefs.edit { putBoolean(RgbKey, on) }
+        glRedrawRequest?.invoke()
     }
 
     private fun apply(argb: Int) {
-        if (argb == 0) { glTop = null; glBottom = null; return }
+        if (argb == 0) {
+            glTop = null; glBottom = null
+            glRedrawRequest?.invoke()
+            return
+        }
         val r = ((argb shr 16) and 0xFF) / 255f
         val g = ((argb shr 8) and 0xFF) / 255f
         val b = (argb and 0xFF) / 255f
         glBottom = floatArrayOf(r, g, b)
         // 0.20 keeps roughly the built-in blue's top/bottom ratio: a deep, near-black anchor.
         glTop = floatArrayOf(r * 0.20f, g * 0.20f, b * 0.20f)
+        glRedrawRequest?.invoke()
     }
 }
 

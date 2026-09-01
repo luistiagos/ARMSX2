@@ -94,28 +94,35 @@ class XmbGlView(context: Context) : TextureView(context), TextureView.SurfaceTex
         private val cp = FloatArray(28)
         private var startNanos = 0L
 
-        fun resize(w: Int, h: Int) { width = w; height = h; sizeDirty = true }
-        fun finish() { running = false; runCatching { join(500) } }
+        // The thread parks between frames instead of spinning at 30 fps (TASK-0070), so every
+        // reason to draw again has to knock on this lock: a resize, a colour change, or shutdown.
+        private val wakeLock = Object()
+        private fun wake() = synchronized(wakeLock) { wakeLock.notifyAll() }
+
+        fun resize(w: Int, h: Int) { width = w; height = h; sizeDirty = true; wake() }
+        fun finish() { running = false; wake(); runCatching { join(500) } }
 
         override fun run() {
             if (!initEgl()) { onStatus(false); return }
             runCatching { initGl() }.onFailure { Log.w(TAG, "GL init failed", it); onStatus(false); teardown(); return }
             startNanos = System.nanoTime()
             var announced = false
+            // A colour change has nothing else to wake us with, now that there is no timer.
+            com.armsx2.ui.theme.LibraryBackgroundColorPreferences.setGlRedrawRequest { wake() }
             while (running) {
-                val frameStart = System.nanoTime()
                 if (sizeDirty) { GLES30.glViewport(0, 0, width, height); sizeDirty = false }
-                val t = (frameStart - startNanos) / 1_000_000_000f
-                runCatching { drawFrame(t) }
+                runCatching { drawFrame(FROZEN_T) }
                 if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) running = false
                 else if (!announced) { announced = true; onStatus(true) }
-                // Cap to ~30 fps. The wave is slow, so 30 looks identical to 60 but roughly
-                // halves GPU/CPU load — without this the loop ran flat-out at vsync (60) and
-                // spun the RP6's fans up. Still more than a GIF (real mesh render vs a blit),
-                // but well within a calm envelope.
-                val leftMs = FRAME_TARGET_MS - (System.nanoTime() - frameStart) / 1_000_000L
-                if (leftMs > 1) runCatching { sleep(leftMs) }
+                // Draw once, then PARK — see FROZEN_T. This used to cap at ~30 fps and keep going
+                // forever; the same call was made for the 2D backdrop in TASK-0063, where stopping
+                // the clock took the library from 0.94 to 0.15 of a core. A parked thread is
+                // blocked, not spinning: it costs nothing until something asks for a frame.
+                synchronized(wakeLock) {
+                    while (running && !sizeDirty) runCatching { wakeLock.wait() }
+                }
             }
+            com.armsx2.ui.theme.LibraryBackgroundColorPreferences.setGlRedrawRequest(null)
             teardown()
         }
 
@@ -354,12 +361,20 @@ class XmbGlView(context: Context) : TextureView(context), TextureView.SurfaceTex
     }
 
     companion object {
+        /**
+         * The instant of the wave the still frame is taken at (TASK-0070).
+         *
+         * The mesh displacement is a function of time, so any value is a valid pose and costs the
+         * same to draw. Not 0: at t = 0 the flow and tension terms are at their starting phase and
+         * the ribbon reads flatter than the shape the wave was designed around.
+         */
+        private const val FROZEN_T = 7.5f
+
         private const val TAG = "XmbGlView"
         private const val PIf = PI.toFloat()
         private const val STEX_W = 256
         private const val STEX_H = 64
 
-        private const val FRAME_TARGET_MS = 33L // ~30 fps cap (fan-friendly; wave is slow)
 
         // Gradient: a bold "eye-candy" PS3 blue. linkev's raw values (near-black -> #2559B3) read
         // as muted navy on-device, so the top is lifted to a deep blue and the bottom pushed to a
