@@ -152,3 +152,34 @@ Próximas alavancas, agora com dado em vez de hipótese:
    ver com Compose.
 2. **Os 25 ms que sobraram na aba App** — achar quem ainda invalida por linha.
 3. Os itens 1 e 3 do bug seguem intocados.
+
+## Validação de comportamento (critério 4)
+
+Feita no SM-A127M em 2026-09-01, na build já instalada (a do commit desta task):
+
+| Item | Resultado |
+|---|---|
+| Anel de foco anda linha a linha | ✅ 8 × Baixo levaram a seleção do topo até a chip de tema "Personalizado" |
+| Linha selecionada entra em vista sozinha (`bringIntoView`) | ✅ a página acompanhou a seleção |
+| Subir até a fila de chips leva a página ao topo | ✅ depois de rolar para baixo, 12 × Cima trouxeram a barra "Configurações" inteira de volta |
+| **Reabrir NÃO salta para o topo** | ✅ a barra de topo fica rolada para fora ao reabrir, ou seja o `animateScrollTo(0)` não disparou — a guarda de primeira emissão sobreviveu à troca de `LaunchedEffect(chave)` por `snapshotFlow` |
+
+### Uma observação que ficou SEM resposta
+
+Reabrir devolve sempre o **mesmo ponto perto do topo**, não o deslocamento onde eu tinha parado —
+duas capturas de reabertura, depois de rolagens bem diferentes, saíram byte-idênticas (124 239 B).
+O critério como escrito ("não saltar para o topo") passa, mas "voltar para onde você estava", que é
+o que o `SettingsScrollMemory` promete no comentário dele, aparentemente não acontece.
+
+**Não determinei se isso é regressão minha ou comportamento anterior.** O A/B exigia construir a
+versão sem a mudança, e a árvore **não compila neste momento** por trabalho não commitado de outra
+frente (o merge com o upstream): `Unresolved reference 'RecentGamesAccess'` em
+`RecentGamesContentProvider.kt` e `AppTab.kt` — o símbolo não existe em lugar nenhum da árvore, e os
+dois arquivos que o citam são modificações não commitadas. Reverti meus dois arquivos, tentei
+construir, falhou por isso, e restaurei.
+
+A leitura do código sugere que é anterior (a seleção retida é trazida à vista pelo `bringIntoView`
+da linha, e a sequência de emissões do `snapshotFlow` é a mesma do `LaunchedEffect(chave)`), **mas
+isso é raciocínio, não medição** — e foi exatamente assim que eu errei o piso de 57 ms. Fica em
+aberto até dar para compilar as duas versões.
+
