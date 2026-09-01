@@ -118,16 +118,21 @@ static u64 ArchTimerFrequency()
 	static const u64 freq = []() -> u64 {
 		u64 f;
 		asm volatile("mrs %0, cntfrq_el0" : "=r"(f));
-		if (f == 0)
+		// Real ARM timers are MHz-range (19.2/24/26/50 MHz, 1GHz with ECV). This bound comes from
+		// upstream and is kept over our earlier `f == 0` test: firmware that programs a nonsense
+		// sub-MHz value leaves the clock exactly as unusable as firmware that programs nothing,
+		// and only the bound rejects both. Returning 0 keeps every caller below on the single
+		// "unusable" test they already have.
+		if (f < 1000000u)
 		{
-			Console.Warning("HostSys: CNTFRQ_EL0 reads 0 (firmware did not program it); "
-							"using CLOCK_MONOTONIC for GetCPUTicks()");
-		}
-		else
-		{
-			Console.WriteLn("HostSys: architected timer at %llu Hz",
+			Console.Warning("HostSys: CNTFRQ_EL0 reads %llu, which is not a usable timer "
+							"frequency; using CLOCK_MONOTONIC for GetCPUTicks()",
 				static_cast<unsigned long long>(f));
+			return 0;
 		}
+
+		Console.WriteLn("HostSys: architected timer at %llu Hz",
+			static_cast<unsigned long long>(f));
 		return f;
 	}();
 	return freq;
