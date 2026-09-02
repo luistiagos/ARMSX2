@@ -164,22 +164,33 @@ Feita no SM-A127M em 2026-09-01, na build já instalada (a do commit desta task)
 | Subir até a fila de chips leva a página ao topo | ✅ depois de rolar para baixo, 12 × Cima trouxeram a barra "Configurações" inteira de volta |
 | **Reabrir NÃO salta para o topo** | ✅ a barra de topo fica rolada para fora ao reabrir, ou seja o `animateScrollTo(0)` não disparou — a guarda de primeira emissão sobreviveu à troca de `LaunchedEffect(chave)` por `snapshotFlow` |
 
-### Uma observação que ficou SEM resposta
+### A observação que estava em aberto: RESOLVIDA — não é regressão minha
 
-Reabrir devolve sempre o **mesmo ponto perto do topo**, não o deslocamento onde eu tinha parado —
-duas capturas de reabertura, depois de rolagens bem diferentes, saíram byte-idênticas (124 239 B).
-O critério como escrito ("não saltar para o topo") passa, mas "voltar para onde você estava", que é
-o que o `SettingsScrollMemory` promete no comentário dele, aparentemente não acontece.
+Ficara registrado que reabrir devolve sempre o **mesmo ponto perto do topo**, não o deslocamento
+onde se parou, e que eu não sabia se era meu. O A/B ficou bloqueado na sessão anterior porque a
+árvore não compilava (`RecentGamesAccess`, do merge). Com o merge commitado e a árvore limpa,
+o A/B foi feito em 2026-09-01:
 
-**Não determinei se isso é regressão minha ou comportamento anterior.** O A/B exigia construir a
-versão sem a mudança, e a árvore **não compila neste momento** por trabalho não commitado de outra
-frente (o merge com o upstream): `Unresolved reference 'RecentGamesAccess'` em
-`RecentGamesContentProvider.kt` e `AppTab.kt` — o símbolo não existe em lugar nenhum da árvore, e os
-dois arquivos que o citam são modificações não commitadas. Reverti meus dois arquivos, tentei
-construir, falhou por isso, e restaurei.
+- ninguém tocou nos dois arquivos depois do meu commit, então `c67fb87bff~1` difere do HEAD
+  **exatamente** pela minha mudança — A/B limpo;
+- dois APKs, mesmo aparelho, mesmo roteiro (abrir Configurações → rolar → Voltar → reabrir).
 
-A leitura do código sugere que é anterior (a seleção retida é trazida à vista pelo `bringIntoView`
-da linha, e a sequência de emissões do `snapshotFlow` é a mesma do `LaunchedEffect(chave)`), **mas
-isso é raciocínio, não medição** — e foi exatamente assim que eu errei o piso de 57 ms. Fica em
-aberto até dar para compilar as duas versões.
+Resultado: as três capturas de reabertura — **duas com a mudança e uma sem** — são
+**byte-idênticas**, mesmo sha256 `665a571da1ff817e`, 124 239 B. Ou seja, o comportamento é o mesmo
+com e sem a mudança: **é anterior, não regressão**. O `SettingsScrollMemory` não devolve o
+deslocamento exato, e nunca devolveu; quem quiser isso abre uma task própria.
 
+Com isso o **critério 4 passa inteiro**.
+
+### Remedição pós-merge
+
+Depois do `git merge upstream/master` (TASK-0067), com a mudança, aba App, mesmo protocolo:
+**p50 57 ms / p90 85 ms** — contra 101/117 antes da mudança e 61/97 logo depois dela, antes do
+merge. O ganho se manteve; o merge não o desfez.
+
+### Armadilha de roteiro, para a próxima medição
+
+O merge acrescentou "BIOS de inicialização" e "Launch Game" à gaveta, e **"Configurações" desceu de
+y≈645 para y≈877**. Um `input tap 219 645` agora cai em "Launch Game", que abre o seletor SAF do
+Android — o teste sai do app sem avisar e as capturas seguintes são do seletor de arquivos, não do
+app. Conferir a tela antes de tocar, em vez de reusar coordenada.
