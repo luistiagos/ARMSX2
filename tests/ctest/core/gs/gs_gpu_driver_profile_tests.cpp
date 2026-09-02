@@ -75,7 +75,16 @@ AutoRendererPreference AutoRendererForGL(const char* renderer, const char* versi
 // The policy applies to every game on the affected driver, rather than naming the title which
 // happened to expose it. It remains separate from the framebuffer-fetch workaround because the
 // device stayed black with that path disabled, while Vulkan rendered the same frames correctly.
-TEST(GSGpuDriverProfile, MaliG52R38PrefersVulkanForAndroidAuto)
+// This device is still IDENTIFIED exactly -- that half was never in doubt and the strings stay
+// pinned -- but it must no longer be STEERED. The gl-arm-g52-r38-auto-vulkan rule that used to
+// send it to Vulkan was removed once the retest showed 10 Pin - Champions Alley rendering through
+// GL on this same phone in the same session, while 007 stayed black: the discriminator is the
+// title, and no axis this table is keyed on separates two games. The account sits where the rule
+// was, in GSGPUDriverProfile.cpp.
+//
+// Asserting Default here rather than deleting the test is the point: a rule re-added on this
+// device's identity fails this, and whoever adds it has to read why it went.
+TEST(GSGpuDriverProfile, MaliG52R38IsIdentifiedButNotSteered)
 {
 	const GpuProfileSelection sel =
 		ResolveGL("ARM", kMaliG52R38p1GlRenderer, kMaliG52R38p1GlVersion);
@@ -84,15 +93,20 @@ TEST(GSGpuDriverProfile, MaliG52R38PrefersVulkanForAndroidAuto)
 	EXPECT_EQ(sel.gpu.architecture, MobileGpuArchitecture::MaliBifrost);
 	EXPECT_EQ(sel.gpu.model_number, 52);
 	EXPECT_EQ(sel.driver.driver, MobileGpuDriver::ArmProprietary);
-	EXPECT_EQ(sel.driver.auto_renderer_preference, AutoRendererPreference::Vulkan);
-	EXPECT_EQ(sel.driver.auto_renderer_rule, "gl-arm-g52-r38-auto-vulkan");
+	EXPECT_TRUE(sel.driver.version.known);
+	EXPECT_EQ(sel.driver.version.major, 38);
+	EXPECT_EQ(sel.driver.auto_renderer_preference, AutoRendererPreference::Default);
+	EXPECT_TRUE(sel.driver.auto_renderer_rule.empty());
 	EXPECT_FALSE(TakesTheRenderTargetCopyPath(sel));
 }
 
-// Do not turn a field observation into a blanket Mali rule. Adjacent driver revisions and GPU
-// models keep the platform default until they have their own evidence-backed rule.
-TEST(GSGpuDriverProfile, MaliG52R38AutoPreferenceIsNarrow)
+// No Mali GL driver steers the Auto renderer today, and that is the state to hold: a field
+// observation on one title is not a driver fact. r38p1 itself is in the list now -- it used to be
+// the one exception, and it is the case most likely to be re-added by reflex.
+TEST(GSGpuDriverProfile, NoMaliOpenGLDriverSteersAutoRenderer)
 {
+	EXPECT_EQ(AutoRendererForGL("Mali-G52", "OpenGL ES 3.2 v1.r38p1-test"),
+		AutoRendererPreference::Default);
 	EXPECT_EQ(AutoRendererForGL("Mali-G52", "OpenGL ES 3.2 v1.r37p1-test"),
 		AutoRendererPreference::Default);
 	EXPECT_EQ(AutoRendererForGL("Mali-G52", "OpenGL ES 3.2 v1.r39p0-test"),

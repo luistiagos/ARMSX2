@@ -109,3 +109,22 @@ O que o reteste acrescenta ao registro:
    mesmo aparelho e na mesma sessão e renderizou normalmente. Isso enfraquece ainda mais a regra
    `gl-arm-g52-r38-auto-vulkan`, que desvia **todo** Mali-G52 r38 do mundo com base neste jogo.
 4. **Não é "o upstream já resolveu".** Essa hipótese está eliminada.
+
+## O contorno foi retirado (2026-09-02)
+
+O achado nº 3 do reteste acima — *10 Pin* renderiza em GL no mesmo aparelho e na mesma sessão —
+derrubou a premissa da regra `gl-arm-g52-r38-auto-vulkan`: o discriminador é o **título**, e nenhum
+eixo do banco de drivers separa dois jogos. A regra saiu na
+[TASK-0072](../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md), com o registro
+do porquê no lugar onde ela estava.
+
+**Este bug continua aberto e agora é visível no padrão**: no `auto`, o 007 volta a ficar preto
+nesses aparelhos. A saída, por jogo e alcançável com a tela preta (o overlay de toque fica por cima
+da área de render), é: menu em jogo → Renderer → Vulkan → reiniciar.
+
+As duas pistas que ficaram, e que são melhores do que tudo que se tinha antes:
+
+1. **É do título, não do backend.** Procurar o que o 007 faz e o *10 Pin* não faz.
+2. **A apresentação PARA, não deixa de começar.** O FMV aparece por volta de +80 s e só então
+   congela. Isso descarta falha de criação de device ou de shader e aponta para superfície/swapchain
+   perdida, ou para a thread do GS presa no present.

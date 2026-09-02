@@ -340,7 +340,7 @@ static bool RuleMatches(const DriverRule& rule, const GpuProfileSelection& selec
 // Sources and exact upstream revisions are mirrored in docs/gpu-driver-database.json. A known
 // driver bug is not automatically an active workaround: expensive renderer fallbacks stay disabled
 // until their PCSX2 integration has a bounded, tested condition.
-static constexpr std::array<DriverRule, 28> s_driver_rules = {{
+static constexpr std::array<DriverRule, 27> s_driver_rules = {{
 	{"gl-arm-buffer-stream", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenUnsynchronizedMapping) |
@@ -349,15 +349,31 @@ static constexpr std::array<DriverRule, 28> s_driver_rules = {{
 	{"gl-arm-g57-fifo", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenVSync), Workaround(DriverWorkaround::ForceFifoPresent)},
-	// Galaxy A12 field A/B, RetroSystem PS2 1.0.24: Mali-G52 r38p1 presents persistent black
-	// output through OpenGL in 007: Everything or Nothing while the VM, audio, FMVs and frame
-	// counter continue. Vulkan renders the same boot sequence correctly. Disabling framebuffer
-	// fetch and rebuilding the GL shader cache did not change the failure, so this is renderer
-	// steering rather than a feature workaround. Keep the first rule narrow; expanding beyond
-	// Bifrost G52/r38 needs proper testing on the affected hardware and other games.
-	{"gl-arm-g52-r38-auto-vulkan", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
-		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::MaliBifrost, 52, 52, 0,
-		{38, 0, 0}, {39, 0, 0}, 0, 0, false, 0, 0, AutoRendererPreference::Vulkan},
+	// Mali-G52 r38p1 and the Auto renderer: there is deliberately NO rule here, and it was
+	// REMOVED rather than never written. Read this before adding one back.
+	//
+	// A gl-arm-g52-r38-auto-vulkan rule shipped in 1.0.24, steering every Mali-G52 on r38.x from
+	// OpenGL to Vulkan. Its evidence was one title on one phone: 007: Everything or Nothing goes
+	// persistently black through GL on a Galaxy A12 while the VM, audio and frame counter carry on.
+	//
+	// The retest after the 2026-08-31 upstream merge measured what nobody had: 10 Pin - Champions
+	// Alley boots through GL on that same device, in that same session, and renders correctly. The
+	// discriminator is the TITLE, not the driver -- and no axis this table is keyed on (api, vendor,
+	// architecture, model, driver revision) can tell those two games apart. A rule here either
+	// covers both or neither.
+	//
+	// What it cost meanwhile was global and silent: every G52/r38 device off its GL fast path
+	// (GL_ARM_shader_framebuffer_fetch), and -- because GSDeviceVK drops the PS2 32-bit Z floor on
+	// all Mali while GSDeviceOGL keeps it -- a change to how DEPTH IS EMULATED, for every game, that
+	// nobody chose. A driver rule that quietly alters emulation semantics is the wrong shape.
+	//
+	// Do not "fix" this with a per-title condition either: that is the practice
+	// docs/plano-grafico-mali-convergencia-upstream.md names as the origin of the 1.0.17->1.0.22
+	// cycle. The recourse for the affected title is the app's PER-GAME renderer picker, which stays
+	// reachable while the output is black because the touch overlay draws above the render area.
+	//
+	// A future rule here needs driver evidence: the same failure on the same blob across several
+	// titles, or on hardware other than one phone.
 	// r44p1 and the in-tile render-target self-read, on GL: there is deliberately NO rule here,
 	// and that is a product decision made on field evidence, not an oversight — read this before
 	// "completing the pair" with the Vulkan rule below.

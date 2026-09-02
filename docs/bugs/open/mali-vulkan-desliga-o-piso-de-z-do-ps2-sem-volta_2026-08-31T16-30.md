@@ -127,3 +127,14 @@ transitório: reproduziu em duas capturas separadas por 35 s.
 Os dois fixes de GS do upstream já estavam na árvore antes do merge, e os 72 commits novos não
 trouxeram outro. A hipótese "está consertado lá e a gente não puxou" está eliminada; a
 [TASK-0064](../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md) segue sendo o caminho.
+
+## Alcance reduzido (2026-09-02)
+
+A [TASK-0072](../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) retirou a
+regra `gl-arm-g52-r38-auto-vulkan`, que era o que empurrava esses aparelhos para o Vulkan. Com ela
+fora, o `auto` volta a resolver OpenGL no Mali-G52 r38 — e **no OpenGL o piso de Z é mantido**.
+
+Ou seja: a exposição involuntária descrita acima (todo Mali-G52 r38 emulando profundidade de forma
+diferente sem ninguém decidir) **acabou**. O defeito de fundo **não**: quem escolher Vulkan à mão,
+nesses ou em outros aparelhos Mali, continua sem o piso — e a chave `ForcePS2DepthQuantization` da
+TASK-0064 continua sendo a forma de trazê-lo de volta, ainda **não testada em campo**.

@@ -119,6 +119,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0066](TASK-0066-rede-de-seguranca-do-renderer-automatico.md) — rede de segurança do renderer automático, que a linha anterior tinha e o fork perdeu | em andamento | — | renderer-automatico-sem-rede-de-seguranca-no-fork | — |
 | [TASK-0067](TASK-0067-merge-com-o-upstream.md) — `git merge upstream/master`: 72 commits, 5 conflitos, GS todo em auto-merge | concluída | FEAT-0001 | — | — |
 | [TASK-0071](TASK-0071-passo-do-direcional-nao-recompoe-a-pagina.md) — um passo do direcional recompõe duas linhas, não a página inteira | em andamento | — | configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread | — |
+| [TASK-0072](TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) — retirar a regra `gl-arm-g52-r38-auto-vulkan`: o defeito é do título, não do driver | em andamento | — | — | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`
