@@ -6,7 +6,7 @@
 - **Feature:** nenhuma
 - **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
   (paliativo — o defeito é do aparelho)
-- **Commit:** o vínculo é o prefixo `TASK-0077:` no assunto
+- **Commit:** ed3e7e7c46 (o vínculo é o prefixo `TASK-0077:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
 
