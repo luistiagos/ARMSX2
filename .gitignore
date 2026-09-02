@@ -168,3 +168,11 @@ platforms/android/.kotlin/
 **/discord_partner_sdk.aar
 **/discord_partner_sdk.jar
 platforms/android/app/src/main/cpp/3rdparty/discord/include/
+
+# Publicacao no R2 (TASK-0075, scripts/publish_fork_r2.ps1).
+# dist/ sao artefatos de release (APK, version.json, .sha256) regerados a cada
+# publicacao. r2-config.json e build.properties carregam credenciais R2 e o token
+# de purga do Cloudflare -- nenhum dos dois pode entrar num commit.
+dist/
+r2-config.json
+build.properties

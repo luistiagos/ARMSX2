@@ -277,18 +277,35 @@ android {
             //   ./gradlew assembleGithubRelease -Parmsx2.updateEndpoint=<url>
             //
             // O canal e a outra metade de um par: o `channel` dentro do version.json tem de casar
-            // com este valor, senao o app recusa a atualizacao. Serve para publicar um build de
-            // teste no mesmo bucket sem que os clientes o recebam.
+            // com este valor, senao o app recusa a atualizacao (AppUpdateManager.java:181). Serve
+            // para publicar um build de teste no mesmo bucket sem que os clientes o recebam.
+            //
+            // TASK-0075 -- ATENCAO, A PASTA E `ps2fork`, NAO `ps2`.
+            //
+            // `rgs/ps2/` e a trilha da LINHA ANTIGA (feature/handoff-end-to-end), que tem clientes
+            // instalados: em 2026-09-02 ela servia 1.0.23 / versionCode 37. Este fork publica em
+            // `rgs/ps2fork/` e as duas trilhas nunca se cruzam -- cada APK so consulta a URL que
+            // foi compilada DENTRO dele, entao a separacao vale pelo resto da vida do APK e nao
+            // depende de ninguem lembrar de nada na hora de publicar.
+            //
+            // Apontar isto de volta para `rgs/ps2/` faz o fork atualizar sozinho todo aparelho da
+            // linha antiga: os dois lados compartilham applicationId E certificado de release, e o
+            // Android trata a instalacao como upgrade in-place. E por isso que o valor vive aqui
+            // como DEFAULT DE PROJETO e nao como flag -- esquecer uma flag publica o APK errado.
             buildConfigField(
                 "String",
                 "APP_UPDATE_ENDPOINT",
                 "\"" + (providers.gradleProperty("armsx2.updateEndpoint").orNull
-                    ?: "https://versions.digitalstoregames.com/rgs/ps2/version.json") + "\"",
+                    ?: "https://versions.digitalstoregames.com/rgs/ps2fork/version.json") + "\"",
             )
+            // `fork` e a segunda tranca, independente da URL: se algum dia os dois version.json
+            // forem trocados de lugar, o app recusa o da linha antiga (channel `default`) em vez
+            // de instalar. Mudar este valor sem mudar o do script de publicacao quebra a
+            // atualizacao de todo mundo que ja tem o fork.
             buildConfigField(
                 "String",
                 "APP_UPDATE_CHANNEL",
-                "\"" + (providers.gradleProperty("armsx2.updateChannel").orNull ?: "default") + "\"",
+                "\"" + (providers.gradleProperty("armsx2.updateChannel").orNull ?: "fork") + "\"",
             )
             externalNativeBuild { cmake { arguments += "-DARMSX2_ENABLE_LSFG=ON" } }
         }

@@ -122,6 +122,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0073](TASK-0073-lancamento-externo-entrega-file-uri-cru-ao-core.md) — o lançamento externo entrega `file://` cru ao core, e o jogo não boota | concluída | — | intent-view-externo-abre-o-app-e-nao-boota-o-jogo | — |
 | [TASK-0072](TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) — retirar a regra `gl-arm-g52-r38-auto-vulkan`: o defeito é do título, não do driver | em andamento | — | — | — |
 | [TASK-0074](TASK-0074-musica-do-menu-de-pausa-nasce-desligada.md) — a música do menu de pausa nasce desligada | concluída | 9f699f9390 | — | — |
+| [TASK-0075](TASK-0075-publicacao-do-fork-em-trilha-propria.md) — o fork publica em trilha própria, sem tocar nos clientes da linha antiga | em andamento | — | — | — |
 
 > **O índice está 22 linhas atrasado.** As tasks TASK-0018 a TASK-0037 e a TASK-0039 existem, estão
 > commitadas e não aparecem acima. Não é descuido de quem as escreveu: `check_traceability.py --fix`
