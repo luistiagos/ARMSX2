@@ -46,8 +46,11 @@ object PauseMusic {
     private const val FadeOutMs = 500L
     private const val FadeSteps = 32
 
-    /** On by default — the menu was silent and this fills it; the toggle turns it off. */
-    val enabled = mutableStateOf(true)
+    /** OFF by default (TASK-0074, product owner's call): audio starting when you open a menu is
+     *  startling if you didn't ask for it. The toggle in App settings turns it on, and because
+     *  [EnabledKey] is written ONLY by [set], flipping this default reaches every install that
+     *  never touched that toggle while leaving anyone who deliberately enabled it playing. */
+    val enabled = mutableStateOf(false)
     val volumePercent = mutableStateOf(DefaultVolumePercent)
     /** Display name of an imported track, or null when using the bundled one. */
     val customName = mutableStateOf<String?>(null)
@@ -88,7 +91,7 @@ object PauseMusic {
         java.io.File(context.filesDir, "pause_music_custom")
 
     fun load() {
-        enabled.value = MainActivityRuntime.prefs.getBoolean(EnabledKey, true)
+        enabled.value = MainActivityRuntime.prefs.getBoolean(EnabledKey, false)
         volumePercent.value = MainActivityRuntime.prefs.getInt(VolumeKey, DefaultVolumePercent)
         customName.value = MainActivityRuntime.prefs.getString(CustomNameKey, null)
     }
