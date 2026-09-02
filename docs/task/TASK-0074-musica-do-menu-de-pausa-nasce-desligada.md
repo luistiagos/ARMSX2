@@ -1,11 +1,11 @@
 # TASK-0074: a música do menu de pausa nasce desligada
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-02
-- **Concluída em:** —
+- **Concluída em:** 2026-09-02
 - **Feature:** nenhuma
 - **Bugs que resolve:** nenhum
-- **Commit:** — (o vínculo é o prefixo `TASK-0074:` no assunto)
+- **Commit:** 9f699f9390 (o vínculo é o prefixo `TASK-0074:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
 
