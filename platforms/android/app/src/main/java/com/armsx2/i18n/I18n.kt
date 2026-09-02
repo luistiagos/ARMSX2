@@ -248,15 +248,7 @@ private val BASE_EN: Map<String, String> = mapOf(
     "tab.patches" to "Patches",
     "tab.recompiler" to "Recompiler",
     "tab.skins" to "Skins",
-    // --- App tab / icon / language ---
-    "app.icon" to "App Icon",
-    "app.icon.desc" to "Choose the icon displayed on your home screen.",
-    "app.icon.default" to "Default",
-    "app.icon.classic" to "Classic",
-    "app.icon.gold" to "Gold",
-    "app.icon.retro" to "Retro",
-    "app.icon.minimal" to "Minimalist",
-    "app.icon.applied" to "Launcher icon updated.",
+    // --- App tab / language ---
     "app.libraryMusic" to "Library Music",
     "app.libraryMusic.volume" to "Library Music Volume",
     "app.libraryMusic.choose" to "Choose Music File…",

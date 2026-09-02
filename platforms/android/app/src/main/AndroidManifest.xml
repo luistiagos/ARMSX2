@@ -108,7 +108,13 @@
             </intent-filter>
         </activity>
 
-        <!-- Alternative App Icon Aliases (AppIconManager) -->
+        <!-- Dead aliases from the old app-icon picker (TASK-0076), kept on purpose.
+             The picker is gone and nothing enables these any more, but an install that had
+             picked one still carries the PackageManager decision that enabled the alias and
+             DISABLED .BootSplashActivity - it survives the APK update. Deleting them here
+             would leave that install with no launcher entry at all, and AppIconManager's
+             one-shot reset only runs when the app is launched. They go once no supported
+             install can still be sitting on one. -->
         <activity-alias
             android:name=".BootSplashActivityClassic"
             android:enabled="false"

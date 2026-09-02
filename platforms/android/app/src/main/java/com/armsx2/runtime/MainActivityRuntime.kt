@@ -2399,7 +2399,7 @@ open class MainActivityRuntime : ComponentActivity() {
         com.armsx2.LibraryView.load()
         com.armsx2.ui.UiScale.load()
         com.armsx2.ui.theme.ThemePreferences.load()
-        com.armsx2.utils.AppIconManager.load(applicationContext)
+        com.armsx2.utils.AppIconManager.restoreDefaultIcon(applicationContext)
         com.armsx2.ui.ScreenPinning.load()
         com.armsx2.ui.QuickMenuSide.load()
         com.armsx2.ui.theme.ToolbarPositionPreferences.load()
