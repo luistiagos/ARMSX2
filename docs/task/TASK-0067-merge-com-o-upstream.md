@@ -1,8 +1,8 @@
 # TASK-0067: `git merge upstream/master` — 72 commits, incluindo correções de GS que não temos
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-31
-- **Concluída em:** —
+- **Concluída em:** 2026-09-01
 - **Feature:** [FEAT-0001](../features/FEAT-0001-sync-upstream-oficial.md)
 - **Bugs que resolve:** nenhum confirmado — ver "O que esta task NÃO promete"
 - **Commit:** — (o vínculo é o prefixo `TASK-0067:` no assunto)
