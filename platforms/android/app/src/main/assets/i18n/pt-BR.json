@@ -1,13 +1,5 @@
 {
  "_note": "Machine-translated (pt-BR); report bad strings to fix.",
- "app.icon": "Ícone do aplicativo",
- "app.icon.desc": "Escolha o ícone exibido na tela inicial do dispositivo.",
- "app.icon.default": "Padrão",
- "app.icon.classic": "Clássico",
- "app.icon.gold": "Dourado",
- "app.icon.retro": "Retrô",
- "app.icon.minimal": "Minimalista",
- "app.icon.applied": "Ícone do launcher atualizado.",
  "catalog.title": "Catálogo de ROMs",
  "catalog.loading": "Carregando catálogo…",
  "catalog.available": "Disponíveis",

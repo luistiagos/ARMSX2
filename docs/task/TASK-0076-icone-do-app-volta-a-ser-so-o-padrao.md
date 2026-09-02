@@ -63,6 +63,9 @@ no launcher.
   `restoreDefaultIcon()`, uma vez por instalação, com guarda em preferência.
 - `MainActivityRuntime.kt:2402` — `AppIconManager.load()` vira `restoreDefaultIcon()`.
 - `I18n.kt` — fora as oito chaves `app.icon*`, sem uso depois disto.
+- `assets/i18n/pt-BR.json` — as mesmas oito chaves traduzidas. É o único dos 19 JSONs de
+  idioma que as tinha; `grep` no `.kt` não alcança `assets/`, e por isso elas quase ficaram
+  para trás.
 - `test/.../utils/AppIconTest.kt` — apagado. Testava só o `enum AppIcon` (o `fromId()` e as
   propriedades das cinco variantes); sem o enum ele não compila, e não há o que ele ainda
   cubra. `compileGithubDebugKotlin` **não** compila `src/test`, então isto não aparece na
