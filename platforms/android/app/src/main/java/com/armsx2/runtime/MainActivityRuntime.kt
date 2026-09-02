@@ -1057,7 +1057,16 @@ open class MainActivityRuntime : ComponentActivity() {
             // while the same title launched from our own library applied them correctly.
             // Build a GameInfo for the incoming URI so the external path keys off the same
             // settingsKey the library path does (serial for discs, filename stem otherwise).
-            launchGame(queued, externalGameInfo(queued), external = true)
+            // The core wants the BARE /storage path for file:// and the URI string for
+            // content:// — the same conversion HomeViewModel.launch, HomeShortcuts,
+            // launchGameFromSaveSlot and SettingsScreen all do. Without it the native boot
+            // rejects the percent-encoded "file:///…" and kicks straight back to the library
+            // with no error, which is exactly how this arrived as a bug report. Note
+            // externalGameInfo still gets the ORIGINAL string, so GameInfo.uri stays the real
+            // file:// URI the library also stores; only the launch argument is converted.
+            val queuedUri = queued.toUri()
+            val launchPath = if (queuedUri.scheme == "file") queuedUri.path ?: queued else queued
+            launchGame(launchPath, externalGameInfo(queued), external = true)
         }
 
         /**

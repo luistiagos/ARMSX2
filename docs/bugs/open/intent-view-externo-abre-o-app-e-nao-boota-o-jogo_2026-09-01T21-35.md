@@ -8,7 +8,7 @@
 - **Classe:** fail
 - **Reincidência:** não registrado antes
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** nenhuma
+- **Tasks que o resolvem:** [TASK-0073](../../task/TASK-0073-lancamento-externo-entrega-file-uri-cru-ao-core.md)
 
 ## Sintoma
 
@@ -69,3 +69,19 @@ Instrumentar os três pontos com uma linha de log cada — `handleExternalLaunch
 (com a URI), `launchPendingExternalGameIfReady` no `return` do gate (com os dois booleanos), e
 `launchGame` na entrada. Uma execução responde qual dos três não acontece, e o defeito hoje é
 invisível justamente porque nenhum deles fala.
+
+## Causa encontrada (2026-09-02)
+
+A seção acima dizia que a causa não estava identificada e sugeria instrumentar três pontos. **A
+instrumentação já existia**: `launchGame` imprime `@@ANDROID_LAUNCH_GAME@@` com a URI em toda
+chamada. O log capturado ontem já tinha a resposta.
+
+`launchGame` é chamado. O argumento é que está errado — chega `file:///…/007%20-%20….chd` em vez
+do caminho nu `/storage/…/007 - Everything or Nothing (USA).chd`. O core rejeita e volta à
+biblioteca em silêncio. Corrigido pela [TASK-0073](../../task/TASK-0073-lancamento-externo-entrega-file-uri-cru-ao-core.md).
+
+Duas coisas que a suspeita de ontem errou, e vale registrar:
+
+1. **Não é específico de `am start` por shell.** Qualquer chamador que mande `file://` cai nisso,
+   e `resolveCueToTrack` — escrito para Cocoon/Daijisho/ES-DE — produz `file://` por construção.
+2. **Não é regressão do merge.** O idioma de conversão falta no lado externo desde que ele existe.
