@@ -97,14 +97,38 @@ todo aparelho.
 2. **Default inalterado** — com `ForcePS2DepthQuantization=false`, a linha de log do device
    (`GSDeviceVK.cpp:3913`, que já imprime `no_ps2_z_quantization`) sai igual à de antes no mesmo
    aparelho.
-3. **No aparelho, o A/B que hoje é impossível** — Galaxy A12, renderizador Vulkan, 007 Everything or
-   Nothing, upscale 1x:
-   - toggle **off**: as linhas estão lá (estado atual);
-   - toggle **on** + reiniciar o jogo: as linhas somem ou não.
+3. **No aparelho — o A/B, com o passo que a TASK-0072 tornou obrigatório**
 
-   **As duas respostas são resultado.** Se sumirem, a causa está nomeada e a discussão passa a ser
-   qual deve ser o default em Mali. Se não sumirem, uma hipótese cara caiu por um toggle em vez de
-   por um ciclo de APK — e a próxima suspeita é a lista de diferenças GL↔Vulkan do registro do bug.
+   ⚠️ **O renderizador precisa ser posto em Vulkan À MÃO.** Desde a
+   [TASK-0072](TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) o `auto` resolve
+   **OpenGL** neste aparelho, e em OpenGL o 007 fica preto — sem este passo o teste mede o defeito
+   errado.
+
+   | # | passo |
+   |---|---|
+   | 1 | menu em jogo → **Renderer** → **Vulkan** (é por jogo) |
+   | 2 | Configurações → Renderer → **Forçar precisão de profundidade do PS2** → **ligado** |
+   | 3 | reiniciar o jogo — a chave é lida em `CheckFeatures`, na criação do device |
+   | 4 | conferir no log que a chave PEGOU (abaixo) |
+   | 5 | olhar o cano do revólver e a cena 3D do briefing |
+
+   **Conferir que pegou, antes de olhar a imagem.** O device imprime, em `DevCon` (nível `DEV`, e o
+   Android sobe o console para `DEBUG` em [native-lib.cpp:308](../../platforms/android/app/src/main/cpp/native-lib.cpp#L308),
+   então a linha aparece):
+
+   ```
+   Optional features: primitive_id texture_barrier ... no_ps2_z_quantization
+   ```
+
+   Com o toggle **ligado**, o token `no_ps2_z_quantization` tem de **sumir** dessa linha. Se ele
+   continuar lá, o toggle não chegou ao core e o resultado da imagem não vale nada — este passo
+   existe para que um resultado nulo não seja confundido com "a chave não pegou".
+
+   **As duas respostas são resultado.** Se as linhas sumirem, a causa está nomeada e a discussão
+   passa a ser qual deve ser o default em Mali. Se não sumirem, uma hipótese cara caiu por um toggle
+   em vez de por um ciclo de APK — e a próxima suspeita é a lista de diferenças GL↔Vulkan do
+   registro do bug (`dual_source_blend`, o caminho de `framebuffer_fetch`, `test_and_sample_depth`,
+   `stencil_buffer`).
 
 ## Contexto que quem pegar isto precisa ter
 
