@@ -1,10 +1,11 @@
 # TASK-0076: o ícone do app volta a ser só o padrão
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-02
+- **Concluída em:** 2026-09-02
 - **Feature:** nenhuma
 - **Bugs que resolve:** nenhum
-- **Commit:** —
+- **Commit:** 8d0964b416, 695228cd38 (o vínculo é o prefixo `TASK-0076:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
 
