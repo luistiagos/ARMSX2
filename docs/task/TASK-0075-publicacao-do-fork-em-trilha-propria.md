@@ -1,11 +1,11 @@
 # TASK-0075: o fork publica em trilha própria, sem tocar nos clientes da linha antiga
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-02
-- **Concluída em:** —
+- **Concluída em:** 2026-09-02
 - **Feature:** nenhuma
 - **Bugs que resolve:** nenhum
-- **Commit:** —
+- **Commit:** 6bb695c0c3 (o vínculo é o prefixo `TASK-0075:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
 
