@@ -85,14 +85,43 @@ commits de correções que simplesmente não tínhamos.
 Se depois do merge os defeitos continuarem, isso é **informação**: elimina "está consertado lá e a
 gente não puxou" de uma vez, em vez de uma hipótese por rodada.
 
-## Como será validado
+## Como foi validado
 
 1. **Kotlin** — `:app:compileGithubDebugKotlin` com `-Pkotlin.incremental=false`. ✅ passou.
-2. **Nativo** — build completo do `emucore_4k` em árvore limpa, com as sete pastas do shaderc
-   copiadas para o worktree do merge (elas são `gitignore`d e não acompanham worktree novo).
+2. **Nativo** — build completo do `emucore_4k`, com as sete pastas do shaderc presentes na
+   árvore (elas são `gitignore`d e não acompanham worktree novo). ✅ passou.
 3. **Identidade** — `applicationId`/`versionCode`/`versionName` conferidos. ✅ intactos.
-4. **Rastreabilidade** — `check_traceability.py`.
-5. **No aparelho** — APK no A12, 007 em Vulkan e em OpenGL. As duas respostas são resultado.
+4. **Rastreabilidade** — `check_traceability.py`. ✅ OK, 71 tasks, 2 features.
+5. **No aparelho** — APK no A12, 007 em Vulkan e em OpenGL. ✅ executado em 2026-09-01, abaixo.
+
+## O resultado no aparelho (2026-09-01)
+
+Merge integrado na branch de trabalho (`e047ce36fe`, dois pais), `:app:assembleGithubDebug`
+BUILD SUCCESSFUL em 10 min 41 s, APK instalado no Galaxy A12 `SM-A127M`. Condições iguais às do
+A/B de 31/08: `upscaleFloat = 1` (1x nativo) e `forcePs2DepthQuantization = false`.
+
+**Os dois defeitos continuam. Nenhum dos 72 commits corrigiu qualquer um deles.**
+
+| renderizador | backend confirmado no log | resultado |
+|---|---|---|
+| Vulkan | `reason=commit renderer=14`, device Vulkan inicializado, 189 entradas lidas do cache de shader | **linhas verticais presentes** — no cano do revólver o círculo branco sai estriado em vez de sólido, e a cena 3D do briefing fica listrada de ponta a ponta |
+| OpenGL | `reason=commit renderer=12`, `GL_RENDERER: Mali-G52`, driver `r38p1` | **tela preta permanente** — o FMV de abertura aparece e, a partir dele, a saída não muda mais |
+
+A tela preta foi **medida, não julgada a olho**: as capturas em +52 s, +112 s, +142 s e +172 s são
+byte a byte idênticas (md5 `629192d67bc9d079dd30d6a549d2b453`), enquanto o `PerfLog` do mesmo
+intervalo mostra a VM viva e produzindo — quadro 5845, 36,9 fps, GS em 66%. É a assinatura exata
+do bug: o GS produz quadros e nada chega ao painel.
+
+**Um dado lateral que não estava registrado:** o defeito do GL é **do título, não do backend**. O
+*10 Pin - Champions Alley* bootou em OpenGL no mesmo aparelho e na mesma sessão, e renderizou
+normalmente. A regra `gl-arm-g52-r38-auto-vulkan`, que desvia **todo** Mali-G52 r38 para Vulkan,
+continua sendo alcance global a partir de evidência de um jogo.
+
+### O que isso fecha
+
+O merge entregou o que a task prometia, que era eliminar uma hipótese — não consertar um sintoma.
+"Está consertado lá e a gente não puxou" deixa de ser explicação possível: a árvore está no
+upstream de 31/08 e os dois defeitos continuam idênticos. É informação, e era o objetivo.
 
 ## Nota de processo
 

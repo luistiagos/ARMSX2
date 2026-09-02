@@ -89,3 +89,23 @@ Uma diferença já foi conferida e **não** é a causa: `SetSwapInterval` ganhou
 3. Com o veredito do renderer agora em todo relato (TASK-0065), confirmar em campo que a regra está
    de fato casando nos aparelhos afetados — hoje isso é indistinguível de "não casou e o usuário
    escolheu Vulkan à mão".
+
+## Reteste depois do merge com o upstream (2026-09-01)
+
+Retestado no mesmo A12 `SM-A127M`, com a árvore já no upstream de 31/08
+([TASK-0067](../../task/TASK-0067-merge-com-o-upstream.md), 72 commits) e APK `githubDebug` novo.
+**O defeito continua.** `renderer=12` confirmado no log, `GL_RENDERER: Mali-G52`, driver `r38p1`.
+
+O que o reteste acrescenta ao registro:
+
+1. **A tela preta agora está medida, não julgada a olho.** As capturas em +52 s, +112 s, +142 s e
+   +172 s do boot são **byte a byte idênticas** (md5 `629192d67bc9d079dd30d6a549d2b453`), enquanto o
+   `PerfLog` do mesmo intervalo mostra a VM viva — quadro 5845, 36,9 fps, GS em 66%. Confirma a
+   descrição do sintoma com número em vez de impressão.
+2. **O FMV de abertura APARECE.** Não é preto desde o primeiro quadro: a silhueta da abertura
+   renderiza por volta de +80 s, e só depois a saída congela em preto. Quem for procurar a causa
+   precisa saber que o caminho de apresentação funciona por alguns segundos antes de parar.
+3. **O defeito é do título, não do backend.** O *10 Pin - Champions Alley* bootou em OpenGL no
+   mesmo aparelho e na mesma sessão e renderizou normalmente. Isso enfraquece ainda mais a regra
+   `gl-arm-g52-r38-auto-vulkan`, que desvia **todo** Mali-G52 r38 do mundo com base neste jogo.
+4. **Não é "o upstream já resolveu".** Essa hipótese está eliminada.

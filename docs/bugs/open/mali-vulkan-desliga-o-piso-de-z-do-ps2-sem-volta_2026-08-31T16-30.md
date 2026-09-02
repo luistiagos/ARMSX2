@@ -112,3 +112,18 @@ foram ao aparelho e voltaram erradas**. Esta não vai ser a terceira: ela vai co
 | `pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm` | 1358 | mesmo formato, Apple GPU |
 | `pcsx2/GS/Renderers/HW/GSRendererHW.cpp` | 5790 | o que o piso protege (`false passing`) |
 | `pcsx2/Config.h` | 908 | `DisablePS2DepthQuantization` |
+
+## Reteste depois do merge com o upstream (2026-09-01)
+
+Retestado no mesmo A12 `SM-A127M`, com a árvore já no upstream de 31/08
+([TASK-0067](../../task/TASK-0067-merge-com-o-upstream.md), 72 commits) e APK `githubDebug` novo.
+**As linhas continuam.** `renderer=14` confirmado no log, device Vulkan inicializado, upscale em
+1x nativo e `forcePs2DepthQuantization = false` — as mesmas condições do A/B de 31/08.
+
+Onde elas aparecem, para quem for reproduzir: na sequência do cano do revólver o círculo branco sai
+**estriado** em vez de sólido, e a cena 3D do briefing fica listrada de ponta a ponta. Não é
+transitório: reproduziu em duas capturas separadas por 35 s.
+
+Os dois fixes de GS do upstream já estavam na árvore antes do merge, e os 72 commits novos não
+trouxeram outro. A hipótese "está consertado lá e a gente não puxou" está eliminada; a
+[TASK-0064](../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md) segue sendo o caminho.
