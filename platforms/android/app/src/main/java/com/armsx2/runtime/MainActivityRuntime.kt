@@ -5439,6 +5439,10 @@ open class MainActivityRuntime : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         runCatching { com.armsx2.SecondScreen.setForeground(applicationContext, true) }
+        // O usuário SAI do app para desabilitar o GOS (LADB em tela dividida com os Ajustes) e
+        // volta. Reconsultar o pacote aqui é o que faz a linha de conserto sumir de Configurações
+        // na volta, em vez de só no próximo arranque. No-op fora de um Samsung.
+        com.armsx2.ThrottleWatcher.refresh()
         // Woke from a real sleep (paired with the onPause sleep chime): play the wake chime + a brief
         // top-left "Welcome Back!". A plain background return never set wasAsleep, so this only fires
         // after an actual screen-off sleep.

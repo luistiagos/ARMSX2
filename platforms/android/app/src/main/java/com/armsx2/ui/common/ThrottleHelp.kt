@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -24,12 +25,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -54,8 +57,12 @@ import com.armsx2.ui.settings.controllerFocusable
  * O que resolve é `pm disable-user`, e há caminho sem PC para ele. É mais longo, mas é **uma vez
  * na vida do aparelho** contra três toques por sessão que quase sempre não funcionam.
  *
- * **Autolimitante:** o aviso só nasce enquanto o GOS estiver ativo. Assim que o usuário concluir,
- * a condição fica falsa e ele nunca mais aparece — sem precisar de "não mostrar de novo".
+ * **Autolimitante, e ainda assim com caixa de silêncio.** O aviso só nasce enquanto o GOS estiver
+ * ativo: quem conclui o procedimento para de ser interrompido sozinho. A TASK-0059 concluiu daí
+ * que um "não mostrar de novo" era dispensável, e isso valia só para quem FAZ o procedimento —
+ * para quem não vai instalar o LADB, o diálogo nascia em toda abertura do app, para sempre. A
+ * checkbox do passo 0 (TASK-0077) é a saída desse caso, e ela silencia apenas o disparo
+ * automático: a linha de Configurações continua lá, que é a porta de volta.
  *
  * Não usa `Dialog`/`AlertDialog` pelo motivo que o cabeçalho de [PadModal] explica: cada um é uma
  * janela Android própria e engole os KeyEvents do gamepad antes do `dispatchKeyEvent` da Activity.
@@ -180,6 +187,20 @@ object ThrottleHelp {
                                 .weight(1f, fill = false)
                                 .verticalScroll(bodyScroll),
                         )
+                        // Só no aviso (passo 0). Dentro do assistente ela não faria sentido: quem
+                        // está no passo 6 já decidiu resolver, e a condição vai sumir sozinha.
+                        //
+                        // De duas vias de propósito: quem reabrir pelo menu de Configurações a
+                        // encontra MARCADA e pode desmarcar. Uma caixa que só sabe silenciar é um
+                        // botão de sentido único com cara de opção.
+                        if (s == 0) {
+                            Spacer(Modifier.height(12.dp))
+                            DontShowAgainRow(
+                                id = "$LAYER.dontShow",
+                                checked = com.armsx2.ThrottleWatcher.noticeDismissed.value,
+                                onChange = { com.armsx2.ThrottleWatcher.setNoticeDismissed(it) },
+                            )
+                        }
                         Spacer(Modifier.height(14.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             HelpButton(
@@ -233,6 +254,38 @@ object ThrottleHelp {
      *  `ActivityNotFoundException` em cima de quem só seguia instruções. */
     private fun warnUnavailable() {
         WelcomeBanner.show(I18n.get("throttle.help.openFailed"))
+    }
+}
+
+/**
+ * "Não mostrar isto de novo", no aviso de abertura.
+ *
+ * Focável por controle como toda linha deste app — sem isso ela seria perfeita no toque e
+ * inalcançável num aparelho de controle, que é exatamente o defeito que o [PadModal] existe para
+ * não repetir. Esquerda/direita desmarcam/marcam, e o toque em qualquer ponto da linha alterna.
+ */
+@Composable
+private fun DontShowAgainRow(id: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .controllerFocusable(
+                controllerId = id,
+                shape = RoundedCornerShape(12.dp),
+                onConfirm = { onChange(!checked) },
+                onLeft = { if (checked) onChange(false) },
+                onRight = { if (!checked) onChange(true) },
+            )
+            .clickable { onChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onChange)
+        Spacer(Modifier.width(4.dp))
+        Text(
+            str("throttle.help.dontShowAgain"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

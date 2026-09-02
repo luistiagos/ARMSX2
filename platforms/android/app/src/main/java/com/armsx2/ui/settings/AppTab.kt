@@ -722,10 +722,15 @@ fun AppTab() {
             onChange = { com.armsx2.ThrottleWatcher.set(it) },
         )
 
-        // Só aparece para quem o corte já atingiu, e só onde eu sei para qual tela mandar. Um
-        // botão de conserto num aparelho sem o defeito seria ruído; num aparelho de outro
-        // fabricante seria um chute com cara de instrução.
-        if (com.armsx2.ThrottleWatcher.vendorFixAvailable()) {
+        // A porta de volta. Quem marcou "não mostrar de novo" no aviso, ou fechou com "Agora não"
+        // e depois mudou de ideia, chega ao assistente por aqui — e é por isso que esta linha NÃO
+        // olha o interruptor acima nem a checkbox: silenciar o aviso não pode esconder o conserto.
+        //
+        // O portão é um só, [ThrottleWatcher.deviceAffected]: Samsung com o GOS habilitado agora.
+        // Um botão de conserto num aparelho sem o defeito seria ruído; num aparelho de outro
+        // fabricante seria um chute com cara de instrução. Como `vendorActive` é estado do Compose
+        // e o `onResume` o reconsulta, esta linha some sozinha assim que o GOS for desabilitado.
+        if (com.armsx2.ThrottleWatcher.deviceAffected()) {
             Text(
                 str("app.throttleWarnings.fixHint"),
                 style = MaterialTheme.typography.bodySmall,

@@ -1374,6 +1374,7 @@
  "throttle.help.step10": "Pronto. Abra um jogo: ele deve estar bem mais rápido.\n\nSe um dia voltar a ficar lento — depois de uma atualização do sistema, por exemplo — é só repetir estes passos.\n\nPara desfazer, use o LADB de novo com o comando:\npm enable com.samsung.android.game.gos",
  "throttle.help.seeHow": "Quero resolver",
  "throttle.help.later": "Agora não",
+ "throttle.help.dontShowAgain": "Não mostrar isto de novo",
  "throttle.help.start": "Vamos lá",
  "throttle.help.gotIt": "Entendi",
  "throttle.help.openStore": "Abrir a loja",

@@ -18,7 +18,9 @@
   [TASK-0054](../../task/TASK-0054-assistente-do-limite-do-aparelho.md) (assistente passo a
   passo que cabe deitado) e
   [TASK-0059](../../task/TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) (o assistente
-  abre no início do app e ensina o `pm disable-user`, que é o que funciona) —
+  abre no início do app e ensina o `pm disable-user`, que é o que funciona) e
+  [TASK-0077](../../task/TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) (o aviso ganha
+  "não mostrar de novo", e o item de Configurações vira a porta de volta) —
   **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
   desabilitar o GOS nem forçar a parada dele
 

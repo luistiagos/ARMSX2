@@ -33,9 +33,17 @@ object ThrottleWatcher {
     private const val CPU0_CPUFREQ = "/sys/devices/system/cpu/cpu0/cpufreq"
 
     private const val PREF_KEY = "throttle.warnings"
-    /** Houve corte neste aparelho. Grudento de propósito: responde "este aparelho já sofreu isso",
-     *  e é o que decide se a linha de conserto aparece em Configurações — não se o aviso dispara. */
+    /** Houve corte neste aparelho. Grudento de propósito: responde "este aparelho já sofreu isso".
+     *  Só alimenta o log de sessão — quem decide o que aparece na tela é [deviceAffected]. */
     private const val PREF_DETECTED = "throttle.detected"
+    /**
+     * O usuário marcou "não mostrar isto de novo" no aviso de abertura.
+     *
+     * Pref PRÓPRIA, e não o [PREF_KEY]. O interruptor é o mestre e desarma também a medição de
+     * clock que grava `@@ANDROID_THROTTLE@@` — que é o que o suporte lê quando o cliente reclama
+     * de lentidão. Calar o aviso não pode custar o diagnóstico, então são duas chaves.
+     */
+    private const val PREF_NOTICE_DISMISSED = "throttle.notice.dismissed"
 
     /**
      * O serviço da Samsung que aplica o corte. Só o nome do pacote: o app não o desabilita — a
@@ -66,6 +74,13 @@ object ThrottleWatcher {
     val detected = androidx.compose.runtime.mutableStateOf(false)
 
     /**
+     * Checkbox "não mostrar isto de novo" do aviso de abertura. Silencia SÓ o disparo automático:
+     * o item de Configurações continua aparecendo, porque ele é a porta de volta para quem marcou
+     * a caixa e depois mudou de ideia.
+     */
+    val noticeDismissed = androidx.compose.runtime.mutableStateOf(false)
+
+    /**
      * O pacote do GOS está instalado E habilitado. Reavaliado a cada início de sessão porque o
      * estado muda debaixo do app: o serviço volta sozinho depois de uma parada forçada (medido —
      * o mesmo pid reapareceu ~40 min depois), e pode ter sido desabilitado por `pm disable-user`
@@ -89,37 +104,52 @@ object ThrottleWatcher {
             val prefs = com.armsx2.runtime.MainActivityRuntime.prefs
             enabled.value = prefs.getBoolean(PREF_KEY, true)
             detected.value = prefs.getBoolean(PREF_DETECTED, false)
+            noticeDismissed.value = prefs.getBoolean(PREF_NOTICE_DISMISSED, false)
         }
-        refreshVendorState()
+        refresh()
     }
 
     /**
-     * Há o que ensinar: o serviço que sei desarmar está instalado e habilitado agora.
+     * **Este aparelho tem o problema, agora.** Fabricante Samsung **e** pacote do GOS instalado e
+     * habilitado.
      *
-     * Não exige mais ter medido um corte antes. O corte é consequência do GOS estar ativo, e
-     * esperar a medição para oferecer ajuda significa só oferecer depois que o usuário já
-     * apanhou — enquanto a condição que importa dá para checar no início do app.
+     * É a ÚNICA definição disso no app, de propósito: tanto o aviso de abertura
+     * ([maybeShowStartupNotice]) quanto o item de Configurações leem daqui, então os dois não
+     * podem discordar. Enquanto eram duas expressões separadas, o item de menu checava só o
+     * pacote — num aparelho de outro fabricante que por qualquer motivo o tivesse, o menu
+     * oferecia um conserto que o aviso não oferecia.
+     *
+     * Não exige ter medido um corte antes. O corte é consequência do GOS estar ativo, e esperar a
+     * medição para oferecer ajuda significa só oferecer depois que o usuário já apanhou.
      */
-    fun vendorFixAvailable(): Boolean = vendorActive.value
+    fun deviceAffected(): Boolean =
+        vendorActive.value && Build.MANUFACTURER.equals("samsung", ignoreCase = true)
 
     /**
-     * O aviso do início do app: uma vez por abertura, e só quando as duas condições valem —
-     * fabricante Samsung **e** pacote do GOS instalado e habilitado.
+     * O aviso do início do app: uma vez por abertura, e só quando o aparelho tem o problema
+     * ([deviceAffected]) e o usuário não pediu silêncio.
      *
-     * **Autolimitante de propósito.** Assim que o usuário seguir o assistente, o pacote fica
-     * desabilitado, [vendorActive] passa a ser falso e este aviso nunca mais aparece. É o que
-     * dispensa um "não mostrar de novo": quem resolveu para de ser interrompido sozinho.
+     * **Autolimitante primeiro, checkbox depois.** Quem segue o assistente para de ser
+     * interrompido sozinho — o pacote fica desabilitado e [deviceAffected] passa a ser falsa. A
+     * caixa existe para o outro caso, que a TASK-0059 não cobriu: quem NÃO vai instalar o LADB
+     * levava este diálogo em toda abertura do app, para sempre.
      */
     fun maybeShowStartupNotice() {
         if (!enabled.value) return
-        refreshVendorState()
-        if (!vendorActive.value) return
-        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true)) return
+        if (noticeDismissed.value) return
+        refresh()
+        if (!deviceAffected()) return
         val activity = com.armsx2.runtime.MainActivityRuntime.instance ?: return
         activity.runOnUiThread { ThrottleHelp.show() }
     }
 
     /**
+     * Reconsulta o estado do pacote. Chamada do `onCreate` e do `onResume`.
+     *
+     * **O `onResume` não é zelo.** Para rodar o `pm disable-user` o usuário SAI do app (LADB, tela
+     * dividida com os Ajustes) e volta; sem reconsultar na volta, o item de Configurações seguiria
+     * oferecendo um conserto já feito até o app ser morto e reaberto.
+     *
      * Consulta o `PackageManager`. Exige `<queries>` no manifesto: sem isso a visibilidade de
      * pacotes do Android 11+ esconde o GOS e a resposta seria sempre "não existe".
      *
@@ -127,11 +157,20 @@ object ThrottleWatcher {
      * cair em `false` aqui é a resposta certa — desabilitado é o mesmo que inativo para quem
      * pergunta se ainda há corte a desarmar.
      */
-    private fun refreshVendorState() {
+    fun refresh() {
+        // Fora de um Samsung não há o que consultar, e isto roda a cada onResume: pular a chamada
+        // de binder na esmagadora maioria dos aparelhos é de graça, porque `vendorActive` num
+        // aparelho de outro fabricante não decide nada — [deviceAffected] já o excluiu.
+        if (!Build.MANUFACTURER.equals("samsung", ignoreCase = true)) return
         val ctx = com.armsx2.runtime.MainActivityRuntime.instance?.applicationContext
+        val wasActive = vendorActive.value
         vendorActive.value = if (ctx == null) false else runCatching {
             ctx.packageManager.getApplicationInfo(VENDOR_THROTTLER_PACKAGE, 0).enabled
         }.getOrDefault(false)
+        // Resolveu: desarma a caixa. Sem isto, um "não mostrar de novo" marcado hoje calaria o
+        // aviso para sempre — inclusive daqui a meses, se uma atualização de sistema ou uma
+        // restauração trouxer o GOS de volta e o corte com ele. A caixa é para o aviso de HOJE.
+        if (wasActive && !vendorActive.value && noticeDismissed.value) setNoticeDismissed(false)
     }
 
     fun set(value: Boolean) {
@@ -139,6 +178,15 @@ object ThrottleWatcher {
         runCatching {
             com.armsx2.runtime.MainActivityRuntime.prefs.edit()
                 .putBoolean(PREF_KEY, value).apply()
+        }
+    }
+
+    /** A checkbox do aviso. De duas vias: quem reabrir pelo menu pode desmarcar. */
+    fun setNoticeDismissed(value: Boolean) {
+        noticeDismissed.value = value
+        runCatching {
+            com.armsx2.runtime.MainActivityRuntime.prefs.edit()
+                .putBoolean(PREF_NOTICE_DISMISSED, value).apply()
         }
     }
 
@@ -153,7 +201,7 @@ object ThrottleWatcher {
      */
     fun start() {
         if (!enabled.value || sysfsUnreadable || sampler != null) return
-        refreshVendorState()
+        refresh()
         val clusters = readClusters()
         if (clusters.isEmpty()) {
             sysfsUnreadable = true

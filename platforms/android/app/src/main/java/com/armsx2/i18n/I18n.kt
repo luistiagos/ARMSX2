@@ -1492,6 +1492,7 @@ private val BASE_EN: Map<String, String> = mapOf(
     "throttle.help.step10" to "Done. Open a game: it should be much faster now.\n\nIf it ever gets slow again — after a system update, for instance — just repeat these steps.\n\nTo undo it, use LADB again with the command:\npm enable com.samsung.android.game.gos",
     "throttle.help.seeHow" to "Show me how",
     "throttle.help.later" to "Not now",
+    "throttle.help.dontShowAgain" to "Don't show this again",
     "throttle.help.start" to "Let's go",
     "throttle.help.gotIt" to "Got it",
     "throttle.help.openStore" to "Open the store",
