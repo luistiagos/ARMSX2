@@ -4,7 +4,7 @@
 - **Criada em:** 2026-09-02
 - **Concluída em:** 2026-09-02
 - **Feature:** —
-- **Bugs que resolve:** [intent-view-externo-abre-o-app-e-nao-boota-o-jogo](../bugs/open/intent-view-externo-abre-o-app-e-nao-boota-o-jogo_2026-09-01T21-35.md)
+- **Bugs que resolve:** [intent-view-externo-abre-o-app-e-nao-boota-o-jogo](../bugs/done/intent-view-externo-abre-o-app-e-nao-boota-o-jogo_2026-09-01T21-35.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0073:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —

@@ -85,3 +85,32 @@ Duas coisas que a suspeita de ontem errou, e vale registrar:
 1. **Não é específico de `am start` por shell.** Qualquer chamador que mande `file://` cai nisso,
    e `resolveCueToTrack` — escrito para Cocoon/Daijisho/ES-DE — produz `file://` por construção.
 2. **Não é regressão do merge.** O idioma de conversão falta no lado externo desde que ele existe.
+
+## Correção validada (2026-09-02)
+
+Mesmo `am start`, no mesmo A12, com o APK que contém a correção:
+
+```
+@@ANDROID_LAUNCH_GAME@@ ... uri=/storage/emulated/0/…/007 - Everything or Nothing (USA).chd
+Loading /storage/emulated/0/…/007 - Everything or Nothing (USA).chd
+Opening CDVD... → cdvdLoadElf(): 'cdrom0:\SLUS_207.51;1' → Serial: SLUS-20751
+ELF cdrom0:\SLUS_207.51;1 with entry point at 0x01F00008 is executing.
+```
+
+Sem `@@ANDROID_VM_INIT_FAILED@@`. O `Loading game settings from '…/SLUS-20751_6848699B.ini'` mostra
+de quebra que o `externalGameInfo` sondou o serial e o caminho externo passou a resolver as
+configurações **por jogo** — o que a [TASK-0067](../../task/TASK-0067-merge-com-o-upstream.md)
+tinha consertado e nunca se pôde exercitar, porque o boot morria antes.
+
+### Uma correção ao registro acima
+
+O sintoma foi descrito como "nada é dito — nem toast, nem log, nem erro". **O core dizia.** A linha
+existia e ficou de fora da captura de 01/09:
+
+```
+@@ANDROID_VM_INIT_FAILED@@ result=1 error=Requested filename
+'file:///storage/…/007%20-%20Everything%20or%20Nothing%20%28USA%29.chd' does not exist.
+```
+
+Ela nomeia a causa inteira — a URI percent-encoded chegando onde se espera caminho. Vale como
+lembrete de que "o log não diz nada" costuma ser um `grep` que não pegou, e não silêncio.
