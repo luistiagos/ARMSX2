@@ -1739,11 +1739,39 @@ open class MainActivityRuntime : ComponentActivity() {
             }
         }
 
+        /** Resolvido uma vez por escolha de pasta, e nunca mais. Chave = `systemDir.value`, para a
+         *  invalidação acontecer sozinha quando o usuário troca a pasta — sem depender de alguém
+         *  lembrar de limpar o cache em cada um dos pontos que escrevem a preferência. */
+        @Volatile private var assetCopyRootCache: Pair<String?, String>? = null
+
+        /**
+         * Raiz onde os assets são instalados e onde o core pina `EmuFolders`.
+         *
+         * **Memoizado de propósito, e não é otimização.** Uma resolução custa
+         * `validateSystemDirWritable` (`mkdirs` + `createNewFile` + `delete`) e, no caminho de
+         * fallback, `getExternalFilesDir(null)` — que entra em `ensureExternalDirsExistOrFilter()`
+         * e faz `mkdirs`. Esse é, literalmente, o stack do ANR do
+         * [A07](../../../../../../../../docs/bugs/open/armsx2-fork/datadirectorymanager-anr-getexternalfilesdir-a07_2026-08-20T14-17.md):
+         * quatro ocorrências, `java.io.UnixFileSystem.createDirectory0` na main thread. E há nove
+         * chamadores, vários em caminho de tela (capas, memory cards, overlays, catálogo).
+         *
+         * O cache também torna a raiz **estável durante o processo**, o que é mais correto que o
+         * comportamento anterior: com a sonda refeita a cada chamada, um cartão SD que desmontasse
+         * no meio da sessão fazia a raiz mudar por baixo, espalhando arquivos por duas pastas.
+         */
         fun assetCopyRoot(context: Context): String {
+            val key = systemDir.value
+            assetCopyRootCache?.let { (cachedKey, cachedRoot) ->
+                if (cachedKey == key) return cachedRoot
+            }
             val custom = systemDirPosix()
-            return custom?.takeIf { validateSystemDirWritable(it) }
+            val resolved = custom?.takeIf { validateSystemDirWritable(it) }
                 ?: context.getExternalFilesDir(null)?.absolutePath
                 ?: context.dataDir.absolutePath
+            // Corrida entre duas threads aqui é inofensiva: ambas calculam o mesmo caminho a
+            // partir da mesma chave, e a última a escrever grava o que a outra teria gravado.
+            assetCopyRootCache = key to resolved
+            return resolved
         }
 
         /**
@@ -1973,114 +2001,141 @@ open class MainActivityRuntime : ComponentActivity() {
     private fun kickoffEmucoreInit() {
         if (emucoreInitDone) return
         emucoreInitDone = true
-        // Record the root native is about to pin (same resolution as
-        // NativeApp.initializeOnce's dataPath) so a later storage change can be
-        // detected and trigger a restart instead of silently not taking effect.
-        lastInitDataRoot = assetCopyRoot(applicationContext)
 
-        // #9: one-time recovery for a fresh install that reuses an old data folder — restore
-        // settings from the in-folder mirror, or seed from the folder's old PCSX2-Android.ini,
-        // BEFORE the core loads/rewrites it. No-op (guarded) for anyone already on the new UI.
-        runCatching { com.armsx2.config.ConfigStore.reconcileReusedFolder() }
-        // A genuinely empty install gets capability-aware frame-queue defaults only
-        // after reused-folder recovery had its chance. Capable handhelds start in
-        // low-latency mode (queue 0); low-end devices retain the smoother queue 2.
-        runCatching { com.armsx2.config.ConfigStore.seedFreshInstallDefaults(applicationContext) }
-        // One-time: existing capable devices also get the Low Latency default (matches fresh installs).
-        runCatching { com.armsx2.config.ConfigStore.migrateLowLatencyOff(applicationContext) }
-        runCatching { com.armsx2.config.ConfigStore.migrateAffinityPerfCores(applicationContext) }
-        // Steer the renderer's Auto resolution. Vulkan HW on Adreno (tile-memory framebuffer-fetch
-        // fast path) and on any device whose GL driver cannot read the render target in-tile, where
-        // OpenGL degrades to a tile flush per self-referential draw; a healthy Mali stays on
-        // OpenGL, which is its fast path. The verdict is computed natively because it consults the
-        // driver-bug database, so all we do here is hand over the probed GL strings. Sets a native
-        // flag GSUtil::GetPreferredRenderer reads before the GS starts, so an explicit GL/SW pick
-        // still wins. Re-asserted each launch.
-        runCatching {
-            val gl = com.armsx2.GpuInfo.glStrings()
-            kr.co.iefriends.pcsx2.NativeApp.setAutoRendererGpuStrings(gl.vendor, gl.renderer, gl.version)
-            // As mesmas strings anexadas a todo relato de crash. Um tombstone sem GPU e driver nao
-            // e diagnosticavel, e foi essa ausencia que fez quatro rodadas de correcao grafica
-            // serem feitas as cegas na linha anterior.
-            //
-            // Aqui e SO a identidade do GPU. O que o GS decidiu a partir dela -- perfil resolvido,
-            // regras do banco de drivers que casaram, framebuffer fetch e texture barrier -- e
-            // impresso pelo proprio core em GSDeviceOGL/GSDeviceVK, vai para o logcat (o
-            // `initialize` liga Log::SetConsoleOutputLevel(LOGLEVEL_DEBUG) e redireciona o stdout
-            // nativo), e o CrashReporter ja captura o logcat. Por isso NAO ha gancho nosso dentro
-            // de pcsx2/: o core do upstream ja e observavel, ao contrario do da linha anterior,
-            // onde todos os sinks nasciam em NONE.
-            // ... e o VEREDITO, que a identidade sozinha nao da. Ele existia so no
-            // `Console.WriteLn` do core, ou seja, chegava a um relato apenas pelo logcat que o
-            // CrashReporter anexa -- e esse caminho so dispara em CRASH. Tela preta e imagem
-            // corrompida, que sao exatamente o que essa decisao provoca quando erra, nao sao
-            // crash. Sem esta linha, um relato de "ficou preto" nao distingue "a regra do banco
-            // mandou para o Vulkan" de "a regra nao casou e ficou no OpenGL" de "o usuario
-            // escolheu na mao". As tres produzem relatos identicos.
-            val verdict = runCatching { kr.co.iefriends.pcsx2.NativeApp.getAutoRendererVerdict() }
-                .getOrNull().orEmpty()
-            com.armsx2.telemetry.TelemetryReporter.setGraphicsBootSummary(
-                "gl_vendor=\"${gl.vendor.orEmpty()}\" gl_renderer=\"${gl.renderer.orEmpty()}\" " +
-                    "gl_version=\"${gl.version.orEmpty()}\"" +
-                    if (verdict.isEmpty()) "" else " auto_renderer=\"$verdict\"",
-            )
-        }
+        // TUDO o que este corpo faz roda no `eScope`, e nao na thread que chamou.
+        //
+        // `kickoffEmucoreInit` nasce de `onCreate`/`LaunchedEffect`, ou seja, da thread da UI. Ate
+        // a TASK-0079 metade deste corpo executava LA, antes de o `invoke { }` comecar -- e duas
+        // linhas em particular sao ANR registrado em telemetria de producao:
+        //
+        //   * `assetCopyRoot(...)` -> `getExternalFilesDir(null)` -> `ensureExternalDirsExistOrFilter`
+        //     -> `mkdirs`, que e literalmente o stack do relato do A07 (4 ocorrencias);
+        //   * `NativeApp.setAutoRendererGpuStrings(...)`, que e o PRIMEIRO toque na classe
+        //     `NativeApp` e portanto dispara o `static {}` dela: `System.loadLibrary` do
+        //     `libemucore.so` inteiro, que e o stack do relato do OnePlus 8 Pro.
+        //
+        // Mais `copyAssetAll` de duas arvores, a sonda EGL do `GpuInfo`, o `deleteRecursively` do
+        // cache de shader e a copia do BIOS. O comentario da copia do BIOS ja dizia, ele proprio,
+        // que aquilo "must not block first paint / risk an ANR on slow SD cards" -- valia para
+        // todo o resto igualmente.
+        //
+        // A ORDEM E PRESERVADA, e importa: `setAutoRendererGpuStrings` antes de `initializeOnce`,
+        // `reconcileReusedFolder` antes de o core reescrever o `.ini`, migracao do BIOS antes do
+        // pin de `Filenames/BIOS`. `eDispatcher` e um executor de UMA thread, entao "em ordem"
+        // aqui dentro continua significando o mesmo que significava antes.
+        //
+        // O latch `emucoreInitDone` fica FORA de proposito: ele impede o despacho duplo, e para
+        // isso tem de ser decidido no ponto de chamada, nao no worker.
+        invoke {
+            // Record the root native is about to pin (same resolution as
+            // NativeApp.initializeOnce's dataPath) so a later storage change can be
+            // detected and trigger a restart instead of silently not taking effect.
+            lastInitDataRoot = assetCopyRoot(applicationContext)
 
-        // Default resources — shaders, GameIndex, fonts, fullscreenui,
-        // patches.zip, controller DB. assetCopyRoot resolves to the
-        // user's chosen systemDir (now valid post-setup) so emucore
-        // finds them at <systemDir>/resources/...
-        copyAssetAll(applicationContext, "bios")
-        copyAssetAll(applicationContext, "resources")
-
-        // On an app UPDATE (versionCode changed), drop the regenerable GPU caches. Installing a
-        // new build over an old one keeps the compiled GS shader/pipeline cache under
-        // <dataRoot>/cache, and a cache baked by a different core build can render corrupt — the
-        // "scrambled PS2 logo" and post-update graphical glitches users currently fix by
-        // reinstalling clean (#376/#385). The cache is pure derived data (rebuilt on demand),
-        // never user content, so wiping it is always safe. Skipped on first install (no prior
-        // version recorded) — there is nothing stale to clear.
-        runCatching {
-            val prevVc = prefs.getInt("lastRunVersionCode", 0)
-            val curVc = BuildConfig.VERSION_CODE
-            if (prevVc != 0 && prevVc != curVc) {
-                File(assetCopyRoot(applicationContext), "cache").deleteRecursively()
-                android.util.Log.i("ARMSX2", "Update $prevVc -> $curVc: cleared GS shader/pipeline cache")
+            // #9: one-time recovery for a fresh install that reuses an old data folder — restore
+            // settings from the in-folder mirror, or seed from the folder's old PCSX2-Android.ini,
+            // BEFORE the core loads/rewrites it. No-op (guarded) for anyone already on the new UI.
+            runCatching { com.armsx2.config.ConfigStore.reconcileReusedFolder() }
+            // A genuinely empty install gets capability-aware frame-queue defaults only
+            // after reused-folder recovery had its chance. Capable handhelds start in
+            // low-latency mode (queue 0); low-end devices retain the smoother queue 2.
+            runCatching { com.armsx2.config.ConfigStore.seedFreshInstallDefaults(applicationContext) }
+            // One-time: existing capable devices also get the Low Latency default (matches fresh installs).
+            runCatching { com.armsx2.config.ConfigStore.migrateLowLatencyOff(applicationContext) }
+            runCatching { com.armsx2.config.ConfigStore.migrateAffinityPerfCores(applicationContext) }
+            // Steer the renderer's Auto resolution. Vulkan HW on Adreno (tile-memory framebuffer-fetch
+            // fast path) and on any device whose GL driver cannot read the render target in-tile, where
+            // OpenGL degrades to a tile flush per self-referential draw; a healthy Mali stays on
+            // OpenGL, which is its fast path. The verdict is computed natively because it consults the
+            // driver-bug database, so all we do here is hand over the probed GL strings. Sets a native
+            // flag GSUtil::GetPreferredRenderer reads before the GS starts, so an explicit GL/SW pick
+            // still wins. Re-asserted each launch.
+            runCatching {
+                val gl = com.armsx2.GpuInfo.glStrings()
+                kr.co.iefriends.pcsx2.NativeApp.setAutoRendererGpuStrings(gl.vendor, gl.renderer, gl.version)
+                // As mesmas strings anexadas a todo relato de crash. Um tombstone sem GPU e driver nao
+                // e diagnosticavel, e foi essa ausencia que fez quatro rodadas de correcao grafica
+                // serem feitas as cegas na linha anterior.
+                //
+                // Aqui e SO a identidade do GPU. O que o GS decidiu a partir dela -- perfil resolvido,
+                // regras do banco de drivers que casaram, framebuffer fetch e texture barrier -- e
+                // impresso pelo proprio core em GSDeviceOGL/GSDeviceVK, vai para o logcat (o
+                // `initialize` liga Log::SetConsoleOutputLevel(LOGLEVEL_DEBUG) e redireciona o stdout
+                // nativo), e o CrashReporter ja captura o logcat. Por isso NAO ha gancho nosso dentro
+                // de pcsx2/: o core do upstream ja e observavel, ao contrario do da linha anterior,
+                // onde todos os sinks nasciam em NONE.
+                // ... e o VEREDITO, que a identidade sozinha nao da. Ele existia so no
+                // `Console.WriteLn` do core, ou seja, chegava a um relato apenas pelo logcat que o
+                // CrashReporter anexa -- e esse caminho so dispara em CRASH. Tela preta e imagem
+                // corrompida, que sao exatamente o que essa decisao provoca quando erra, nao sao
+                // crash. Sem esta linha, um relato de "ficou preto" nao distingue "a regra do banco
+                // mandou para o Vulkan" de "a regra nao casou e ficou no OpenGL" de "o usuario
+                // escolheu na mao". As tres produzem relatos identicos.
+                val verdict = runCatching { kr.co.iefriends.pcsx2.NativeApp.getAutoRendererVerdict() }
+                    .getOrNull().orEmpty()
+                com.armsx2.telemetry.TelemetryReporter.setGraphicsBootSummary(
+                    "gl_vendor=\"${gl.vendor.orEmpty()}\" gl_renderer=\"${gl.renderer.orEmpty()}\" " +
+                        "gl_version=\"${gl.version.orEmpty()}\"" +
+                        if (verdict.isEmpty()) "" else " auto_renderer=\"$verdict\"",
+                )
             }
-            if (prevVc != curVc) prefs.edit { putInt("lastRunVersionCode", curVc) }
-        }
 
-        // Point the ANGLE EGL env vars at the bundled libs (or clear them) before the
-        // GS thread ever opens a GL context. Re-applied per launch below too.
-        applyAngleEnv(applicationContext)
+            // Default resources — shaders, GameIndex, fonts, fullscreenui,
+            // patches.zip, controller DB. assetCopyRoot resolves to the
+            // user's chosen systemDir (now valid post-setup) so emucore
+            // finds them at <systemDir>/resources/...
+            copyAssetAll(applicationContext, "bios")
+            copyAssetAll(applicationContext, "resources")
 
-        // Keep the configured BIOS in app-private internal storage (NOT under a
-        // custom/SD data root). The native core can't reliably open a BIOS off a
-        // removable/SAF volume on Android 11+, so a data-root-on-SD setup failed VM
-        // init and bounced back to the library. This also MIGRATES any BIOS an older
-        // build moved onto the SD data root back to internal. No-op when no BIOS is
-        // set or it's already internal; on copy failure we leave the pref untouched
-        // so biosFolderPosix still points emucore at the old (working) location.
-        bios.value?.takeIf { it.isNotEmpty() }?.let { current ->
-            val src = File(current)
-            val target = File(internalBiosDir(applicationContext).apply { mkdirs() }, src.name)
-            if (!sameFilePath(target, src)) {
-                val present = (target.exists() && target.length() > 0L) ||
-                    copyFileViaTemp(src, target)
-                if (present) {
+            // On an app UPDATE (versionCode changed), drop the regenerable GPU caches. Installing a
+            // new build over an old one keeps the compiled GS shader/pipeline cache under
+            // <dataRoot>/cache, and a cache baked by a different core build can render corrupt — the
+            // "scrambled PS2 logo" and post-update graphical glitches users currently fix by
+            // reinstalling clean (#376/#385). The cache is pure derived data (rebuilt on demand),
+            // never user content, so wiping it is always safe. Skipped on first install (no prior
+            // version recorded) — there is nothing stale to clear.
+            runCatching {
+                val prevVc = prefs.getInt("lastRunVersionCode", 0)
+                val curVc = BuildConfig.VERSION_CODE
+                if (prevVc != 0 && prevVc != curVc) {
+                    File(assetCopyRoot(applicationContext), "cache").deleteRecursively()
+                    android.util.Log.i("ARMSX2", "Update $prevVc -> $curVc: cleared GS shader/pipeline cache")
+                }
+                if (prevVc != curVc) prefs.edit { putInt("lastRunVersionCode", curVc) }
+            }
+
+            // Point the ANGLE EGL env vars at the bundled libs (or clear them) before the
+            // GS thread ever opens a GL context. Re-applied per launch below too.
+            applyAngleEnv(applicationContext)
+
+            // Keep the configured BIOS in app-private internal storage (NOT under a
+            // custom/SD data root). The native core can't reliably open a BIOS off a
+            // removable/SAF volume on Android 11+, so a data-root-on-SD setup failed VM
+            // init and bounced back to the library. This also MIGRATES any BIOS an older
+            // build moved onto the SD data root back to internal. No-op when no BIOS is
+            // set or it's already internal; on copy failure we leave the pref untouched
+            // so biosFolderPosix still points emucore at the old (working) location.
+            bios.value?.takeIf { it.isNotEmpty() }?.let { current ->
+                val src = File(current)
+                val target = File(internalBiosDir(applicationContext).apply { mkdirs() }, src.name)
+                if (!sameFilePath(target, src)) {
+                    val present = (target.exists() && target.length() > 0L) ||
+                        copyFileViaTemp(src, target)
+                    if (present) {
+                        bios.value = target.absolutePath
+                        prefs.edit { putString("bios", target.absolutePath) }
+                    }
+                } else if (target.exists() && target.length() > 0L) {
                     bios.value = target.absolutePath
                     prefs.edit { putString("bios", target.absolutePath) }
                 }
-            } else if (target.exists() && target.length() > 0L) {
-                bios.value = target.absolutePath
-                prefs.edit { putString("bios", target.absolutePath) }
             }
-        }
 
-        // (BIOS data-root mirror runs in the background invoke{} block below — it's
-        // cosmetic and must not block first paint / risk an ANR on slow SD cards.)
+            // (O espelho do BIOS no data root fica mais abaixo, depois de `initializeOnce`: é
+            // cosmético e não pode atrasar o boot. Desde a TASK-0079 o bloco inteiro está no
+            // worker, então "não bloqueia o primeiro frame" passou a valer para tudo aqui — mas a
+            // ordem continua sendo a razão de ele estar lá, e não aqui.)
 
-        invoke {
             // `armsx2/boot` — a inicializacao nativa e o unico ponto do boot cuja falha nao deixa
             // rastro nenhum hoje. `NativeApp` ja detecta a carga falha (poe `hasNoNativeBinary` no
             // `UnsatisfiedLinkError`), mas nada no app le essa variavel: o boot segue e morre na
