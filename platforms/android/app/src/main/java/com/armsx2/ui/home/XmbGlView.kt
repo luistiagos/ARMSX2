@@ -38,9 +38,15 @@ class XmbGlView(context: Context) : TextureView(context), TextureView.SurfaceTex
     private var thread: RenderThread? = null
 
     /** Reports whether the GL wave actually came up: true once the first frame presents, false if
-     *  EGL/GLES3 init fails (e.g. older Mali without float-texture filtering). HomeScreen uses it
-     *  to run an animated Compose backdrop only when the wave can't — no wasted work when it can.
-     *  Always delivered on the main thread. */
+     *  EGL/GLES3 init fails. HomeScreen uses it to run the Compose backdrop only when the wave
+     *  can't — no wasted work when it can. Always delivered on the main thread.
+     *
+     *  O motivo escrito aqui costumava ser "older Mali without float-texture filtering", e no
+     *  único caso já medido isso era falso: no Galaxy A12 (Mali-G52) o que falhava era a
+     *  COMPILAÇÃO do nosso GLSL — um uniform chamado `length`, que é função embutida —, e teria
+     *  falhado em qualquer driver que aplique a regra. Corrigido na TASK-0080. A lição fica: um
+     *  `onStatus(false)` diz que o GL não subiu, nunca por quê; quem quiser o porquê lê o
+     *  `Log.w(TAG, "GL init failed")` com o log de compilação junto. */
     var onGlStatus: ((Boolean) -> Unit)? = null
 
     init {
@@ -171,7 +177,7 @@ class XmbGlView(context: Context) : TextureView(context), TextureView.SurfaceTex
             GLES30.glUniform1f(u("flowSpeed"), FLOW_SPEED)
             GLES30.glUniform1f(u("tension"), TENSION)
             GLES30.glUniform1f(u("damping"), DAMPING)
-            GLES30.glUniform1f(u("length"), LENGTH)
+            GLES30.glUniform1f(u("waveLength"), LENGTH)
             GLES30.glUniform1f(u("spacing"), SPACING)
             GLES30.glUniform1f(u("perturbation"), PERTURBATION)
             GLES30.glUniform1f(u("perturbationScale"), PERTURBATION_SCALE)
@@ -484,7 +490,7 @@ uniform float uTime;
 uniform float flowSpeed;
 uniform float tension;
 uniform float damping;
-uniform float length;
+uniform float waveLength;
 uniform float spacing;
 uniform float perturbation;
 uniform float perturbationScale;
@@ -510,10 +516,10 @@ void main() {
   p.z += cos(ffd2.z + uTime * flowSpeed) * ffdZAmp;
   float baseWave = cos(p.x * 2.0 - uTime * 0.5 * timeStep) * waveCosAmp + waveBias;
   baseWave *= (1.0 - damping);
-  baseWave += tension * sin(p.x * length + uTime * flowSpeed * timeStep * 0.25);
+  baseWave += tension * sin(p.x * waveLength + uTime * flowSpeed * timeStep * 0.25);
   float structured = perturbation * perturbationScale * (
-    sin((p.x * length * 6.0 + p.z * 0.5) * spacing * 0.01 + uTime * flowSpeed * timeStep * 0.7) * 0.5 +
-    sin((p.x * length * 10.0 - p.z * 0.8) * spacing * 0.005 - uTime * flowSpeed * timeStep * 0.35) * 0.25
+    sin((p.x * waveLength * 6.0 + p.z * 0.5) * spacing * 0.01 + uTime * flowSpeed * timeStep * 0.7) * 0.5 +
+    sin((p.x * waveLength * 10.0 - p.z * 0.8) * spacing * 0.005 - uTime * flowSpeed * timeStep * 0.35) * 0.25
   );
   float totalWave = (baseWave + structured) * waveHeightScale;
   totalWave = waveSoftClip * tanh(totalWave / max(waveSoftClip, 1e-4));

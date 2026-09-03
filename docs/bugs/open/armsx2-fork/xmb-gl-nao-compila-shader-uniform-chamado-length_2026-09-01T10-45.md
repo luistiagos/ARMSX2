@@ -5,7 +5,7 @@
 - **Errors (serviço):** nenhum — falha silenciosa, com queda para o fundo 2D
 - **Classe:** correção
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** nenhuma ainda — ver "Cuidado antes de corrigir"
+- **Tasks que o resolvem:** [TASK-0080](../../../task/TASK-0080-onda-xmb-para-de-usar-nome-reservado-no-shader.md)
 
 ## Sintoma
 

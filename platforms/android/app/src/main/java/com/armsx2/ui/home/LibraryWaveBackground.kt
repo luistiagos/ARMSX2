@@ -17,8 +17,11 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * Library background for devices where the GLES3 [XmbGlView] can't run — older Mali without
- * float-texture filtering, or any EGL failure. It used to fall back to a fixed looping GIF
+ * Library background for devices where the GLES3 [XmbGlView] can't run — qualquer falha de EGL ou
+ * de init do GL. (O texto antigo dizia "older Mali without float-texture filtering". No único caso
+ * já medido não era hardware: era um uniform chamado `length` no nosso próprio shader, nome de
+ * função embutida do GLSL, que qualquer driver estrito recusa. Ver TASK-0080.) Antes isto caía num
+ * looping GIF fixo
  * (R.raw.library_fallback) that ignored the colour picker entirely, so Mali users had a background
  * they couldn't recolour. This is a PPSSPP-style procedural background instead: a soft vertical
  * gradient, four wave sheets and a few PlayStation glyphs, drawn with the hardware 2D Canvas (Skia)
