@@ -91,7 +91,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0008](TASK-0008-port-mfifo-spr-upstream.md) — port do MFIFO/SPR do upstream | concluída | FEAT-0001 | — (hipótese derrubada) | `cca3bf0c69` |
 | [TASK-0009](TASK-0009-publicar-versao.md) — publicar a 1.0.23 | concluída | FEAT-0001 | — | `0bc7e826d0` |
 | [TASK-0010](TASK-0010-corrigir-validador-rastreabilidade.md) — corrigir o validador de rastreabilidade | concluída | FEAT-0002 | checktraceability-grep-casa-corpo-do-commit, checktraceability-fix-nao-insere-task-ausente-do-indice | `5c81aa34f1` `a9b6622acf` |
-| [TASK-0011](TASK-0011-impor-regra-de-commit-mecanicamente.md) — impor a regra de commit mecanicamente | concluída | FEAT-0002 | rastreabilidade-sem-verificacao-de-git-para-task | `067af7f609` |
+| [TASK-0011](TASK-0011-impor-regra-de-commit-mecanicamente.md) — impor a regra de commit mecanicamente | concluída | FEAT-0002 | rastreabilidade-sem-verificacao-de-git-para-task | `067af7f609` `9c94a7ff55` |
 | [TASK-0012](TASK-0012-portao-de-boot-nao-perde-informacao.md) — portão de boot honra falha de init nativa e `onNewIntent` | concluída | — | app-falha-de-init-nativa-sem-consumidor, bootsplash-singletop-descarta-intent-novo | `3e25c6adb1` |
 | [TASK-0013](TASK-0013-detector-valor-veneno-dma.md) — detector de valor-veneno no DMA (instrumenta o crash do SotC) | concluída | — | — (instrumenta, não corrige) | `a71a51e17d` |
 | [TASK-0014](TASK-0014-comparador-superficie-jni.md) — comparador da superfície JNI contra o upstream | concluída | FEAT-0001 | — | `353dae44f1` |
@@ -158,6 +158,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0075](TASK-0075-publicacao-do-fork-em-trilha-propria.md) — o fork publica em trilha própria, sem tocar nos clientes da linha antiga | concluída | — | — | `6bb695c0c3` `99d6150596` |
 | [TASK-0076](TASK-0076-icone-do-app-volta-a-ser-so-o-padrao.md) — o ícone do app volta a ser só o padrão, e o seletor sai | concluída | — | — | `8d0964b416` `695228cd38` `a3b78a343e` |
 | [TASK-0077](TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) — o aviso do GOS ganha "não mostrar de novo", e o item de menu vira a porta de volta | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | `ed3e7e7c46` `fe66b785f3` |
+| [TASK-0078](TASK-0078-numero-de-task-identifica-neste-ramo.md) — fazer o número da task identificar alguma coisa, ao menos dentro deste ramo | concluída | FEAT-0002 | numeros-de-task-colidem-entre-ramos | `863a7b3ad8` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
