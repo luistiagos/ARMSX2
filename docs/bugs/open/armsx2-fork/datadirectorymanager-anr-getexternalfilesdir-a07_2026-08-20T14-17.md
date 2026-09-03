@@ -5,6 +5,7 @@
 - **Errors (serviço):** 1510, 1514, 1574, 1577 (4 ocorrências)
 - **Classe:** fail (ANR)
 - **Reincidência:** quatro execuções no Samsung `SM-A075M`, app 1.0.16
+- **Tasks que o resolvem:** [TASK-0079](../../../task/TASK-0079-boot-nao-toca-o-nativo-nem-o-disco-na-ui.md)
 
 ## Sintoma
 

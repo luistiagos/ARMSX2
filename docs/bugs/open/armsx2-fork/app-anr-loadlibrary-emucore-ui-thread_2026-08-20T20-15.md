@@ -5,6 +5,7 @@
 - **Errors (serviço):** 1522 (1 ocorrência)
 - **Classe:** fail (ANR)
 - **Reincidência:** primeira vez; OnePlus 8 Pro, app 1.0.16
+- **Tasks que o resolvem:** [TASK-0079](../../../task/TASK-0079-boot-nao-toca-o-nativo-nem-o-disco-na-ui.md)
 
 ## Sintoma
 
