@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-30
 - **Concluída em:** 2026-08-31 (validada no A12: registrador, contadores e MTVU)
 - **Feature:** nenhuma
-- **Bugs que resolve:** [cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks](../bugs/open/armsx2-fork/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md)
+- **Bugs que resolve:** [cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks](../bugs/done/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md)
 - **Backlog:** itens 0 e 1 de [`desempenho-com-clock-cortado-a55`](../backlog/desempenho-com-clock-cortado-a55.md) — **os dois, pela mesma causa**
 - **Commit:** — (o vínculo é o prefixo `TASK-0060:` no assunto)
 - **Revertida por:** —
@@ -19,7 +19,7 @@ vDSO dele nunca divide pelo registrador de EL0. O nosso divide, em todo lugar, e
 e a recíproca vira `0.0`.
 
 O registro completo, com a medição, está no
-[bug](../bugs/open/armsx2-fork/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md). O
+[bug](../bugs/done/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md). O
 resumo é que **um registrador explica três defeitos**: os contadores de desempenho zerados, a
 thread MTVU girando a 90% de um núcleo com a VM pausada, e o limitador de quadros que não limita.
 Os dois primeiros estão **medidos** antes e depois; o terceiro é **derivado** do código — a tabela

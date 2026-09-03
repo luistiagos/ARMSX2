@@ -5,17 +5,17 @@
 - **Errors (serviço):** nenhum — não gera crash, ANR nem log. É silencioso por construção.
 - **Classe:** correção / performance
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0060](../../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md)
+- **Tasks que o resolvem:** [TASK-0060](../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md)
 
 ## Sintoma
 
 Cinco defeitos que pareciam separados, e são um só. Os três primeiros são os que doem:
 
 1. **`PerfLog` reporta `EE 0% GS 0% VU 0%`** com o jogo a 8 fps e a 50 fps — item 0 do backlog
-   [`desempenho-com-clock-cortado-a55`](../../../backlog/desempenho-com-clock-cortado-a55.md).
+   [`desempenho-com-clock-cortado-a55`](../../backlog/desempenho-com-clock-cortado-a55.md).
 2. **A thread `MTVU` queima ~90% de um núcleo** em estado `R`, com a VM **pausada** e nada a
    fazer — item 1 do mesmo backlog, e a pergunta que a
-   [TASK-0046](../../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) deixou em aberto.
+   [TASK-0046](../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) deixou em aberto.
 3. **O limitador de quadros não limita nada** (`VMManager::Internal::Throttle`) — *derivado do
    código, não medido*; ver "O que é medido e o que é derivado".
 
@@ -161,3 +161,24 @@ upstream nunca o veria.
 
 Todo alvo AArch64 cujo firmware não programe `CNTFRQ_EL0`. Não é exclusivo do Exynos 850, e não é
 detectável a não ser lendo o registrador — que é o que a correção passa a fazer.
+
+## Fechamento — 2026-09-03
+
+Este relatório estava **obsoleto em `open/`**: a correção foi feita e validada em aparelho pela
+[TASK-0060](../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md) em 2026-08-31, e só
+faltava mover o arquivo.
+
+A correção está em `common/Linux/LnxMisc.cpp` — conferido hoje: a leitura de `CNTFRQ_EL0` é
+resolvida uma vez e memorizada; valor ≠ 0 mantém o caminho `mrs` intacto, e valor = 0 cai para
+`CLOCK_MONOTONIC` em nanossegundos com um `Console.Warning` dizendo o que aconteceu.
+
+A prova registrada na task, medida no Galaxy A12:
+
+| | antes | depois |
+|---|---|---|
+| thread MTVU, VM pausada e tela bloqueada | `R (running)`, 89–91% de um núcleo | `S (sleeping)`, 0% |
+| `voluntary_ctxt_switches` da MTVU | `0` na vida inteira da thread | 4 |
+| `PerfLog` | `EE 0% GS 0% VU 0% GPU 0%` | `EE 100% GS 37% ...` |
+
+O `voluntary_ctxt_switches == 0` é o critério que fecha: a thread nunca havia bloqueado uma única
+vez. Depois da correção, bloqueia.

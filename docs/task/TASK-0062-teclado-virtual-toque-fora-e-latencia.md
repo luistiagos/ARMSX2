@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-31
 - **Concluída em:** —
 - **Feature:** nenhuma
-- **Bugs que resolve:** [teclado-virtual-scrim-de-tamanho-zero](../bugs/open/armsx2-fork/teclado-virtual-scrim-de-tamanho-zero_2026-08-31T00-00.md)
+- **Bugs que resolve:** [teclado-virtual-scrim-de-tamanho-zero](../bugs/done/teclado-virtual-scrim-de-tamanho-zero_2026-08-31T00-00.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0062:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
