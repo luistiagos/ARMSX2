@@ -8,7 +8,7 @@
 - **Reincidência:** segunda vez. A primeira foi respondida ligando o rótulo sob a capa por padrão
   (`GameInfo.GridLabels`), o que tornou as células distinguíveis sem reduzir a repetição
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0047](../../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md)
+- **Tasks que o resolvem:** [TASK-0047](../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md)
 
 > **Registro escrito depois da task.** A TASK-0047 já existia e apontava para este arquivo, que
 > nunca tinha sido criado — o validador de rastreabilidade reprovava por isso. O conteúdo abaixo
@@ -22,7 +22,7 @@ região/idioma/revisão/disco, todas com **a mesma arte**, porque o repositório
 imagem por jogo e não por lançamento.
 
 Isto já estava escrito na própria árvore, no comentário de `GridLabels`
-([GameInfo.kt:101](../../../../platforms/android/app/src/main/java/com/armsx2/GameInfo.kt#L101)):
+([GameInfo.kt:101](../../../platforms/android/app/src/main/java/com/armsx2/GameInfo.kt#L101)):
 
 > *"A grade aqui carrega o catalogo inteiro, e o repositorio de capas tem UMA arte por jogo, nao
 > por lancamento: '007 - Nightfire' tem cinco entradas (USA, duas europeias, Japan, Korea) com a
@@ -72,7 +72,44 @@ Abrir a biblioteca com o catálogo carregado e buscar por `Metal Gear Solid 3` o
 
 ## Próximos passos
 
-- [TASK-0047](../../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md), em andamento: uma célula
+- [TASK-0047](../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md), em andamento: uma célula
   por título entre as linhas de catálogo, e um painel de versões no toque.
 - Só as linhas **de catálogo** são agrupadas. Um jogo já no aparelho é um arquivo concreto e
   precisa de célula própria — senão a grade esconde qual deles dá boot.
+
+## Validado em aparelho — 2026-09-03
+
+moto g86 5G, Android 16 (SDK 36), `github/release`, catálogo com **6313 títulos**.
+
+**Uma célula por título, com o número de versões no selo.** A grade mostra `0 Story` `3×`,
+`007 - Agent Under Fire` `3×`, `007 - Everything or Nothing` `5×`, `007 - From Russia with Love`
+`2×`, `007 - Quantum of Solace` `4×`. O relato descrevia 25 células idênticas para *Metal Gear Solid
+3* e 14 para *Hitman 2*, diferindo só pelo rótulo — isso acabou.
+
+**O painel de versões abre no toque**, como a TASK-0047 desenhou. Capturado abrindo um título com
+várias versões:
+
+```
+A Visual Mix - Ayumi Hamasaki Dome Tour 2001 A
+  A Visual Mix … (Japan) (Disc 1) (Alt)           ISO
+  A Visual Mix … (Japan) (Disc 1) (SLPM-65086)    ISO
+  A Visual Mix … (Japan) (Disc 1) (SLPS-25071)    ISO
+  A Visual Mix … (Japan) (Disc 1)                 ISO
+  A Visual Mix … (Japan) (Disc 2) (Alt)           …
+```
+
+Cada versão mantém o código de região/serial e o formato, que é o que o relato pedia para o usuário
+poder escolher — e o `heightIn` segura o painel dentro da tela.
+
+**Um defeito foi encontrado nesta mesma validação**, e tem relatório próprio: o subtítulo do painel
+saía escrito `catalog.versions.subtitle`, a chave de tradução crua. Corrigido pela
+[TASK-0081](../../task/TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md); ver
+[chave-de-traducao-crua-na-tela](../open/armsx2-fork/chave-de-traducao-crua-na-tela_2026-09-03T19-40.md).
+Não invalida este fechamento: o agrupamento — que é o que este relatório pede — funciona.
+
+> **Nota de rastreabilidade.** O código deste agrupamento entrou no commit `bf45520833`, cujo
+> assunto é `*` e que carrega 114 arquivos. Por isso a TASK-0047 aparecia `em andamento` sem commit
+> nenhum ligado a ela: não há prefixo `TASK-0047:` em assunto de commit algum. É exatamente o buraco
+> que a [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) fechou hoje — um
+> commit assim passa a **reprovar** na checagem `--commits`. Aquele hash ficou registrado
+> nominalmente em `LEGACY_SUBJECT_EXCEPTIONS`, porque já estava publicado.

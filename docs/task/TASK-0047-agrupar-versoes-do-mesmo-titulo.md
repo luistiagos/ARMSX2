@@ -1,10 +1,10 @@
 # TASK-0047: agrupar versões do mesmo título e escolher a versão num painel
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-28
-- **Concluída em:** —
+- **Concluída em:** 2026-09-03
 - **Feature:** nenhuma
-- **Bugs que resolve:** [biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao](../bugs/open/armsx2-fork/biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao_2026-08-28T11-30.md)
+- **Bugs que resolve:** [biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao](../bugs/done/biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao_2026-08-28T11-30.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0047:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -94,4 +94,21 @@ No aparelho:
 
 ## Resultado
 
-Preenchido ao concluir.
+Implementado e **validado em aparelho** em 2026-09-03 — moto g86 5G, Android 16 (SDK 36),
+`github/release`, catálogo com 6313 títulos:
+
+- uma célula por título, com o número de versões no selo (`3×`, `5×`, `2×`, `4×` observados na
+  primeira tela da grade);
+- o painel de versões abre no toque, listando cada variante com região/serial e formato;
+- o `heightIn(max = 340.dp)` segura o painel dentro da tela, que era o motivo de ele existir.
+
+**Um defeito apareceu nesta validação:** o subtítulo do painel saía como `catalog.versions.subtitle`
+— a chave de tradução crua, porque ela nunca foi definida. Corrigido pela
+[TASK-0081](TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md), que também deixou um teste
+para a próxima chave ausente.
+
+**Nota de rastreabilidade, e ela dói:** o código desta task entrou no commit `bf45520833`, assunto
+`*`, 114 arquivos. Não existe nenhum commit com assunto `TASK-0047:`, e é por isso que esta task
+ficou `em andamento` com o trabalho pronto — o índice não tinha como saber. É o buraco que a
+[TASK-0011](TASK-0011-impor-regra-de-commit-mecanicamente.md) fechou no mesmo dia: daqui em diante
+um commit assim reprova. O hash ficou em `LEGACY_SUBJECT_EXCEPTIONS` porque já estava publicado.
