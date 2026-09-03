@@ -4,12 +4,18 @@
 Rode antes de todo push:
 
     python scripts/check_traceability.py
-    python scripts/check_traceability.py --fix   # completa o indice de docs/task/README.md
+    python scripts/check_traceability.py --fix                          # completa o indice
+    python scripts/check_traceability.py --commits upstream/master..HEAD  # git -> task
 
 Sai com codigo 1 e lista os problemas quando algo nao fecha. O que ele checa e
 estrutural -- se um link declarado de um lado existe do outro, se uma task
 concluida aponta para um commit que existe. Se a task DESCREVE honestamente o
 que o commit fez, isso nenhum script verifica.
+
+Sem `--commits` ele so caminha de arquivo de task para o git. Com `--commits` ele
+tambem parte do `git log`, que e o sentido do incidente que criou este processo:
+commit `TASK-NNNN:` sem task escrita, e `chore:` alterando caminho que a excecao
+nao cobre. O gancho versionado em scripts/hooks/pre-push roda os dois.
 """
 
 import os
@@ -35,11 +41,42 @@ TABLE_TASK_ROW_RE = re.compile(r"^\|\s*\[(TASK-\d{4})\]")
 TASK_STATUSES = {"aberta", "em andamento", "concluída", "revertida"}
 FEAT_STATUSES = {"planejada", "em andamento", "concluída", "abandonada"}
 
+# Assunto que vincula um commit a uma task.
+COMMIT_TASK_RE = re.compile(r"^(TASK-\d{4}):")
+
+# A excecao `chore:` de docs/README.md NAO cobre nada disto. A lista mora aqui, num lugar so,
+# porque espalhada ela deixa de ser regra e vira lembranca de quem commita.
+GUARDED_PREFIXES = (
+    "platforms/android/app/src/",
+    "pcsx2/",
+    "common/",
+    "scripts/",
+)
+GUARDED_SUFFIXES = (
+    ".gradle", ".gradle.kts", "gradle.properties", "libs.versions.toml",
+    "CMakeLists.txt", ".cmake",
+)
+
+# Prefixos de assunto aceitos alem de `TASK-NNNN:`.
+ALLOWED_SUBJECT_PREFIXES = ("chore:",)
+
+# Commits anteriores a esta checagem cujo assunto nao pode mais ser corrigido: reescrever
+# historico ja publicado e o mesmo estrago que `commit_is_reachable` existe para detectar. Ficam
+# registrados aqui, nominalmente, em vez de enfraquecer a regra para todo mundo.
+LEGACY_SUBJECT_EXCEPTIONS = {
+    "bf45520833": "assunto `*` em 114 arquivos (2026-08-31) -- exatamente o que esta checagem "
+                  "passa a barrar; ja estava publicado quando ela foi escrita",
+}
+
 problems = []
 
 
 def fail(path, msg):
     problems.append("%s: %s" % (os.path.relpath(path, ROOT).replace("\\", "/"), msg))
+
+
+def fail_commit(sha, subject, msg):
+    problems.append("commit %s (%s): %s" % (sha, subject[:60], msg))
 
 
 def read(path):
@@ -220,9 +257,23 @@ def table_task_rows(text):
     return rows
 
 
+def commits_argument(argv):
+    """`--commits <range>` ou `--commits=<range>`. None quando nao foi pedido."""
+    for i, arg in enumerate(argv):
+        if arg == "--commits":
+            if i + 1 >= len(argv):
+                problems.append("--commits exige um range, por exemplo upstream/master..HEAD")
+                return ""
+            return argv[i + 1]
+        if arg.startswith("--commits="):
+            return arg.split("=", 1)[1]
+    return None
+
+
 def main():
     tasks = {}   # TASK-NNNN -> (path, text)
     feats = {}   # FEAT-NNNN -> (path, text)
+    rev_range = commits_argument(sys.argv[1:])
 
     for name in md_files(TASK_DIR, TASK_RE):
         path = os.path.join(TASK_DIR, name)
@@ -232,7 +283,10 @@ def main():
         path = os.path.join(FEAT_DIR, name)
         feats["FEAT-" + FEAT_RE.match(name).group(1)] = (path, read(path))
 
-    if not tasks:
+    # "Nenhuma task" NAO encerra a checagem quando `--commits` foi pedido: um repositorio sem
+    # nenhum arquivo de task e commits alterando `app/src/` e exatamente o incidente fundador,
+    # e sair com 0 aqui seria aprova-lo.
+    if not tasks and not rev_range:
         print("Nenhuma task encontrada em docs/task/ -- nada a validar.")
         return 0
 
@@ -317,15 +371,71 @@ def main():
 
     check_index(tasks)
 
+    # ---- git -> task -------------------------------------------------------
+    commits = check_commits(rev_range, tasks) if rev_range else 0
+
     if problems:
         print("Rastreabilidade REPROVADA -- %d problema(s):\n" % len(problems))
         for p in problems:
             print("  - " + p)
         return 1
 
-    print("OK -- %d task(s), %d feature(s), rastreabilidade consistente."
-          % (len(tasks), len(feats)))
+    print("OK -- %d task(s), %d feature(s)%s, rastreabilidade consistente."
+          % (len(tasks), len(feats),
+             ", %d commit(s) em %s" % (commits, rev_range) if rev_range else ""))
     return 0
+
+
+def is_guarded(path):
+    """O caminho esta fora da excecao `chore:`?"""
+    p = path.replace("\\", "/")
+    return p.startswith(GUARDED_PREFIXES) or p.endswith(GUARDED_SUFFIXES)
+
+
+def check_commits(rev_range, tasks):
+    """O sentido git -> task, que nao existia.
+
+    Ate aqui tudo partia do sistema de arquivos e ia ao git conferir; nenhum laco partia do
+    `git log`. Por isso a ferramenta escrita depois do incidente fundador -- tres versoes
+    distribuidas a clientes a partir de 41 arquivos nunca commitados -- **nao teria detectado
+    aquele incidente**: nada nela olhava para o que foi commitado, nem para o que deixou de ser.
+
+    Merges nao entram. Um `git merge upstream/master` traz commits de terceiros, cujo assunto nao
+    e nosso para governar."""
+    out = git("log", "--no-merges", "--format=%h%x00%s", rev_range)
+    if out is None:
+        problems.append("range de commits invalido: %r" % rev_range)
+        return 0
+    seen = 0
+    for line in out.splitlines():
+        if "\0" not in line:
+            continue
+        sha, subject = line.split("\0", 1)
+        seen += 1
+        if any(sha.startswith(k) or k.startswith(sha) for k in LEGACY_SUBJECT_EXCEPTIONS):
+            continue
+
+        m = COMMIT_TASK_RE.match(subject)
+        if m:
+            if m.group(1) not in tasks:
+                fail_commit(sha, subject,
+                            "nao existe docs/task/%s-*.md -- a task nunca foi escrita" % m.group(1))
+            continue
+
+        if subject.startswith(ALLOWED_SUBJECT_PREFIXES):
+            touched = git("show", "--name-only", "--format=", "--no-renames", sha) or ""
+            guarded = sorted({p for p in touched.splitlines() if p and is_guarded(p)})
+            if guarded:
+                fail_commit(sha, subject,
+                            "`chore:` alterando caminho que a excecao NAO cobre (%s%s). "
+                            "Ver a excecao em docs/README.md: escreva uma task."
+                            % (", ".join(guarded[:3]),
+                               " e mais %d" % (len(guarded) - 3) if len(guarded) > 3 else ""))
+            continue
+
+        fail_commit(sha, subject, "o assunto nao comeca por 'TASK-NNNN:' nem por %s"
+                                  % " nem ".join(repr(p) for p in ALLOWED_SUBJECT_PREFIXES))
+    return seen
 
 
 def check_bugs(tasks):

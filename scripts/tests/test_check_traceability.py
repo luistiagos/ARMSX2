@@ -375,3 +375,95 @@ def test_task_ja_publicada_sem_o_campo_reprova(repo):
     code, out = repo.check()
     assert code == 1
     assert "**Publicado em** esta vazio" in out
+
+
+# ---- git -> task: o sentido que o incidente fundador percorreu -------------
+
+def test_commit_de_task_que_nao_existe_reprova(repo):
+    repo.commit("TASK-9999: task que nao existe")
+
+    code, out = repo.check("--commits", "HEAD~1..HEAD")
+    assert code == 1
+    assert "a task nunca foi escrita" in out
+
+
+def test_commit_de_task_existente_passa(repo):
+    repo.task("TASK-0099")
+    repo.index_row("TASK-0099")
+    repo.commit("TASK-0099: faz o trabalho")
+
+    code, out = repo.check("--commits", "HEAD~1..HEAD")
+    assert code == 0, out
+    assert "1 commit(s)" in out
+
+
+def test_chore_tocando_caminho_protegido_reprova(repo):
+    """A excecao `chore:` existe para o que NAO roda no aplicativo. Este e o segundo commit que
+    o relato `rastreabilidade-sem-verificacao-de-git-para-task` diz passar sem qualquer aviso."""
+    repo.write("platforms/android/app/src/main/java/com/armsx2/Z.kt", "// nada\n")
+    repo.commit("chore: ajuste rapido", allow_empty=False)
+
+    code, out = repo.check("--commits", "HEAD~1..HEAD")
+    assert code == 1
+    assert "excecao NAO cobre" in out
+    assert "platforms/android/app/src/main/java/com/armsx2/Z.kt" in out
+
+
+def test_chore_so_de_documentacao_passa(repo):
+    repo.write("docs/qualquer-coisa.md", "# nota\n")
+    repo.commit("chore: anota uma coisa", allow_empty=False)
+
+    code, out = repo.check("--commits", "HEAD~1..HEAD")
+    assert code == 0, out
+
+
+def test_chore_tocando_arquivo_de_build_reprova(repo):
+    repo.write("platforms/android/gradle.properties", "armsx2.versionCode=99\n")
+    repo.commit("chore: bump", allow_empty=False)
+
+    code, out = repo.check("--commits", "HEAD~1..HEAD")
+    assert code == 1
+    assert "gradle.properties" in out
+
+
+def test_assunto_fora_do_vocabulario_reprova(repo):
+    """O commit `bf45520833` deste repositorio tem assunto `*` e 114 arquivos. E o que esta
+    checagem passa a barrar."""
+    repo.commit("*")
+
+    code, out = repo.check("--commits", "HEAD~1..HEAD")
+    assert code == 1
+    assert "nao comeca por 'TASK-NNNN:'" in out
+
+
+def test_merge_nao_e_julgado(repo):
+    """`git merge upstream/master` traz commits de terceiros, cujo assunto nao e nosso para
+    governar. Sem isto, um merge com o upstream reprovaria 72 vezes."""
+    repo.git("checkout", "-q", "-b", "lado")
+    repo.write("outro.txt", "x\n")
+    repo.commit("commit de terceiro sem prefixo nenhum", allow_empty=False)
+    repo.git("checkout", "-q", "main")
+    base = repo.git("rev-parse", "HEAD").strip()
+    repo.git("merge", "-q", "--no-ff", "-m", "Merge branch 'lado'", "lado")
+
+    code, out = repo.check("--commits", "%s..HEAD" % base)
+    assert code == 1, out
+    # o merge nao aparece; o commit de terceiro que ele traz, sim
+    assert "Merge branch" not in out
+    assert "commit de terceiro" in out
+
+
+def test_range_invalido_reprova_em_vez_de_passar_calado(repo):
+    code, out = repo.check("--commits", "nao-existe..HEAD")
+    assert code == 1
+    assert "range de commits invalido" in out
+
+
+def test_sem_commits_o_validador_nao_muda_de_comportamento(repo):
+    repo.task("TASK-0099")
+    repo.index_row("TASK-0099")
+    repo.commit("TASK-0099: faz o trabalho")
+
+    code, out = repo.check()
+    assert code == 0, out
+    assert "commit(s) em" not in out

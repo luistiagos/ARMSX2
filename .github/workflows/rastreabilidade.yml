@@ -1,0 +1,62 @@
+# Rastreabilidade feature <-> task <-> bug, verificada na CI.
+#
+# Esta e a barreira que vale. O gancho de scripts/hooks/pre-push roda a mesma checagem, mas
+# `git push --no-verify` o contorna e um gancho que so existe na maquina de uma pessoa nao e
+# processo. Ver docs/README.md e a FEAT-0002.
+name: Rastreabilidade
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rastreabilidade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # A checagem parte do `git log`: com o clone raso (default 1) nao ha historico
+          # nenhum para percorrer, e ela passaria sem ter olhado para nada.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Estrutura dos registros
+        run: python scripts/check_traceability.py
+
+      - name: Testes de regressao do validador
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest scripts/tests -q
+
+      - name: Sentido git -> task
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -e
+          # Push inicial de uma branch nova traz `before` zerado; nesse caso vale o que a branch
+          # tem de proprio em relacao ao upstream, e nao a arvore inteira do PCSX2.
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            git remote add upstream https://github.com/ARMSX2/ARMSX2.git 2>/dev/null || true
+            git fetch --quiet upstream master || true
+            if git rev-parse --verify --quiet upstream/master >/dev/null; then
+              BASE=upstream/master
+            else
+              echo "Sem base para comparar -- pulando o sentido git -> task."
+              exit 0
+            fi
+          fi
+          echo "Range: $BASE..$HEAD_SHA"
+          python scripts/check_traceability.py --commits "$BASE..$HEAD_SHA"

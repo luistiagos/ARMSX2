@@ -69,6 +69,17 @@ Os demais arquivos soltos em `docs/` são especificações e decisões de arquit
 4. Atualizar os links do outro lado (bug e feature) — no mesmo commit.
 5. `python scripts/check_traceability.py` e só então `git push`.
 
+> **Instale o gancho uma vez por worktree** — `.git/hooks/` não é versionado, então um gancho que
+> só existe numa máquina não é processo:
+>
+> ```powershell
+> git config core.hooksPath scripts/hooks
+> ```
+>
+> Ele roda a checagem sobre o range que está sendo empurrado e barra o push que quebra a regra,
+> dizendo **o que fazer**. `git push --no-verify` o contorna de propósito: a barreira que ninguém
+> contorna é a CI (`.github/workflows/rastreabilidade.yml`), que roda a mesma checagem.
+
 > **Por que não gravamos o hash dentro da própria task:** é circular. O hash só existe depois do
 > commit, e `git commit --amend` para inseri-lo gera um hash novo — o campo fica apontando para um
 > commit órfão que ainda responde a `git cat-file` e, portanto, mente sem ser detectado. Isso
@@ -85,10 +96,17 @@ crível; ela **não** cobre nada em `app/src/`, `scripts/` ou arquivos de build.
 ## Validação
 
 ```powershell
-python scripts/check_traceability.py
+python scripts/check_traceability.py                            # estrutura dos registros
+python scripts/check_traceability.py --fix                      # completa o índice de tasks
+python scripts/check_traceability.py --commits upstream/master..HEAD   # git → task
+python -m pytest scripts/tests -q                               # regressão do próprio validador
 ```
 
-Rodar antes de todo push.
+Rodar antes de todo push — ou instalar o gancho, que faz isso sozinho.
+
+**Os dois sentidos são checagens diferentes.** Sem `--commits`, o validador só caminha de arquivo
+de task para o git: ele vê a task que mente, não o commit que não deveria existir. `--commits`
+parte do `git log`, que é o sentido do incidente que criou este processo.
 
 ### O que ele verifica
 
@@ -97,8 +115,19 @@ Rodar antes de todo push.
 - Task `concluída` sem nenhum commit alcançável com o assunto `TASK-NNNN:`.
 - Hash escrito à mão que não é **ancestral de `HEAD`**. Existir no banco de objetos não basta: um
   commit órfão de `--amend` ainda responde a `git cat-file` e mentiria sobre o histórico.
-- Link feature↔task de mão única, nos dois sentidos; link task→bug de mão única.
-- Bug em `done/` sem nenhuma menção a uma task.
+- Link feature↔task de mão única, nos dois sentidos; link task→bug **e** bug→task de mão única.
+- Status divergente entre a tabela da feature e o arquivo da task.
+- Task `concluída` cujo commit já foi publicado e que ficou com **Publicado em** vazio.
+- Task `concluída` **fora do índice** de `docs/task/README.md`.
+- Bug em `done/` sem task declarada no campo **Tasks que o resolvem** (menção em prosa não conta).
+
+Com `--commits <range>`, mais três, agora partindo do git:
+
+- Assunto `TASK-NNNN:` **sem** `docs/task/TASK-NNNN-*.md` — a task nunca foi escrita.
+- `chore:` alterando `platforms/android/app/src/`, `pcsx2/`, `common/`, `scripts/` ou arquivo de
+  build. A lista de caminhos mora num só lugar, em `GUARDED_PREFIXES`/`GUARDED_SUFFIXES`.
+- Assunto que não é `TASK-NNNN:` nem `chore:`. Merges ficam de fora: um `git merge upstream/master`
+  traz commits de terceiros, cujo assunto não é nosso para governar.
 
 ### O que o validador NÃO verifica
 
@@ -108,17 +137,24 @@ confiança sem lastro. Fechar esta lista é a [FEAT-0002](features/FEAT-0002-ras
 | Não verifica | Consequência observada |
 |---|---|
 | **Se a task descreve honestamente o que o commit fez.** | Nenhum script alcança isso — é revisão humana, e continuará sendo. |
-| **O sentido git → task.** Nada parte do `git log`. | Um commit `TASK-NNNN:` sem arquivo de task, ou um `chore:` que altera `app/src/`, é invisível. É o sentido do incidente que criou este processo. |
-| **A exceção `chore` por caminho.** Não há gancho em `.git/hooks/`. | A regra depende de quem commita lembrar dela. |
-| **O vínculo task→commit pelo assunto.** O `--grep` casa o **corpo** do commit. | Uma menção `TASK-NNNN:` numa linha do corpo de um `chore:` conta como se fosse o commit da task. |
-| **Se `--fix` fez o que diz.** Ele só substitui linha existente. | O índice ficou com 1 linha para 9 tasks enquanto dois `chore:` anunciavam ter gravado hashes. |
-| **Status cruzado feature↔task.** | A FEAT-0001 listou a TASK-0009 como `aberta` depois de publicada. |
-| **O campo `Publicado em`.** Não é obrigatório nem conferido. | Cinco tasks que foram ao ar na 1.0.23 seguiram com `—`. |
 | **Quantos commits uma task tem.** Deixou de ser regra na [TASK-0042](task/TASK-0042-remover-regra-um-commit-por-task.md). | Uma task pode espalhar-se por vários commits sem ninguém notar. Trocado de propósito: exigir um só empurrava para `--amend`, que reescreve o histórico — o estrago que a checagem de hash órfão existe para pegar. |
-| **O sentido bug → task.** | Um bug que declara ser resolvido por uma task que não o lista passa. |
-| **Declaração vs. prosa.** O check de `done/` é a substring `"TASK-"`. | Um bug fechado cuja única menção é *"hipótese eliminada pela TASK-0008"* satisfaz a exigência. |
 
-Os três defeitos de implementação estão registrados como bugs em
-[`bugs/open/`](bugs/open/README.md) e planejados nas
-[TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md) e
-[TASK-0011](task/TASK-0011-impor-regra-de-commit-mecanicamente.md).
+### O que ele passou a verificar, e não verificava
+
+Oito linhas saíram da tabela acima em 2026-09-03. Ficam registradas porque a lista de buracos só
+tem valor se der para ver quando cada um foi tapado.
+
+| Era buraco | Fechado por |
+|---|---|
+| O sentido **git → task**: nada partia do `git log`. | [TASK-0011](task/TASK-0011-impor-regra-de-commit-mecanicamente.md) — modo `--commits`, gancho e CI |
+| A exceção `chore` por caminho; não havia gancho. | [TASK-0011](task/TASK-0011-impor-regra-de-commit-mecanicamente.md) |
+| O vínculo task→commit casava o **corpo** do commit. | [TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md) |
+| `--fix` só substituía linha existente, e anunciava sucesso sem inserir. | [TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md) |
+| Status cruzado feature↔task. | [TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md) |
+| O campo `Publicado em`. | [TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md) |
+| O sentido bug → task. | [TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md) |
+| `done/` aceitava a substring `"TASK-"` em prosa qualquer. | [TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md) |
+
+Os três bugs correspondentes estão em [`bugs/done/`](bugs/done/README.md), com o teste de regressão
+que prova cada um: `python -m pytest scripts/tests -q`, 27 testes, cada um montando um repositório
+git de verdade.

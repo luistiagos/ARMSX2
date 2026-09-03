@@ -144,10 +144,34 @@ hashes da task.
 **Exceção `chore:`** — só para o que **não roda no aplicativo**: README, docs, formatação. Não cobre
 `app/src/`, `scripts/` nem arquivos de build.
 
-> ⚠️ O `--fix` do validador **não insere** no índice a linha de uma task nova, e reintroduz um espaço
-> duplo antes do hash. Falhou 3× do mesmo jeito na sessão anterior. Conferir `docs/task/README.md` à
-> mão depois de rodá-lo. Bug registrado; conserto na
-> [TASK-0010](docs/task/TASK-0010-corrigir-validador-rastreabilidade.md).
+**A regra passou a ser verificada nos dois sentidos** ([TASK-0010](docs/task/TASK-0010-corrigir-validador-rastreabilidade.md)
+e [TASK-0011](docs/task/TASK-0011-impor-regra-de-commit-mecanicamente.md), 2026-09-03):
+
+```powershell
+python scripts/check_traceability.py                                   # estrutura dos registros
+python scripts/check_traceability.py --fix                             # completa o índice
+python scripts/check_traceability.py --commits upstream/master..HEAD   # git -> task
+python -m pytest scripts/tests -q                                      # regressão do validador
+```
+
+Instale o gancho uma vez por worktree — `.git/hooks/` não é versionado, e um gancho que só existe
+numa máquina não é processo:
+
+```powershell
+git config core.hooksPath scripts/hooks
+```
+
+Sem `--commits`, o validador só caminha de arquivo de task para o git. Com `--commits` ele parte do
+`git log` e reprova commit `TASK-NNNN:` sem task escrita, `chore:` alterando caminho fora da
+exceção, e assunto fora do vocabulário. A mesma checagem roda na CI
+(`.github/workflows/rastreabilidade.yml`), que é a barreira que `--no-verify` não contorna.
+
+> ✅ **O aviso antigo sobre o `--fix` saiu porque o defeito saiu.** Desde a TASK-0010 ele **insere** a
+> linha da task nova, atualiza o `Status`, não assume que `Commit` é a última coluna e não deixa mais
+> espaço duplo; e o validador **reprova** task concluída fora do índice, então não pode mais anunciar
+> sucesso sem ter feito o trabalho. Uma exceção deliberada: a célula `Commit` das TASK-0001 a
+> TASK-0015 é preservada, porque `HEAD` não alcança os commits da linha anterior e sobrescrever
+> apagaria o único registro daqueles hashes.
 
 ## Antes de escrever Java/Kotlin que chame o nativo
 

@@ -1,0 +1,73 @@
+#!/bin/sh
+# Gancho de pre-push: barra o push que quebra a regra de commit do projeto.
+#
+# Instalar (uma vez por worktree -- `.git/hooks/` NAO e versionado):
+#
+#     git config core.hooksPath scripts/hooks
+#
+# ou, se preferir copiar:
+#
+#     cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# Para pular deliberadamente: `git push --no-verify`. Isso e possivel de proposito -- o gancho
+# e conveniencia, nao barreira. A barreira que ninguem contorna e a CI
+# (.github/workflows/rastreabilidade.yml), que roda a MESMA checagem sobre o mesmo range.
+
+set -e
+
+ROOT=$(git rev-parse --show-toplevel)
+PYTHON=${PYTHON:-python}
+ZERO="0000000000000000000000000000000000000000"
+
+# Fallback de range quando o remoto ainda nao tem a branch: tudo que nao esta no upstream.
+# Se nem `upstream/master` existir, cai para os ultimos 50 commits, que e melhor que nada.
+default_base() {
+  if git rev-parse --verify --quiet upstream/master >/dev/null; then
+    echo "upstream/master"
+  else
+    echo "HEAD~50"
+  fi
+}
+
+status=0
+
+# stdin do pre-push: <ref local> <sha local> <ref remota> <sha remoto>, uma linha por ref.
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue          # deletando uma ref: nada a validar
+
+  if [ "$remote_sha" = "$ZERO" ]; then
+    base=$(default_base)
+  else
+    base=$remote_sha
+  fi
+
+  echo "pre-push: validando rastreabilidade em $base..$local_sha"
+  if ! "$PYTHON" "$ROOT/scripts/check_traceability.py" --commits "$base..$local_sha"; then
+    status=1
+  fi
+done
+
+if [ "$status" -ne 0 ]; then
+  cat >&2 <<'EOF'
+
+Push barrado pela rastreabilidade.
+
+O que fazer, conforme o que a lista acima disse:
+
+  * "a task nunca foi escrita" -> crie docs/task/TASK-NNNN-<slug>.md ANTES do codigo.
+    O numero e novo; o escopo diz o que entra e o que deliberadamente nao entra.
+
+  * "`chore:` alterando caminho que a excecao NAO cobre" -> a excecao `chore:` vale so
+    para o que NAO roda no aplicativo. Escreva a task e reescreva o assunto do commit.
+
+  * "o assunto nao comeca por 'TASK-NNNN:'" -> o prefixo no assunto e o vinculo
+    autoritativo entre task e commit. Nao ha hash escrito a mao que o substitua.
+
+  * "nao tem linha no indice" -> rode `python scripts/check_traceability.py --fix`.
+
+Para pular deliberadamente: git push --no-verify
+(a CI roda a mesma checagem, entao pular aqui so adia.)
+EOF
+fi
+
+exit "$status"

@@ -1,10 +1,10 @@
 # TASK-0011: Impor a regra de commit mecanicamente, no gancho e na CI
 
-- **Status:** aberta
+- **Status:** concluída
 - **Criada em:** 2026-08-25
-- **Concluída em:** —
+- **Concluída em:** 2026-09-03
 - **Feature:** [FEAT-0002](../features/FEAT-0002-rastreabilidade-verificavel.md)
-- **Bugs que resolve:** [rastreabilidade-sem-verificacao-de-git-para-task](../bugs/open/armsx2-fork/rastreabilidade-sem-verificacao-de-git-para-task_2026-08-25T22-44.md)
+- **Bugs que resolve:** [rastreabilidade-sem-verificacao-de-git-para-task](../bugs/done/rastreabilidade-sem-verificacao-de-git-para-task_2026-08-25T22-44.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0011:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** — (não altera o aplicativo)
@@ -75,4 +75,32 @@ diz **o que fazer**, não só que falhou.
 
 ## Resultado
 
-Preenchido ao concluir.
+Os quatro itens entraram: modo `--commits`, regra de caminho num só lugar, gancho versionado em
+`scripts/hooks/pre-push` e CI em `.github/workflows/rastreabilidade.yml`. O histórico atual passa:
+
+```
+python scripts/check_traceability.py --commits upstream/master..HEAD
+OK -- 77 task(s), 2 feature(s), 111 commit(s) em upstream/master..HEAD, rastreabilidade consistente.
+```
+
+**Um item do escopo não entrou, de propósito.** O plano pedia reprovar dois commits com o mesmo
+prefixo `TASK-NNNN:` — "a regra 'uma task = um commit', verificada do lado do git". Esse texto foi
+escrito antes da [TASK-0042](TASK-0042-remover-regra-um-commit-por-task.md), que **removeu** essa
+regra porque ela empurrava para `--amend` e reescrevia histórico. Reintroduzi-la aqui desfaria uma
+decisão já tomada.
+
+**Uma exceção nominal foi necessária.** `bf45520833` tem assunto `*` e 114 arquivos, entre eles
+`scripts/` e testes sob `app/src/` — exatamente o que esta checagem passa a barrar, e já publicado
+quando ela foi escrita. Está em `LEGACY_SUBJECT_EXCEPTIONS`, com o motivo ao lado, em vez de
+enfraquecer a regra para todos. Nenhum `chore:` do histórico toca caminho protegido; conferido
+antes de ligar a regra.
+
+**Merges ficam de fora da checagem.** Sem isso, o merge da TASK-0067 reprovaria 72 vezes: um
+`git merge upstream/master` traz commits de terceiros, cujo assunto não é nosso para governar.
+
+**Um defeito real apareceu ao escrever os testes:** `main()` retornava 0 logo no início quando não
+havia nenhum arquivo de task. Um repositório sem tasks e com commits alterando `app/src/` é
+literalmente o incidente fundador, e o validador o aprovava em silêncio. A saída antecipada agora
+só acontece quando `--commits` não foi pedido.
+
+Validação: `python -m pytest scripts/tests -q` — 27 testes, 9 deles novos aqui.
