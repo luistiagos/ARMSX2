@@ -37,6 +37,7 @@ sem lastro.
 - [checktraceability-grep-casa-corpo-do-commit](../bugs/done/checktraceability-grep-casa-corpo-do-commit_2026-08-25T22-44.md) — o vínculo task→commit casa menção no corpo do commit
 - [checktraceability-fix-nao-insere-task-ausente-do-indice](../bugs/done/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md) — `--fix` não insere linha nova e relata sucesso
 - [rastreabilidade-sem-verificacao-de-git-para-task](../bugs/done/rastreabilidade-sem-verificacao-de-git-para-task_2026-08-25T22-44.md) — nada valida o sentido git → task; não há gancho
+- [numeros-de-task-colidem-entre-ramos](../bugs/done/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md) — o identificador não identifica: nove números com duas tasks cada
 
 > **Por que esta feature evita citar números de task na prosa:** o validador varre o texto inteiro
 > com `TASK_ID_RE.findall(text)` e exige backlink de **qualquer** task mencionada, inclusive numa
@@ -52,6 +53,7 @@ sem lastro.
 | [TASK-0010](../task/TASK-0010-corrigir-validador-rastreabilidade.md) | concluída | Corrigir o validador: assunto em vez de corpo, `--fix` que insere, conferência de status e de `Publicado em` |
 | [TASK-0011](../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) | concluída | Impor a regra mecanicamente: modo `--commits`, regra de caminho para `chore:`, gancho versionado e CI |
 | [TASK-0042](../task/TASK-0042-remover-regra-um-commit-por-task.md) | concluída | Sai a regra "uma task = um commit"; `--fix` passa a gravar todos os hashes de uma task |
+| [TASK-0078](../task/TASK-0078-numero-de-task-identifica-neste-ramo.md) | concluída | O número da task passa a identificar dentro deste ramo: a partir da TASK-0016, `concluída` exige commit alcançável de `HEAD` |
 
 ## Bugs originados por esta feature
 

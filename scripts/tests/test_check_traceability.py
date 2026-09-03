@@ -133,7 +133,7 @@ def test_mencao_no_corpo_nao_conta_como_commit_da_task(repo):
 
     code, out = repo.check()
     assert code == 1
-    assert "nenhum commit alcancavel tem assunto 'TASK-0099: ...'" in out
+    assert "nenhum commit deste ramo tem assunto 'TASK-0099: ...'" in out
 
 
 def test_assunto_de_verdade_conta(repo):
@@ -467,3 +467,52 @@ def test_sem_commits_o_validador_nao_muda_de_comportamento(repo):
     code, out = repo.check()
     assert code == 0, out
     assert "commit(s) em" not in out
+
+
+# ---- o numero de task so identifica dentro do ramo -------------------------
+
+def test_commit_de_outro_ramo_nao_satisfaz_task_deste(repo):
+    """De TASK-0016 a TASK-0024 ha nove numeros com um commit em cada ramo, de assuntos
+    completamente diferentes. Sem esta regra, a task daqui podia estar `concluída` e nunca
+    commitada, satisfeita pelo commit homonimo do outro ramo."""
+    repo.git("checkout", "-q", "--orphan", "outro")
+    repo.git("rm", "-rq", "--cached", ".")
+    repo.write("la.txt", "x\n")
+    repo.commit("TASK-0099: a task do OUTRO ramo, sobre outro assunto", allow_empty=False)
+    repo.git("checkout", "-q", "main")
+
+    repo.task("TASK-0099", status="concluída")
+    repo.index_row("TASK-0099")
+    repo.commit("chore: escreve a task e nada mais")
+
+    code, out = repo.check()
+    assert code == 1
+    assert "NAO e alcancavel de HEAD" in out
+    assert "so e unico dentro do ramo" in out
+
+
+def test_task_anterior_ao_fork_aceita_commit_fora_de_head(repo):
+    """As TASK-0001 a TASK-0015 foram concluidas na linha anterior do produto, cujos commits o
+    fork nao alcanca por construcao. Exigir `HEAD` delas seria o registro mentindo sobre
+    trabalho que existe."""
+    repo.git("checkout", "-q", "--orphan", "linha-anterior")
+    repo.git("rm", "-rq", "--cached", ".")
+    repo.write("la.txt", "x\n")
+    repo.commit("TASK-0009: publicar a versao, na linha anterior", allow_empty=False)
+    repo.git("checkout", "-q", "main")
+
+    repo.task("TASK-0009", status="concluída", slug="antiga")
+    repo.index_row("TASK-0009", slug="antiga")
+    repo.commit("chore: escreve a task")
+
+    code, out = repo.check()
+    assert code == 0, out
+
+
+def test_commit_deste_ramo_continua_valendo(repo):
+    repo.task("TASK-0099", status="concluída")
+    repo.index_row("TASK-0099")
+    repo.commit("TASK-0099: feito aqui mesmo")
+
+    code, out = repo.check()
+    assert code == 0, out

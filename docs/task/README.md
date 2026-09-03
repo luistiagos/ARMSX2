@@ -12,14 +12,22 @@ Ver [`docs/README.md`](../README.md) para a regra de commit e o desenho geral da
 
 ## Convenção de nome
 
-`TASK-NNNN-<slug-kebab-case>.md` — o número é sequencial, nunca reaproveitado, e é o identificador
-estável usado nos links. O slug pode ser reescrito; o número, não.
+`TASK-NNNN-<slug-kebab-case>.md` — o número é sequencial dentro deste ramo e nunca reaproveitado
+aqui. O slug pode ser reescrito; o número, não.
 
-**Único dentro deste ramo, e só dentro dele.** `feature/fork-upstream-android` e
-`feature/handoff-end-to-end` não têm história comum e numeraram tasks em paralelo: existe uma
-TASK-0016 em cada, sobre assuntos completamente diferentes. Enquanto isso não for decidido
-([bug](../bugs/open/armsx2-fork/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md)), um `TASK-NNNN` só
-identifica alguma coisa quando se sabe de que ramo se está falando.
+**Único dentro deste ramo, e só dentro dele — e isso agora é verificado.**
+`feature/fork-upstream-android` e `feature/handoff-end-to-end` não têm história comum e numeraram
+tasks em paralelo: **nove números colidem**, de TASK-0016 a TASK-0024, cada um com dois commits de
+assuntos completamente diferentes. Um link `[TASK-NNNN]` só identifica alguma coisa quando se sabe
+de que ramo se está falando.
+
+Desde a [TASK-0078](TASK-0078-numero-de-task-identifica-neste-ramo.md), o validador não deixa mais
+isso passar despercebido: **a partir da TASK-0016**, uma task `concluída` precisa de um commit
+alcançável de `HEAD`. O commit homônimo do outro ramo não a satisfaz, e a mensagem de reprovação
+diz exatamente isso. Abaixo da TASK-0016 a busca larga continua valendo, porque aquelas tasks foram
+concluídas na linha anterior do produto, cujos commits o fork não alcança por construção.
+
+O outro ramo não foi tocado: renumerar ou reservar faixa lá é decisão de lá.
 
 ## Status
 

@@ -6,8 +6,8 @@
 - **Errors (serviço):** nenhum — é defeito de processo, não de app
 - **Classe:** rastreabilidade (o identificador não identifica)
 - **Reincidência:** primeira vez registrada; existe desde que o fork nasceu
-- **Feature:** [FEAT-0002](../../../features/FEAT-0002-rastreabilidade-verificavel.md)
-- **Tasks que o resolvem:** nenhuma ainda
+- **Feature:** [FEAT-0002](../../features/FEAT-0002-rastreabilidade-verificavel.md)
+- **Tasks que o resolvem:** [TASK-0078](../../task/TASK-0078-numero-de-task-identifica-neste-ramo.md)
 
 ## Sintoma
 
@@ -44,7 +44,7 @@ Ele é único *dentro de um ramo*. Entre ramos, não.
 
 ## Consequência já observada
 
-Ao remover a regra "uma task = um commit" ([TASK-0042](../../../task/TASK-0042-remover-regra-um-commit-por-task.md)),
+Ao remover a regra "uma task = um commit" ([TASK-0042](../../task/TASK-0042-remover-regra-um-commit-por-task.md)),
 o `fill_index` passou a gravar **todos** os hashes encontrados — e escreveu na linha da TASK-0016 do
 fork o hash da TASK-0016 do handoff:
 
@@ -74,3 +74,59 @@ consumidor: a ambiguidade do número continua.
    dizerem isso. É o estado de fato hoje, apenas sem estar escrito.
 
 Sem task ainda: precisa da decisão antes.
+
+## Correção — 2026-09-03 ([TASK-0078](../../task/TASK-0078-numero-de-task-identifica-neste-ramo.md))
+
+Das quatro saídas listadas acima, foi feita a **4 com dentes**: a unicidade passa a ser por ramo,
+**declarada e verificada**, sem tocar em `feature/handoff-end-to-end`. Renumerar, prefixar ou
+reservar faixa lá é decisão de lá, e o escopo desta correção é o ARMSX2-fork.
+
+### O que mudou no validador
+
+`commits_for_task()` continua procurando em `--all`, mas quem decide agora é `check_task_has_commit()`:
+
+- **A partir da TASK-0016** — a primeira escrita depois do fork — uma task `concluída` precisa de
+  commit **alcançável de `HEAD`**. O commit homônimo do outro ramo não a satisfaz mais.
+- **Abaixo dela**, a busca larga continua valendo. Não é concessão: as TASK-0001 a TASK-0015 foram
+  concluídas na linha anterior do produto, cujos commits o fork não alcança por construção. Exigir
+  `HEAD` delas seria o registro mentindo sobre trabalho que existe.
+- A fronteira é uma constante única, `FORK_FIRST_TASK`, com o motivo escrito ao lado.
+
+**A mensagem de reprovação distingue os dois casos**, que era metade do problema original — o
+relato abre justamente com o validador dizendo "uma task = um commit, mas ha 2 commits", que foi
+lido como "commitada duas vezes" e não era isso:
+
+```
+status 'concluída', mas o unico commit com assunto 'TASK-0099: ...' (ab12cd34) NAO e alcancavel
+de HEAD -- e a task de outro ramo com o mesmo numero, nao esta. O numero de task so e unico
+dentro do ramo.
+```
+
+### O que a medição de hoje mostrou
+
+Nove números colidem, não um: **TASK-0016 a TASK-0024**, cada um com um commit em cada ramo. O
+relato original tinha registrado dois (0016 e 0017) porque foi escrito antes de os outros
+existirem.
+
+### O que continua verdade, e agora está escrito
+
+`docs/task/README.md` prometia um número "sequencial, nunca reaproveitado, e o identificador
+estável usado nos links". Passou a dizer o que de fato vale: o número é único **dentro deste ramo**,
+e um link `[TASK-NNNN]` só identifica alguma coisa quando se sabe de que ramo se fala.
+
+### O que NÃO foi feito, e por quê
+
+- **Renumerar** — corrigiria o passado e quebraria todo link já escrito nos dois ramos.
+- **Prefixo por linha de produto** (`TASK-F-`/`TASK-H-`) — mexeria no validador, no gancho, na CI e
+  em todo link existente, para resolver um problema que só aparece se os ramos forem fundidos.
+- **Faixa 2000+ para o handoff** — exigiria alterar o outro ramo.
+
+Se os dois ramos forem fundidos algum dia, os nove pares de arquivos homônimos continuam sendo um
+problema, e aí a renumeração volta à mesa. Enquanto forem ramos independentes, o número identifica.
+
+### Validação
+
+`python -m pytest scripts/tests -q` — 30 testes. Os três novos montam um segundo ramo órfão com um
+commit `TASK-0099:` de outro assunto e provam que ele não satisfaz a task daqui; que uma task
+anterior à fronteira continua aceitando commit fora de `HEAD`; e que o caso normal não mudou. O
+primeiro **falha** contra a versão anterior do script.

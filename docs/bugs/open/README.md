@@ -5,10 +5,11 @@ atualizar as referências remotas. O `upstream/master` verificado estava em `5fd
 
 Havia **29 relatórios**, não 18 como dizia o índice anterior. Eles agora estão separados em:
 
-- [`armsx2-fork/`](armsx2-fork/README.md): **19** bugs que afetam, ou cuja causa continua presente,
-  na árvore atual do fork (eram 22; os três de rastreabilidade foram fechados em 2026-09-03 pelas
+- [`armsx2-fork/`](armsx2-fork/README.md): **18** bugs que afetam, ou cuja causa continua presente,
+  na árvore atual do fork (eram 22; os quatro de rastreabilidade foram fechados em 2026-09-03 pelas
   [TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md) e
-  [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md));
+  [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) e
+  [TASK-0078](../../task/TASK-0078-numero-de-task-identifica-neste-ramo.md));
 - [`legado-version1/`](legado-version1/README.md): **7** bugs da linha antiga/`version1`, ou ainda
   sem reprodução depois do transplante, que não devem orientar uma correção no fork sem novo teste.
 
@@ -44,7 +45,6 @@ neles.
 | [GPU timing do GL não lê](armsx2-fork/gpu-timing-do-opengl-no-android-nunca-produz-leitura_2026-09-01T10-50.md) | herdado do upstream | **Sem correção.** O código atual ainda usa entry points core com o alvo da extensão. | Sim, hipótese precisa confirmação | **Baixa** | Primeiro medir `glGetError`; se confirmar, usar `EXT_disjoint_timer_query` corretamente. Upstream `5fd85d7fc9` continua igual. |
 | [Mali perde device com upscale](armsx2-fork/mali-g52-r38-vulkan-perde-o-device-com-qualquer-upscale_2026-09-02T11-33.md) | driver/hardware | **Sem correção de causa no app/core.** | Não para a causa; só mitigação | — | Não remover o para-quedas de device-lost. Oferecer renderer software/limite por jogo se houver evidência suficiente. |
 | [Piso de Z desligado em Mali Vulkan](armsx2-fork/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md) | herdado do upstream, controle no fork | **Implementada**, falta A/B em aparelho. | Sim, já implementada | **Média** | TASK-0064 criou `ForcePS2DepthQuantization`; a exposição automática foi reduzida pela TASK-0072. |
-| [Números de task colidem](armsx2-fork/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md) | processo do fork | **Sem correção de política.** Só o `fill_index` foi limitado a `HEAD`. | Sim, exige decisão | **Baixa** | Escolher namespace/faixa por linha ou declarar formalmente unicidade por ramo. |
 | [Renderer automático sem recuperação completa](armsx2-fork/renderer-automatico-sem-rede-de-seguranca-no-fork_2026-08-31T20-00.md) | delta do fork | **Parcial.** Marcador contra crash-loop foi implementado; tela preta sem crash continua sem ação assistida. | Sim para a recuperação de UX | **Alta** | Adicionar ação “imagem não apareceu” que troca backend por jogo e reinicia, sem classificar pixels. |
 | [Savestate `0x9A54` rejeitado](armsx2-fork/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md) | incompatibilidade fork ↔ version1 | **Implementada**, bloqueada na validação. | Sim, já implementada | **Alta** | TASK-0049 implementou leitor e proteção de consumo integral; falta um `.p2s` real da 1.0.23. |
 | [Scrim do teclado 0×0](armsx2-fork/teclado-virtual-scrim-de-tamanho-zero_2026-08-31T00-00.md) | delta do fork | **Implementada**, falta validação de interação. | Sim, já implementada | **Baixa** | `fillMaxSize()` está fora do `AnimatedVisibility`; confirmar toque fora no aparelho. |

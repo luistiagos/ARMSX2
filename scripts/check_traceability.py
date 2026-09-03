@@ -60,6 +60,20 @@ GUARDED_SUFFIXES = (
 # Prefixos de assunto aceitos alem de `TASK-NNNN:`.
 ALLOWED_SUBJECT_PREFIXES = ("chore:",)
 
+# Primeira task escrita DEPOIS do fork. A partir daqui, task deste ramo tem de ter commit
+# alcancavel de `HEAD`.
+#
+# O numero de task NAO e unico entre ramos: `feature/fork-upstream-android` e
+# `feature/handoff-end-to-end` nao tem historia comum e numeraram em paralelo -- de TASK-0016 a
+# TASK-0024 ha NOVE numeros com dois commits cada, de assuntos completamente diferentes. Aceitar
+# a busca larga para essas fazia o commit do outro ramo satisfazer a exigencia daqui, e uma task
+# nunca commitada passava na validacao.
+#
+# Abaixo da fronteira a busca larga continua valendo, e nao e concessao: as TASK-0001 a TASK-0015
+# foram concluidas na linha anterior do produto, cujos commits o fork nao alcanca por construcao.
+# Exigir `HEAD` delas seria o registro mentindo sobre trabalho que existe.
+FORK_FIRST_TASK = 16
+
 # Commits anteriores a esta checagem cujo assunto nao pode mais ser corrigido: reescrever
 # historico ja publicado e o mesmo estrago que `commit_is_reachable` existe para detectar. Ficam
 # registrados aqui, nominalmente, em vez de enfraquecer a regra para todo mundo.
@@ -311,8 +325,7 @@ def main():
         # o mesmo estrago que `commit_is_reachable` existe para detectar. O que importa continua
         # verificado: task concluida tem de ter ao menos um commit com o assunto.
         if status == "concluída":
-            if not commits_for_task(tid):
-                fail(path, "status 'concluída' mas nenhum commit alcancavel tem assunto '%s: ...'" % tid)
+            check_task_has_commit(tid, path)
 
         # Se o campo Commit tiver um hash escrito a mao, ele tem de bater com o git.
         commit = field(text, "Commit")
@@ -384,6 +397,34 @@ def main():
           % (len(tasks), len(feats),
              ", %d commit(s) em %s" % (commits, rev_range) if rev_range else ""))
     return 0
+
+
+def check_task_has_commit(tid, path):
+    """Task `concluída` tem de ter commit -- e, deste lado da fronteira, commit DESTE ramo.
+
+    A distincao existe porque o numero de task colide entre ramos. Sem ela, uma task deste ramo
+    marcada `concluída` e nunca commitada passava na validacao assim que o OUTRO ramo tivesse uma
+    task com o mesmo numero -- o que acontece para nove numeros hoje. Ver
+    `numeros-de-task-colidem-entre-ramos`."""
+    if commits_for_task(tid, reachable_only=True):
+        return
+
+    numero = int(tid.split("-")[1])
+    if numero < FORK_FIRST_TASK:
+        # Anterior ao fork: o commit esta na linha anterior do produto, que `HEAD` nao alcanca.
+        if not commits_for_task(tid):
+            fail(path, "status 'concluída' mas nenhum commit alcancavel tem assunto "
+                       "'%s: ...'" % tid)
+        return
+
+    noutro_ramo = commits_for_task(tid)
+    if noutro_ramo:
+        fail(path, "status 'concluída', mas o unico commit com assunto '%s: ...' (%s) NAO e "
+                   "alcancavel de HEAD -- e a task de outro ramo com o mesmo numero, nao esta. "
+                   "O numero de task so e unico dentro do ramo."
+                   % (tid, ", ".join(noutro_ramo)))
+    else:
+        fail(path, "status 'concluída' mas nenhum commit deste ramo tem assunto '%s: ...'" % tid)
 
 
 def is_guarded(path):
