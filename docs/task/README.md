@@ -159,7 +159,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0076](TASK-0076-icone-do-app-volta-a-ser-so-o-padrao.md) — o ícone do app volta a ser só o padrão, e o seletor sai | concluída | — | — | `8d0964b416` `695228cd38` `a3b78a343e` |
 | [TASK-0077](TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) — o aviso do GOS ganha "não mostrar de novo", e o item de menu vira a porta de volta | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | `ed3e7e7c46` `fe66b785f3` |
 | [TASK-0078](TASK-0078-numero-de-task-identifica-neste-ramo.md) — fazer o número da task identificar alguma coisa, ao menos dentro deste ramo | concluída | FEAT-0002 | numeros-de-task-colidem-entre-ramos | `863a7b3ad8` `2251a2bfdf` |
-| [TASK-0079](TASK-0079-boot-nao-toca-o-nativo-nem-o-disco-na-ui.md) — tirar da thread da UI a carga do `.so` e a resolução do data root no boot | concluída | — | app-anr-loadlibrary-emucore-ui-thread, datadirectorymanager-anr-getexternalfilesdir-a07 | `efe39c6431` `920b51f69d` |
+| [TASK-0079](TASK-0079-boot-nao-toca-o-nativo-nem-o-disco-na-ui.md) — tirar da thread da UI a carga do `.so` e a resolução do data root no boot | concluída | — | app-anr-loadlibrary-emucore-ui-thread, datadirectorymanager-anr-getexternalfilesdir-a07 | `efe39c6431` `920b51f69d` `42be339905` |
 | [TASK-0080](TASK-0080-onda-xmb-para-de-usar-nome-reservado-no-shader.md) — renomear o uniform `length`, que é função embutida do GLSL e derruba a onda XMB | concluída | — | xmb-gl-nao-compila-shader-uniform-chamado-length | `0870fdb0e0` `bfdc9cc223` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
