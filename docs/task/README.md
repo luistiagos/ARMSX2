@@ -82,7 +82,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0007](TASK-0007-cas-precisao-gles.md) — precisão GLES no shader CAS | concluída | FEAT-0001 | cas-shader-gles-sem-precisao-mali | `7c3f5e775a` |
 | [TASK-0008](TASK-0008-port-mfifo-spr-upstream.md) — port do MFIFO/SPR do upstream | concluída | FEAT-0001 | — (hipótese derrubada) | `cca3bf0c69` |
 | [TASK-0009](TASK-0009-publicar-versao.md) — publicar a 1.0.23 | concluída | FEAT-0001 | — | `0bc7e826d0` |
-| [TASK-0010](TASK-0010-corrigir-validador-rastreabilidade.md) — corrigir o validador de rastreabilidade | concluída | FEAT-0002 | checktraceability-grep-casa-corpo-do-commit, checktraceability-fix-nao-insere-task-ausente-do-indice | — |
+| [TASK-0010](TASK-0010-corrigir-validador-rastreabilidade.md) — corrigir o validador de rastreabilidade | concluída | FEAT-0002 | checktraceability-grep-casa-corpo-do-commit, checktraceability-fix-nao-insere-task-ausente-do-indice | `5c81aa34f1` |
 | [TASK-0011](TASK-0011-impor-regra-de-commit-mecanicamente.md) — impor a regra de commit mecanicamente | aberta | FEAT-0002 | rastreabilidade-sem-verificacao-de-git-para-task | — |
 | [TASK-0012](TASK-0012-portao-de-boot-nao-perde-informacao.md) — portão de boot honra falha de init nativa e `onNewIntent` | concluída | — | app-falha-de-init-nativa-sem-consumidor, bootsplash-singletop-descarta-intent-novo | `3e25c6adb1` |
 | [TASK-0013](TASK-0013-detector-valor-veneno-dma.md) — detector de valor-veneno no DMA (instrumenta o crash do SotC) | concluída | — | — (instrumenta, não corrige) | `a71a51e17d` |
