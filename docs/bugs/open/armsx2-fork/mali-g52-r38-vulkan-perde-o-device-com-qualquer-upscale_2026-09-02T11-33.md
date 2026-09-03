@@ -73,10 +73,10 @@ SLES-52046:
 O banco nomeia o sintoma. Mas `halfPixelOffset` é **exclusivamente de upscaling**, verificado nos
 quatro sítios que o consultam — inclusive nos modos que se **chamam** `Native` e `NativeWTexOffset`,
 que apesar do nome também exigem `scale > 1.0f`
-([GSRendererHW.cpp:6331](../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L6331),
-[8368](../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L8368),
-[8439](../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L8439),
-[8556](../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L8556)).
+([GSRendererHW.cpp:6331](../../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L6331),
+[8368](../../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L8368),
+[8439](../../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L8439),
+[8556](../../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L8556)).
 
 > Uma hipótese minha caiu aqui e fica registrada: eu suspeitei que
 > `Pcsx2Config::GSOptions::MaskUpscalingHacks()` fosse larga demais por zerar também os modos
@@ -106,5 +106,5 @@ o que a medição diz, e é melhor do que continuar procurando um conserto que o
 Não afirma que Mali-G52 r38 perde o device com upscale em **todo** jogo — foi medido em um título.
 O *10 Pin - Champions Alley* não foi testado com upscale. Antes de qualquer regra ou aviso genérico
 sobre upscale nesse GPU, isso precisa ser medido em mais títulos: é exatamente o erro que a
-[TASK-0072](../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) acabou de
+[TASK-0072](../../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) acabou de
 desfazer.

@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-30
 - **Concluída em:** 2026-08-30
 - **Feature:** nenhuma
-- **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
+- **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/armsx2-fork/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 - **Commit:** o código está em `ea80c1041e`, commitado com o prefixo **`TASK-0055:`** —
   ver a nota de colisão abaixo
 - **Revertida por:** —
@@ -18,7 +18,7 @@
 > O commit do código (`ea80c1041e`) ficou com o assunto `TASK-0055:` porque a colisão só
 > apareceu depois. Não reescrevi o histórico de propósito — é o estrago que o validador
 > tem uma checagem inteira para detectar. É o mesmo defeito de processo já registrado em
-> [`numeros-de-task-colidem-entre-ramos`](../bugs/open/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md),
+> [`numeros-de-task-colidem-entre-ramos`](../bugs/open/armsx2-fork/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md),
 > agora visto **dentro** do mesmo ramo, entre duas sessões simultâneas.
 
 ## Contexto

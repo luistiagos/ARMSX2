@@ -8,7 +8,7 @@
 - **Classe:** dado corrompido por construção (o arquivo no disco não é o que o nome diz)
 - **Reincidência:** primeira vez registrada; existe desde que o retry por variantes entrou
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0045](../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md)
+- **Tasks que o resolvem:** [TASK-0045](../../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md)
 
 ## Sintoma
 
@@ -69,7 +69,7 @@ funciona é o bloco `.chd` curado.
 
 ## Situação
 
-Endereçado pela [TASK-0045](../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md), que
+Endereçado pela [TASK-0045](../../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md), que
 para de aceitar fonte que o emulador não abre e passa a gravar com a extensão do conteúdo recebido.
 Continua **aberto** até a validação no aparelho, e **não** cobre a limpeza do manifesto (as ~9k
 entradas `.iso` sem fonte utilizável seguem no catálogo, agora falhando cedo em vez de baixar lixo).

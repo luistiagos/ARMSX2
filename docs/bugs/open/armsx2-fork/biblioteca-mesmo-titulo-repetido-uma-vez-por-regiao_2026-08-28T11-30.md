@@ -8,7 +8,7 @@
 - **Reincidência:** segunda vez. A primeira foi respondida ligando o rótulo sob a capa por padrão
   (`GameInfo.GridLabels`), o que tornou as células distinguíveis sem reduzir a repetição
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0047](../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md)
+- **Tasks que o resolvem:** [TASK-0047](../../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md)
 
 > **Registro escrito depois da task.** A TASK-0047 já existia e apontava para este arquivo, que
 > nunca tinha sido criado — o validador de rastreabilidade reprovava por isso. O conteúdo abaixo
@@ -22,7 +22,7 @@ região/idioma/revisão/disco, todas com **a mesma arte**, porque o repositório
 imagem por jogo e não por lançamento.
 
 Isto já estava escrito na própria árvore, no comentário de `GridLabels`
-([GameInfo.kt:101](../../../platforms/android/app/src/main/java/com/armsx2/GameInfo.kt#L101)):
+([GameInfo.kt:101](../../../../platforms/android/app/src/main/java/com/armsx2/GameInfo.kt#L101)):
 
 > *"A grade aqui carrega o catalogo inteiro, e o repositorio de capas tem UMA arte por jogo, nao
 > por lancamento: '007 - Nightfire' tem cinco entradas (USA, duas europeias, Japan, Korea) com a
@@ -72,7 +72,7 @@ Abrir a biblioteca com o catálogo carregado e buscar por `Metal Gear Solid 3` o
 
 ## Próximos passos
 
-- [TASK-0047](../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md), em andamento: uma célula
+- [TASK-0047](../../../task/TASK-0047-agrupar-versoes-do-mesmo-titulo.md), em andamento: uma célula
   por título entre as linhas de catálogo, e um painel de versões no toque.
 - Só as linhas **de catálogo** são agrupadas. Um jogo já no aparelho é um arquivo concreto e
   precisa de célula própria — senão a grade esconde qual deles dá boot.

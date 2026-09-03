@@ -88,7 +88,7 @@ URI `file://` de verdade — igual ao que a biblioteca guarda. Só o argumento d
 | **depois**, Vulkan (`renderer=14`) | `/storage/…/007 - Everything or Nothing (USA).chd` | **sim** — logo da MGM Interactive na tela |
 
    A conferência visual foi feita em **Vulkan de propósito**: em OpenGL este título cai na tela
-   preta do [outro bug](../bugs/open/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md)
+   preta do [outro bug](../bugs/open/armsx2-fork/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md)
    logo depois do FMV, e a captura preta não distinguiria "não bootou" de "bootou e a tela é preta".
    No lado GL a prova é o log: a VM subiu e produziu quadros, o que antes não acontecia.
 3. **Boot pela grade continua funcionando.** ✅ `@@ANDROID_LAUNCH_GAME@@` com o mesmo caminho nu, e

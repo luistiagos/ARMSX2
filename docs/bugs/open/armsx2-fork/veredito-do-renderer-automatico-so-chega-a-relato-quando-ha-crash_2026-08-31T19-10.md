@@ -6,7 +6,7 @@
 - **Classe:** fail
 - **Reincidência:** é a mesma lacuna que o registro do A07 descreve para os logs, num outro canal
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0065](../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
+- **Tasks que o resolvem:** [TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
 
 ## Sintoma
 
@@ -17,18 +17,18 @@ app. A única saída hoje é pedir uma foto e adivinhar.
 ## Por que o dado existe e mesmo assim não chega
 
 A decisão do `auto` é tomada no núcleo, em
-[`GSUtil::AndroidAutoPrefersVulkan`](../../../pcsx2/GS/GSUtil.cpp#L302), que **já registra o motivo**
+[`GSUtil::AndroidAutoPrefersVulkan`](../../../../pcsx2/GS/GSUtil.cpp#L302), que **já registra o motivo**
 numa string (`s_android_auto_renderer_reason`, com valores como `driver-rule:gl-arm-g52-r38-auto-vulkan`,
 `adreno-default`, `gl-feedback-copy-workaround`, `platform-default`).
 
 Só que essa string tem exatamente um consumidor: um `Console.WriteLn` em
-[`GSUtil::GetPreferredRenderer`](../../../pcsx2/GS/GSUtil.cpp#L385). Daí em diante ela some. As três
+[`GSUtil::GetPreferredRenderer`](../../../../pcsx2/GS/GSUtil.cpp#L385). Daí em diante ela some. As três
 pontes possíveis estão todas cortadas:
 
 | caminho | por que não entrega |
 |---|---|
-| A ponte JNI | `Java_kr_co_iefriends_pcsx2_NativeApp_setAutoRendererGpuStrings` é `void` — o app **manda** as strings do GPU e não **recebe** nada de volta ([native-lib.cpp:2327](../../../platforms/android/app/src/main/cpp/native-lib.cpp#L2327)) |
-| O resumo de boot do GS | `MainActivityRuntime` grava em `TelemetryReporter.setGraphicsBootSummary` só `gl_vendor`/`gl_renderer`/`gl_version` — a **identidade** do GPU, nunca a **decisão** ([MainActivityRuntime.kt:1962](../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L1962)) |
+| A ponte JNI | `Java_kr_co_iefriends_pcsx2_NativeApp_setAutoRendererGpuStrings` é `void` — o app **manda** as strings do GPU e não **recebe** nada de volta ([native-lib.cpp:2327](../../../../platforms/android/app/src/main/cpp/native-lib.cpp#L2327)) |
+| O resumo de boot do GS | `MainActivityRuntime` grava em `TelemetryReporter.setGraphicsBootSummary` só `gl_vendor`/`gl_renderer`/`gl_version` — a **identidade** do GPU, nunca a **decisão** ([MainActivityRuntime.kt:1962](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L1962)) |
 | O logcat capturado no relato | funciona, **mas só existe quando há crash**: `CrashReporter` anexa o logcat a um relato de crash/ANR |
 
 ## O buraco, em uma frase
@@ -57,7 +57,7 @@ As três produzem relatos idênticos.
 
 Levar o veredito ao resumo de boot do GS, que já é anexado a todo relato — e por ser uma string
 curta, também serve para a tela de diagnóstico do app. Detalhes e escopo na
-[TASK-0065](../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md).
+[TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md).
 
 ⚠️ **Sem trocar a assinatura da ponte existente.** JNI liga por **nome**, não por assinatura:
 mudar `setAutoRendererGpuStrings` de `void` para devolver `jstring` compila, linka, roda e devolve

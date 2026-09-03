@@ -1,7 +1,7 @@
 # Backlog: fazer o emulador caber no clock que o aparelho deixa
 
 **Origem:** investigação do limite de CPU do GOS no Galaxy A12, 2026-08-29/30 — ver
-[`bugs/open/gos-samsung-limita-clock-a-metade-em-jogo`](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
+[`bugs/open/gos-samsung-limita-clock-a-metade-em-jogo`](../bugs/open/armsx2-fork/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 **Data da análise:** 2026-08-30
 **Prioridade:** Alta — é a única trilha em que o usuário leigo ganha velocidade **sem fazer nada**
 **Revisado em:** 2026-08-30 · **Medido no Galaxy A12:** 2026-08-30
@@ -28,7 +28,7 @@
 >   medido; os dois de cima estão medidos antes e depois)
 >
 > Registro completo em
-> [`cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks`](../bugs/open/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md).
+> [`cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks`](../bugs/open/armsx2-fork/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md).
 > Correção e medições na [TASK-0060](../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md).
 >
 > **Duas hipóteses anteriores foram ao aparelho e voltaram erradas**, e as anotações "Revisão

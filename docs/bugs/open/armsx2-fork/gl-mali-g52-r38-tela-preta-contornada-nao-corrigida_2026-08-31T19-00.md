@@ -7,10 +7,10 @@
 - **Errors (serviço):** nenhum — **não é crash, e é justamente por isso que não gera telemetria**
 - **Classe:** fail
 - **Reincidência:** é da mesma família da tela preta do A07
-  ([gs-tela-preta-silenciosa-sem-diagnostico-a07](gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)),
+  ([gs-tela-preta-silenciosa-sem-diagnostico-a07](../legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)),
   em outro aparelho e outro backend
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** **nenhuma** — a [TASK-0065](../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
+- **Tasks que o resolvem:** **nenhuma** — a [TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
   registra o defeito e instrumenta o diagnóstico; **não o corrige**
 
 ## Sintoma
@@ -28,7 +28,7 @@ A/B executado no aparelho em 2026-08-31, com upscale em 1x nativo:
 ## O contorno que está publicado, e por que ele não é a correção
 
 A regra `gl-arm-g52-r38-auto-vulkan`
-([GSGPUDriverProfile.cpp:358](../../../pcsx2/GS/Renderers/Common/GSGPUDriverProfile.cpp#L358))
+([GSGPUDriverProfile.cpp:358](../../../../pcsx2/GS/Renderers/Common/GSGPUDriverProfile.cpp#L358))
 faz o `auto` desses aparelhos resolver para Vulkan. Ela funciona — o usuário vê imagem — e por isso
 **fica**: tirá-la agora devolve a tela preta a todo mundo.
 
@@ -40,7 +40,7 @@ Mas ela é um desvio, não um conserto, e tem três custos que precisam estar es
    PS2, e no OpenGL não — registrado em
    [mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta](mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
    Ninguém decidiu isso; veio junto com a troca de backend.
-3. **É o terceiro movimento igual.** [`plano-grafico-mali-convergencia-upstream.md`](../../plano-grafico-mali-convergencia-upstream.md),
+3. **É o terceiro movimento igual.** [`plano-grafico-mali-convergencia-upstream.md`](../../../plano-grafico-mali-convergencia-upstream.md),
    seção *"O que explicitamente NÃO fazer"*: *"Trocar OpenGL ↔ Vulkan globalmente como 'correção'.
    Já foi feito nos dois sentidos (1.0.17 e 1.0.20) e os dois falharam."*
 
@@ -61,7 +61,7 @@ ninguém consegue revisar a decisão nem saber quando ela pode sair.
 |---|---|
 | framebuffer fetch em GL | o aparelho continuou preto com esse caminho desligado (registrado no comentário da regra) |
 | cache de shader do GL corrompido | reconstruir o cache não mudou nada (idem) |
-| `eglSwapInterval(0)` em Mali | o upstream já protege esse caso em [`GSDeviceOGL::SetSwapInterval`](../../../pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L1346), e a guarda só vale com vsync desligado. **Não verificado no aparelho** com vsync ligado/desligado — é a próxima coisa barata a testar |
+| `eglSwapInterval(0)` em Mali | o upstream já protege esse caso em [`GSDeviceOGL::SetSwapInterval`](../../../../pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L1346), e a guarda só vale com vsync desligado. **Não verificado no aparelho** com vsync ligado/desligado — é a próxima coisa barata a testar |
 
 ## A pista que ainda não foi seguida
 
@@ -93,7 +93,7 @@ Uma diferença já foi conferida e **não** é a causa: `SetSwapInterval` ganhou
 ## Reteste depois do merge com o upstream (2026-09-01)
 
 Retestado no mesmo A12 `SM-A127M`, com a árvore já no upstream de 31/08
-([TASK-0067](../../task/TASK-0067-merge-com-o-upstream.md), 72 commits) e APK `githubDebug` novo.
+([TASK-0067](../../../task/TASK-0067-merge-com-o-upstream.md), 72 commits) e APK `githubDebug` novo.
 **O defeito continua.** `renderer=12` confirmado no log, `GL_RENDERER: Mali-G52`, driver `r38p1`.
 
 O que o reteste acrescenta ao registro:
@@ -115,7 +115,7 @@ O que o reteste acrescenta ao registro:
 O achado nº 3 do reteste acima — *10 Pin* renderiza em GL no mesmo aparelho e na mesma sessão —
 derrubou a premissa da regra `gl-arm-g52-r38-auto-vulkan`: o discriminador é o **título**, e nenhum
 eixo do banco de drivers separa dois jogos. A regra saiu na
-[TASK-0072](../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md), com o registro
+[TASK-0072](../../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md), com o registro
 do porquê no lugar onde ela estava.
 
 **Este bug continua aberto e agora é visível no padrão**: no `auto`, o 007 volta a ficar preto

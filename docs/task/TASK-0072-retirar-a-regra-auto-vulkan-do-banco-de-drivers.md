@@ -5,7 +5,7 @@
 - **Concluída em:** —
 - **Feature:** nenhuma
 - **Bugs que resolve:** nenhum — **estreita o contorno** registrado em
-  [gl-mali-g52-r38-tela-preta-contornada-nao-corrigida](../bugs/open/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md),
+  [gl-mali-g52-r38-tela-preta-contornada-nao-corrigida](../bugs/open/armsx2-fork/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md),
   que segue aberto
 - **Commit:** — (o vínculo é o prefixo `TASK-0072:` no assunto)
 - **Revertida por:** —
@@ -46,7 +46,7 @@ Então não se troca a regra de driver por uma regra de título. Ela sai.
 |---|---|---|
 | Alcance | **todo** Mali-G52 em driver r38.x | ninguém |
 | Caminho gráfico | Vulkan, mesmo sendo o GL o caminho rápido do Mali (`GL_ARM_shader_framebuffer_fetch`) | GL, o caminho rápido |
-| Piso de Z de 32 bits do PS2 | **descartado** ([registro](../bugs/open/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md)) | mantido |
+| Piso de Z de 32 bits do PS2 | **descartado** ([registro](../bugs/open/armsx2-fork/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md)) | mantido |
 | Jogos afetados | **todos**, nesses aparelhos | nenhum |
 | Evidência que a sustentava | um jogo, num telefone | — |
 

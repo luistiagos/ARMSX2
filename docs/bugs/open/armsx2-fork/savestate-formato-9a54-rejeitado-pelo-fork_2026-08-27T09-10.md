@@ -23,7 +23,7 @@ if (savever > g_SaveVersion || (savever >> 16) != (g_SaveVersion >> 16))
 
 ## O que já foi medido
 
-A análise completa está em [`docs/savestates-preservar-no-transplante.md`](../../savestates-preservar-no-transplante.md)
+A análise completa está em [`docs/savestates-preservar-no-transplante.md`](../../../savestates-preservar-no-transplante.md)
 (trazida da árvore anterior). O resumo dela:
 
 - 54 dos 56 arquivos que participam da serialização têm sequência de wire **idêntica**;
@@ -72,7 +72,7 @@ falha visível por uma silenciosa.
 
 ## Situação
 
-**Corrigido no código pela [TASK-0049](../../task/TASK-0049-carregar-savestates-0x9A54.md); segue
+**Corrigido no código pela [TASK-0049](../../../task/TASK-0049-carregar-savestates-0x9A54.md); segue
 aberto até um `.p2s` real da 1.0.23 ser carregado**, que é a condição que este próprio registro
 impôs e que continua valendo.
 

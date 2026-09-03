@@ -120,6 +120,6 @@ o fluxo do Android, em que parar o jogo devolve o usuário para a Home.
 
 O mesmo vazamento existe na `feature/handoff-end-to-end`, onde foi corrigido pela TASK-0020
 **daquele ramo** (número que aqui significa outra coisa — ver
-[colisão de números](../open/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md)). Lá o laço
+[colisão de números](../open/armsx2-fork/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md)). Lá o laço
 usa `WaitForWork()` bloqueante, então a thread vazada dorme em vez de girar: mesmo vazamento,
 custo diferente. Este registro é o do ramo que publica.

@@ -6,7 +6,7 @@
 - **Errors (serviço):** nenhum — é defeito de processo, não de app
 - **Classe:** rastreabilidade (o identificador não identifica)
 - **Reincidência:** primeira vez registrada; existe desde que o fork nasceu
-- **Feature:** [FEAT-0002](../../features/FEAT-0002-rastreabilidade-verificavel.md)
+- **Feature:** [FEAT-0002](../../../features/FEAT-0002-rastreabilidade-verificavel.md)
 - **Tasks que o resolvem:** nenhuma ainda
 
 ## Sintoma
@@ -44,7 +44,7 @@ Ele é único *dentro de um ramo*. Entre ramos, não.
 
 ## Consequência já observada
 
-Ao remover a regra "uma task = um commit" ([TASK-0042](../../task/TASK-0042-remover-regra-um-commit-por-task.md)),
+Ao remover a regra "uma task = um commit" ([TASK-0042](../../../task/TASK-0042-remover-regra-um-commit-por-task.md)),
 o `fill_index` passou a gravar **todos** os hashes encontrados — e escreveu na linha da TASK-0016 do
 fork o hash da TASK-0016 do handoff:
 

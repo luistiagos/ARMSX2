@@ -10,7 +10,7 @@
 ## Sintoma
 
 A onda XMB em GLES3 nunca aparece neste aparelho. O usuário vê o fundo 2D
-([`LibraryWaveBackground`](../../../platforms/android/app/src/main/java/com/armsx2/ui/home/LibraryWaveBackground.kt)),
+([`LibraryWaveBackground`](../../../../platforms/android/app/src/main/java/com/armsx2/ui/home/LibraryWaveBackground.kt)),
 que existe como **fallback**.
 
 ## Causa
@@ -49,7 +49,7 @@ Então a onda GL não consome nada aqui; ela simplesmente não existe.
 ## ⚠️ Cuidado antes de corrigir
 
 **Corrigir só o shader seria uma regressão de desempenho.** A
-[TASK-0063](../../task/TASK-0063-fundo-da-biblioteca-para-de-animar.md) removeu a animação do fundo
+[TASK-0063](../../../task/TASK-0063-fundo-da-biblioteca-para-de-animar.md) removeu a animação do fundo
 2D por decisão de produto — "não vale sacrificar desempenho por enfeite" —, e mediu a queda de
 0,94 para 0,15 de um núcleo. Renomear o uniform faria a onda GL **passar a compilar** neste
 aparelho, trocando o fundo estático barato por uma thread EGL desenhando a 30 fps.

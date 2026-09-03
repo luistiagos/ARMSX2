@@ -395,7 +395,7 @@ Especificação completa em [`README.md`](README.md).
 > ⚠️ Nesta sessão o `--fix` do validador anunciou "9 linhas atualizadas" e deixou 3 tasks fora do
 > índice, além de manter `aberta` em linhas que já tinham commit. Conferir o índice à mão depois de
 > rodá-lo. Registrado em
-> [`bugs/open/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md`](bugs/open/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md);
+> [`bugs/open/armsx2-fork/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md`](bugs/open/armsx2-fork/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md);
 > conserto planejado na [TASK-0010](task/TASK-0010-corrigir-validador-rastreabilidade.md).
 
 ---

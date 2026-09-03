@@ -5,7 +5,7 @@
 - **Errors (serviço):** nenhum — defeito latente, ainda não observado em campo
 - **Classe:** fail (latente)
 - **Reincidência:** primeira vez
-- **Feature:** [FEAT-0001](../../features/FEAT-0001-sync-upstream-oficial.md)
+- **Feature:** [FEAT-0001](../../../features/FEAT-0001-sync-upstream-oficial.md)
 - **Tasks que o resolvem:** — (a definir)
 
 ## Correção de rumo — o que eu observei NÃO era este bug
@@ -16,9 +16,9 @@ dispositivo revertia a escolha do usuário em todo boot. **Estava errado**, e a 
 aparelho derrubou a hipótese:
 
 - `AndroidPerformanceProfileVersion` no aparelho é `7`, igual a `ANDROID_PERFORMANCE_PROFILE_VERSION`
-  ([main.cpp:128](../../../app/src/main/cpp/main.cpp#L128)), então `MigrateAndroidPerformanceDefaults`
+  ([main.cpp:128](../../../../app/src/main/cpp/main.cpp#L128)), então `MigrateAndroidPerformanceDefaults`
   retorna logo no começo e as linhas 249–252 **não rodaram**.
-- `ApplyAndroidPerformanceDefaults` ([main.cpp:134](../../../app/src/main/cpp/main.cpp#L134)), que zera
+- `ApplyAndroidPerformanceDefaults` ([main.cpp:134](../../../../app/src/main/cpp/main.cpp#L134)), que zera
   as quatro chaves, só é chamada no ramo de INI vazio (linhas 724 e 819). O INI não estava vazio.
 
 O que reverteu foi o **próprio app em execução**: eu editei um arquivo cujo conteúdo o processo já
@@ -29,7 +29,7 @@ ou usar o switch das Configurações, que é o caminho real do usuário.
 ## O defeito que sobra, este sim real
 
 Mesmo assim, a leitura do código expôs uma armadilha latente em
-[main.cpp:249-252](../../../app/src/main/cpp/main.cpp#L249):
+[main.cpp:249-252](../../../../app/src/main/cpp/main.cpp#L249):
 
 ```cpp
 set_bool_if_missing_or("Logging", "EnableSystemConsole", true, false);
@@ -38,7 +38,7 @@ set_bool_if_missing_or("Logging", "EnableVerbose",       true, false);
 set_bool_if_missing_or("Logging", "RecordAndroidLog",    true, false);
 ```
 
-O lambda ([main.cpp:220](../../../app/src/main/cpp/main.cpp#L220)) grava `new_value` quando a chave está
+O lambda ([main.cpp:220](../../../../app/src/main/cpp/main.cpp#L220)) grava `new_value` quando a chave está
 ausente **ou quando o valor atual é igual a `old_value`**. Com `old_value = true` e
 `new_value = false`, isso significa: *se o log estiver ligado, desligue*.
 
@@ -65,6 +65,6 @@ um default antigo" (legítimo) ou "reverter escolha do usuário" (não é).
 ## Pendência de verificação separada
 
 Continua **não verificado** se o switch de log das Configurações sobrevive a um restart. É
-pré-requisito da [TASK-0004](../../task/TASK-0004-bloco-b2-log-boot-gs.md) e precisa de um teste
+pré-requisito da [TASK-0004](../../../task/TASK-0004-bloco-b2-log-boot-gs.md) e precisa de um teste
 correto: `force-stop`, ligar pelo próprio app, reabrir, conferir se `<DataRoot>/logs/androidlog.txt`
 é criado.

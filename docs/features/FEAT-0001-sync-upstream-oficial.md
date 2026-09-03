@@ -25,9 +25,9 @@ com infraestrutura, e o código já está buscado no repositório desde 18/08/20
 
 ## Bugs que motivaram
 
-- [gs-tela-preta-silenciosa-sem-diagnostico-a07](../bugs/open/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md) — tela preta no A07, sem log que permita diagnosticar
-- [gs-mali-tela-vermelha-e-page-fault-driver](../bugs/open/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md) — tela vermelha no A15 e page fault dentro de `libGLES_mali.so`
-- [graphicshealthmonitor-falso-positivo-cenas-escuras](../bugs/open/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md) — 38 trocas indevidas de renderer em cenas escuras legítimas
+- [gs-tela-preta-silenciosa-sem-diagnostico-a07](../bugs/open/legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md) — tela preta no A07, sem log que permita diagnosticar
+- [gs-mali-tela-vermelha-e-page-fault-driver](../bugs/open/legado-version1/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md) — tela vermelha no A15 e page fault dentro de `libGLES_mali.so`
+- [graphicshealthmonitor-falso-positivo-cenas-escuras](../bugs/open/legado-version1/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md) — 38 trocas indevidas de renderer em cenas escuras legítimas
 
 ## Tasks
 

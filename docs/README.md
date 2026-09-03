@@ -50,7 +50,7 @@ Cardinalidades:
 |---|---|---|
 | [`task/`](task/README.md) | Unidades de trabalho. Uma por commit. | `TASK-NNNN-<slug>.md` |
 | [`features/`](features/README.md) | Iniciativas maiores que agrupam tasks. | `FEAT-NNNN-<slug>.md` |
-| [`bugs/open/`](bugs/open/README.md) | Defeitos em investigação ou aguardando reteste. | `<componente>-<sintoma>_<ISO>.md` |
+| [`bugs/open/`](bugs/open/README.md) | Defeitos em investigação, separados entre fork atual e legado/version1. | `<linha>/<componente>-<sintoma>_<ISO>.md` |
 | [`bugs/done/`](bugs/done/README.md) | Defeitos corrigidos **e validados**. | idem |
 | `backlog/` | Ideias ainda não promovidas a feature. | livre |
 

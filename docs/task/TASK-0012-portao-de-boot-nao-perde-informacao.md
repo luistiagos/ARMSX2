@@ -37,7 +37,7 @@ honrar o que recebe". Reverter uma sem a outra não faz sentido de produto.
 - Tornar a `HomeActivity` utilizável sem o núcleo nativo. O aplicativo é um emulador; sem
   `libemucore` não há produto, e fingir que há seria pior que o diálogo.
 - Mexer no tempo de carga da `libemucore` — isso é o
-  [`app-anr-loadlibrary-emucore-ui-thread`](../bugs/open/app-anr-loadlibrary-emucore-ui-thread_2026-08-20T20-15.md),
+  [`app-anr-loadlibrary-emucore-ui-thread`](../bugs/open/armsx2-fork/app-anr-loadlibrary-emucore-ui-thread_2026-08-20T20-15.md),
   outro defeito, já corrigido por outro caminho.
 
 ## Como validar

@@ -7,7 +7,7 @@
 - **Classe:** regressão de dado na fusão catálogo↔disco
 - **Reincidência:** primeira vez registrada
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0045](../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md)
+- **Tasks que o resolvem:** [TASK-0045](../../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md)
 
 ## Sintoma
 
@@ -42,5 +42,5 @@ só o download deixaria o segundo de pé para todo dump sem serial legível.
 
 ## Situação
 
-Endereçado pela [TASK-0045](../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md).
+Endereçado pela [TASK-0045](../../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md).
 Aberto até a validação no aparelho.

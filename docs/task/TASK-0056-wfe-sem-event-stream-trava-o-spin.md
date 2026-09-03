@@ -5,7 +5,7 @@
 - **Concluída em:** —
 - **Feature:** nenhuma
 - **Bugs que resolve:** [mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm](../bugs/done/mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm_2026-08-28T15-24.md)
-- **Backlog:** item 1 de [`desempenho-com-clock-cortado-a55`](../backlog/desempenho-com-clock-cortado-a55.md) — e o achado de lado registrado em [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
+- **Backlog:** item 1 de [`desempenho-com-clock-cortado-a55`](../backlog/desempenho-com-clock-cortado-a55.md) — e o achado de lado registrado em [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/armsx2-fork/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0056:` no assunto)
 - **Revertida por:** `d71a0631d9`
 - **Publicado em:** —

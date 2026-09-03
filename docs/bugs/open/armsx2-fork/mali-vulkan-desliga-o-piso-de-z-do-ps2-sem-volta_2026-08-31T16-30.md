@@ -7,7 +7,7 @@
 - **Classe:** fail
 - **Reincidência:** não registrado antes
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0064](../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md)
+- **Tasks que o resolvem:** [TASK-0064](../../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md)
 
 ## Sintoma
 
@@ -28,13 +28,13 @@ independentes.
 Os dois backends discordam sobre uma decisão de **emulação**, não de backend, e a discordância é só
 para Mali:
 
-[`GSDeviceOGL.cpp:1046`](../../../pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L1046)
+[`GSDeviceOGL.cpp:1046`](../../../../pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L1046)
 
 ```cpp
 m_features.no_ps2_z_quantization = GSConfig.DisablePS2DepthQuantization || vendor_id_apple;
 ```
 
-[`GSDeviceVK.cpp:3877`](../../../pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L3877)
+[`GSDeviceVK.cpp:3877`](../../../../pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L3877)
 
 ```cpp
 m_features.no_ps2_z_quantization =
@@ -48,7 +48,7 @@ do lado GL admite a divergência em voz alta:
 > tested on a Mali GL driver.
 
 O que se perde está escrito em
-[`GSRendererHW.cpp:5790-5795`](../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L5790-L5795):
+[`GSRendererHW.cpp:5790-5795`](../../../../pcsx2/GS/Renderers/HW/GSRendererHW.cpp#L5790-L5795):
 
 > Even when Z is read-only, Z floor must be enabled with ZTST_GREATER since otherwise there can be
 > **false passing** if the incoming Z is not floored when the buffer value is floored.
@@ -66,12 +66,12 @@ chave. Somando: o app Android **não expõe** `DisablePS2DepthQuantization` em l
 que funciona está ao alcance do usuário.
 
 O mesmo vale para Apple GPU, pelo mesmo motivo, no Metal
-([`GSDeviceMTL.mm:1358`](../../../pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm#L1358)) e no GL.
+([`GSDeviceMTL.mm:1358`](../../../../pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm#L1358)) e no GL.
 
 ## Por que isto importa além deste aparelho
 
 A troca de renderizador é feita hoje por uma regra da tabela de drivers
-(`gl-arm-g52-r38-auto-vulkan`, [`GSGPUDriverProfile.cpp:358`](../../../pcsx2/GS/Renderers/Common/GSGPUDriverProfile.cpp#L358)),
+(`gl-arm-g52-r38-auto-vulkan`, [`GSGPUDriverProfile.cpp:358`](../../../../pcsx2/GS/Renderers/Common/GSGPUDriverProfile.cpp#L358)),
 que casa com **todo Mali-G52 em driver r38.x**. Quem escreveu a regra estava escolhendo um backend
 para resolver uma tela preta; ninguém decidiu mudar como a profundidade é emulada nesses aparelhos.
 A mudança veio de carona, é global, e é invisível — não há log nem tela que diga que o piso de Z
@@ -116,7 +116,7 @@ foram ao aparelho e voltaram erradas**. Esta não vai ser a terceira: ela vai co
 ## Reteste depois do merge com o upstream (2026-09-01)
 
 Retestado no mesmo A12 `SM-A127M`, com a árvore já no upstream de 31/08
-([TASK-0067](../../task/TASK-0067-merge-com-o-upstream.md), 72 commits) e APK `githubDebug` novo.
+([TASK-0067](../../../task/TASK-0067-merge-com-o-upstream.md), 72 commits) e APK `githubDebug` novo.
 **As linhas continuam.** `renderer=14` confirmado no log, device Vulkan inicializado, upscale em
 1x nativo e `forcePs2DepthQuantization = false` — as mesmas condições do A/B de 31/08.
 
@@ -126,11 +126,11 @@ transitório: reproduziu em duas capturas separadas por 35 s.
 
 Os dois fixes de GS do upstream já estavam na árvore antes do merge, e os 72 commits novos não
 trouxeram outro. A hipótese "está consertado lá e a gente não puxou" está eliminada; a
-[TASK-0064](../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md) segue sendo o caminho.
+[TASK-0064](../../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md) segue sendo o caminho.
 
 ## Alcance reduzido (2026-09-02)
 
-A [TASK-0072](../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) retirou a
+A [TASK-0072](../../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md) retirou a
 regra `gl-arm-g52-r38-auto-vulkan`, que era o que empurrava esses aparelhos para o Vulkan. Com ela
 fora, o `auto` volta a resolver OpenGL no Mali-G52 r38 — e **no OpenGL o piso de Z é mantido**.
 

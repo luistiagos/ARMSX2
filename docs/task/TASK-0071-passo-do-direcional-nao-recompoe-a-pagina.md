@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-31
 - **Concluída em:** —
 - **Feature:** nenhuma
-- **Bugs que resolve:** [configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread](../bugs/open/configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread_2026-08-31T18-40.md) — **item 2 apenas**
+- **Bugs que resolve:** [configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread](../bugs/open/armsx2-fork/configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread_2026-08-31T18-40.md) — **item 2 apenas**
 - **Commit:** — (o vínculo é o prefixo `TASK-0071:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —

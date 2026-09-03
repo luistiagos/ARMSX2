@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-24
 - **Concluída em:** 2026-08-25
 - **Feature:** [FEAT-0001](../features/FEAT-0001-sync-upstream-oficial.md)
-- **Bugs que resolve:** [gs-tela-preta-silenciosa-sem-diagnostico-a07](../bugs/open/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)
+- **Bugs que resolve:** [gs-tela-preta-silenciosa-sem-diagnostico-a07](../bugs/open/legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0004:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —

@@ -60,7 +60,7 @@ um ciclo é uma animação por definição, e a decisão foi não ter animação
 **NÃO entra:**
 
 - **Corrigir o shader que impede a onda GL de compilar no Mali**
-  ([bug](../bugs/open/xmb-gl-nao-compila-shader-uniform-chamado-length_2026-09-01T10-45.md): um
+  ([bug](../bugs/open/armsx2-fork/xmb-gl-nao-compila-shader-uniform-chamado-length_2026-09-01T10-45.md): um
   `uniform` chamado `length`). Aquele registro dizia que corrigi-lo seria regressão porque devolveria
   uma animação; **com esta task, esse impedimento cai** — a onda GL agora é parada, então corrigir o
   shader passa a ser uma escolha puramente visual (qual fundo parado o usuário do Mali vê). Continua

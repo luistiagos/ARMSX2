@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-24
 - **Concluída em:** 2026-08-25
 - **Feature:** [FEAT-0001](../features/FEAT-0001-sync-upstream-oficial.md)
-- **Bugs que resolve:** [gs-mali-tela-vermelha-e-page-fault-driver](../bugs/open/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md), [graphicshealthmonitor-falso-positivo-cenas-escuras](../bugs/open/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md)
+- **Bugs que resolve:** [gs-mali-tela-vermelha-e-page-fault-driver](../bugs/open/legado-version1/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md), [graphicshealthmonitor-falso-positivo-cenas-escuras](../bugs/open/legado-version1/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0005:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —

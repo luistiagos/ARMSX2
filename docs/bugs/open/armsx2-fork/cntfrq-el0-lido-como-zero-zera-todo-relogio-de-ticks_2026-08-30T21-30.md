@@ -5,17 +5,17 @@
 - **Errors (serviço):** nenhum — não gera crash, ANR nem log. É silencioso por construção.
 - **Classe:** correção / performance
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0060](../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md)
+- **Tasks que o resolvem:** [TASK-0060](../../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md)
 
 ## Sintoma
 
 Cinco defeitos que pareciam separados, e são um só. Os três primeiros são os que doem:
 
 1. **`PerfLog` reporta `EE 0% GS 0% VU 0%`** com o jogo a 8 fps e a 50 fps — item 0 do backlog
-   [`desempenho-com-clock-cortado-a55`](../../backlog/desempenho-com-clock-cortado-a55.md).
+   [`desempenho-com-clock-cortado-a55`](../../../backlog/desempenho-com-clock-cortado-a55.md).
 2. **A thread `MTVU` queima ~90% de um núcleo** em estado `R`, com a VM **pausada** e nada a
    fazer — item 1 do mesmo backlog, e a pergunta que a
-   [TASK-0046](../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) deixou em aberto.
+   [TASK-0046](../../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) deixou em aberto.
 3. **O limitador de quadros não limita nada** (`VMManager::Internal::Throttle`) — *derivado do
    código, não medido*; ver "O que é medido e o que é derivado".
 

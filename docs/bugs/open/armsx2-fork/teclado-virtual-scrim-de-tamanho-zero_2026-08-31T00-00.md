@@ -7,7 +7,7 @@
 - **Classe:** fail
 - **Reincidência:** primeira vez registrada; o comportamento nunca funcionou desde que foi escrito
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0062](../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
+- **Tasks que o resolvem:** [TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
 
 ## Sintoma
 
@@ -60,4 +60,4 @@ a área de toque sobrevive aos 90 ms da animação de saída e engole o toque se
 
 O escurecimento de 50% **não** é reposto junto: ele nunca chegou a aparecer em build nenhum, e este
 host é composto acima de painéis que desenham o próprio véu (a busca de configurações, o `PadModal`
-de nomear preset). Ver o escopo da [TASK-0062](../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md).
+de nomear preset). Ver o escopo da [TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md).

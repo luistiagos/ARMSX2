@@ -8,8 +8,8 @@
   (38 eventos)
 - **Classe:** regressão / falso positivo com alteração automática do renderer
 - **Reincidência:** bug novo introduzido pelo fallback visual distribuído na 1.0.21
-- **Feature:** [FEAT-0001](../../features/FEAT-0001-sync-upstream-oficial.md)
-- **Tasks que o resolvem:** [TASK-0005](../../task/TASK-0005-bloco-c-pontos-de-consumo.md)
+- **Feature:** [FEAT-0001](../../../features/FEAT-0001-sync-upstream-oficial.md)
+- **Tasks que o resolvem:** [TASK-0005](../../../task/TASK-0005-bloco-c-pontos-de-consumo.md)
 
 ## Sintoma
 
@@ -101,7 +101,7 @@ voltar a ser emitidos pelo código da 1.0.22.
 
 Testado no Galaxy A12 (`SM-A127M`, Android 13, Exynos 850 / Mali-G52, driver `v1.r38p1`) com o mesmo
 jogo do error 2032: **Tomb Raider Underworld** (`SLUS-21858`), em OpenGL (`gpu_profile=Mali`,
-`api=OpenGL` pela linha `GSBoot` da [TASK-0006](../../task/TASK-0006-diagnostico-boot-gs.md)).
+`api=OpenGL` pela linha `GSBoot` da [TASK-0006](../../../task/TASK-0006-diagnostico-boot-gs.md)).
 
 O jogo foi levado até uma cena genuinamente escura — ruína submersa, com colunas e arcos apenas
 insinuados sobre fundo quase preto, que é exatamente a classe de frame que a 1.0.21 classificava como
@@ -115,12 +115,12 @@ Isso valida em campo o hotfix da 1.0.22 no jogo e na condição exatos que produ
 **O que esta validação NÃO cobre:** o caminho de vermelho continua ativo — `GraphicsHealthMonitor`
 ainda chama `setTemporaryRenderer` e `enableGraphicsSafeMode` quando detecta
 `FRAME_DOMINANT_RED` por quatro amostras. Esse caminho não foi exercitado aqui e continua sendo o
-alvo da [TASK-0005](../../task/TASK-0005-bloco-c-pontos-de-consumo.md), que prevê desligar a troca
+alvo da [TASK-0005](../../../task/TASK-0005-bloco-c-pontos-de-consumo.md), que prevê desligar a troca
 automática e manter só o diagnóstico.
 
 ## Fechamento do caminho de vermelho — 2026-08-25 (TASK-0005)
 
-O parágrafo acima está resolvido: a [TASK-0005](../../task/TASK-0005-bloco-c-pontos-de-consumo.md)
+O parágrafo acima está resolvido: a [TASK-0005](../../../task/TASK-0005-bloco-c-pontos-de-consumo.md)
 removeu **toda** troca automática de renderer do monitor. Vermelho e preto continuam sendo
 classificados e enviados à telemetria — agora com a linha `GSBoot` (GPU, driver, versão, renderer)
 anexada ao contexto —, mas nenhuma classificação de pixel altera configuração gráfica.

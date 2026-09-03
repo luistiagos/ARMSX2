@@ -23,11 +23,11 @@ Os caminhos de entrada observados foram `MainActivity.onCreate`/`copyAssetAll` (
 
 ## Causa raiz
 
-[`DataDirectoryManager.getDefaultDataRoot`](../../../app/src/main/java/kr/co/iefriends/pcsx2/utils/DataDirectoryManager.java#L70)
+[`DataDirectoryManager.getDefaultDataRoot`](../../../../app/src/main/java/kr/co/iefriends/pcsx2/utils/DataDirectoryManager.java#L70)
 chama `Context.getExternalFilesDir(null)` sincronamente. Esse método pode entrar em
 `ensureExternalDirsExistOrFilter()` e fazer I/O/mkdir. Vários callers executam em `onCreate`, na
-main thread, inclusive [`HomeActivity.java:98`](../../../app/src/main/java/kr/co/iefriends/pcsx2/activities/HomeActivity.java#L98)
-e [`SettingsActivity.java:2873`](../../../app/src/main/java/kr/co/iefriends/pcsx2/activities/SettingsActivity.java#L2873).
+main thread, inclusive [`HomeActivity.java:98`](../../../../app/src/main/java/kr/co/iefriends/pcsx2/activities/HomeActivity.java#L98)
+e [`SettingsActivity.java:2873`](../../../../app/src/main/java/kr/co/iefriends/pcsx2/activities/SettingsActivity.java#L2873).
 
 A mudança recente de `copyAssetAll` para `startAssetCopyAsync` remove o I/O do asset do caminho
 síncrono de `MainActivity`, mas não elimina as demais resoluções do data root na UI.
@@ -51,3 +51,16 @@ e só liberar as Activities depois. Callers de UI devem ler o caminho já resolv
 o usuário muda a pasta. Assim, os callers de UI apenas leem o `File` já resolvido.
 
 `assembleUnrestrictedDebug` passou. Aguardando reteste no A07/telemetria limpa.
+
+## Auditoria no ARMSX2-fork — 2026-09-03
+
+A classe `DataDirectoryManager` da ocorrência original não existe nesta árvore, mas a mesma chamada
+de risco reapareceu. [`kickoffEmucoreInit`](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L1973)
+resolve `lastInitDataRoot = assetCopyRoot(applicationContext)` antes do despacho ao worker, e
+[`assetCopyRoot`](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L1742)
+chama `getExternalFilesDir(null)`. Assim, mudar o nome da classe não removeu o I/O/mkdir potencial
+da thread da UI.
+
+Este relatório fica entre os bugs do fork atual por equivalência de causa confirmada no código,
+embora ainda não haja nova ocorrência de telemetria atribuída a esta versão. Severidade **alta**;
+correção possível resolvendo e cacheando o diretório no worker antes de liberar a inicialização.

@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-24
 - **Concluída em:** 2026-08-24
 - **Feature:** [FEAT-0001](../features/FEAT-0001-sync-upstream-oficial.md)
-- **Bugs que resolve:** [gs-tela-preta-silenciosa-sem-diagnostico-a07](../bugs/open/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md), [gs-mali-tela-vermelha-e-page-fault-driver](../bugs/open/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md)
+- **Bugs que resolve:** [gs-tela-preta-silenciosa-sem-diagnostico-a07](../bugs/open/legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md), [gs-mali-tela-vermelha-e-page-fault-driver](../bugs/open/legado-version1/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md)
 - **Commit:** assunto `TASK-0003:` — hash no índice de [`README.md`](README.md)
 - **Revertida por:** —
 - **Publicado em:** 1.0.23 / versionCode 37

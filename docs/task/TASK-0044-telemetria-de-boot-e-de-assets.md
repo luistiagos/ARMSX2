@@ -61,7 +61,7 @@ e fecha os streams. A exceção nunca sobe. O `catch` do `copyAssetAll` só vê 
   emitir evento proativo a cada abertura do GS; o segundo exigiria portar as 307 linhas do
   `GraphicsHealthMonitor`, que não existe neste ramo (item 4.4 do
   [plano do fork](../plano-fork-sobre-upstream.md)) e cujo falso positivo segue
-  [em aberto](../bugs/open/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md).
+  [em aberto](../bugs/open/legado-version1/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md).
 - **`kr/co/iefriends/pcsx2/MainActivity.java`.** Seria o lugar natural do gancho de `assets` — é
   onde a exceção realmente morre. Mas `git log upstream/master..HEAD` sobre esse arquivo é
   **vazio**: o fork nunca o tocou, e abrir superfície de conflito ali para um relato que dá para

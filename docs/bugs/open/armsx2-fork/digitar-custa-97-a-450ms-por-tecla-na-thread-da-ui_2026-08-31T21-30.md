@@ -5,7 +5,7 @@
   `ui/home/HomeViewModel.kt::setQuery` + `ui/home/LibraryWaveBackground.kt`
 - **Errors (serviço):** nenhum — não lança e não trava; só demora
 - **Classe:** fail (desempenho)
-- **Reincidência:** primeira vez medido. A [TASK-0062](../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
+- **Reincidência:** primeira vez medido. A [TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
   atacou o teclado e reduziu custo real, mas **não** este.
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** — nenhuma ainda
@@ -89,7 +89,7 @@ invalidado e só o texto recompõe. Tocar teclas *diferentes* invalida o `Overla
 cor de uma. Sobra um piso de ~61 ms mesmo sem isso.
 
 > **Correção de 2026-09-01:** esses ~32 ms vinham de 6 toques numa rodada só. Refeito com 12 toques
-> e três rodadas, o custo do realce é **~24 ms**, não 32. A [TASK-0068](../../task/TASK-0068-realce-do-teclado-sem-recompor-o-grid.md)
+> e três rodadas, o custo do realce é **~24 ms**, não 32. A [TASK-0068](../../../task/TASK-0068-realce-do-teclado-sem-recompor-o-grid.md)
 > derruba ~8 desses (braço B de 85 para 77 ms) e **os outros ~16 continuam sem causa identificada** —
 > recompor duas `KeyCap` não explica esse tempo.
 
@@ -107,7 +107,7 @@ Ler a seleção na **fase de desenho** em vez da de composição — `Modifier.d
 `State`, em vez de `selected: Boolean` como parâmetro. Uma leitura de estado em `drawBehind`
 invalida só o desenho daquele nó, não a composição. Hoje as quarenta teclas leem `row`/`col`
 através do `Overlay`, então todas recompõem para que uma mude de cor. A
-[TASK-0062](../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md) considerou e descartou
+[TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md) considerou e descartou
 isso como "marginal, ~1 ms" — **estimativa errada por mais de trinta vezes**, e o que a corrigiu foi
 medir no aparelho, não reler o código.
 
@@ -116,10 +116,10 @@ medir no aparelho, não reler o código.
 Nenhuma das duas abaixo foi provada; ambas são compatíveis com o pico de 318 ms na fase de desenho:
 
 - **A `HomeScreen` inteira recompõe a cada tecla.** `setQuery` grava `state.copy(query = …)` de
-  imediato, deliberadamente ([TASK-0062](../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
+  imediato, deliberadamente ([TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
   registrou isso como fora de escopo). Se o `backgroundLayer` recompõe junto, a lambda de desenho do
   fundo é recriada e o nó de desenho é invalidado.
-- **A [TASK-0063](../../task/TASK-0063-fundo-da-biblioteca-para-de-animar.md) removeu o `WaveScratch`
+- **A [TASK-0063](../../../task/TASK-0063-fundo-da-biblioteca-para-de-animar.md) removeu o `WaveScratch`
   junto com a animação**, com o argumento de que cache não faz sentido para quem desenha uma vez.
   Só que "uma vez" vale enquanto nada invalida o nó. Quando algo invalida — uma tecla —, a cena
   volta a ser reconstruída, agora **sem** o cache que a TASK-0057 mediu como valendo ~3 pontos de

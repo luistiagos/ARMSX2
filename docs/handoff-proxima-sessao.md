@@ -74,7 +74,7 @@ A terceira é a mais barata e a que mais informação rende. Ver a ressalva na �
 
 ### 2.3. Crash de JIT do Shadow of the Colossus — instrumentado, não resolvido
 
-Bug em [`docs/bugs/open/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md`](bugs/open/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md).
+Bug em [`docs/bugs/open/legado-version1/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md`](bugs/open/legado-version1/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md).
 Reproduz em dois SoCs com assinatura idêntica (`addr=0x12218`, `ee pc=44bb910d`). Hipótese de
 MFIFO/SPR **eliminada** pela TASK-0008.
 

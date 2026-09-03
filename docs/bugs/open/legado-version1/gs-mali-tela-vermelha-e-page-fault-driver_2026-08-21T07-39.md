@@ -6,8 +6,8 @@
   do mesmo Galaxy A17 na mesma janela, mas ficaram sem backtrace por falha do decoder
 - **Classe:** crash / investigação de corrupção gráfica silenciosa
 - **Reincidência:** primeira assinatura decodificada dentro de `libGLES_mali.so`
-- **Feature:** [FEAT-0001](../../features/FEAT-0001-sync-upstream-oficial.md)
-- **Tasks que o resolvem:** [TASK-0003](../../task/TASK-0003-bloco-b1-shader-cache-driver.md), [TASK-0005](../../task/TASK-0005-bloco-c-pontos-de-consumo.md)
+- **Feature:** [FEAT-0001](../../../features/FEAT-0001-sync-upstream-oficial.md)
+- **Tasks que o resolvem:** [TASK-0003](../../../task/TASK-0003-bloco-b1-shader-cache-driver.md), [TASK-0005](../../../task/TASK-0005-bloco-c-pontos-de-consumo.md)
 
 ## Sintoma
 
@@ -39,13 +39,13 @@ não o A15 do relato.
 Ainda não confirmada para a tela vermelha. O código confirma três lacunas relevantes:
 
 1. O perfil Mali reativa framebuffer fetch em
-   [`GSDeviceOGL.cpp:825`](../../../app/src/main/cpp/pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L825)
+   [`GSDeviceOGL.cpp:825`](../../../../app/src/main/cpp/pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L825)
    depois de `DisableFramebufferFetch` ter sido aplicado nas linhas 783–789. Portanto
    `DisableFramebufferFetch=true` **não desabilita de fato** o recurso em Mali.
 2. Vulkan considera texture barrier habilitada sempre que `OverrideTextureBarriers != 0`
-   ([`GSDeviceVK.cpp:2743-2746`](../../../app/src/main/cpp/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L2743)).
+   ([`GSDeviceVK.cpp:2743-2746`](../../../../app/src/main/cpp/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L2743)).
    O caminho de cópia de render target só entra quando a feature fica desabilitada
-   ([`GSDeviceVK.cpp:6092-6105`](../../../app/src/main/cpp/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L6092)).
+   ([`GSDeviceVK.cpp:6092-6105`](../../../../app/src/main/cpp/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L6092)).
    Assim, apenas trocar OpenGL por Vulkan não garante o caminho seguro por cópia.
 3. O safe mode atual só detecta crash/boot sem frames do renderer automático. Uma imagem vermelha
    continua apresentando frames, então o marcador é aposentado e nenhum fallback é acionado.
@@ -105,7 +105,7 @@ no Galaxy A15 com MGS3 e observação da telemetria do fallback.
 ## Substituição da correção de 2026-08-22 — 2026-08-25 (TASK-0005)
 
 Dois dos quatro itens acima foram **desfeitos de propósito** pela
-[TASK-0005](../../task/TASK-0005-bloco-c-pontos-de-consumo.md), e o registro precisa dizer por quê,
+[TASK-0005](../../../task/TASK-0005-bloco-c-pontos-de-consumo.md), e o registro precisa dizer por quê,
 porque cada um deles parecia uma correção quando foi escrito.
 
 **1. A regra de MGS3 por título saiu.** Ela dizia: "GPU Mali **e** título começando com Metal Gear

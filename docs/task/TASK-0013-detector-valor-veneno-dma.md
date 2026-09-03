@@ -5,7 +5,7 @@
 - **Concluída em:** 2026-08-25
 - **Feature:** nenhuma
 - **Bugs que resolve:** nenhum — esta task **instrumenta**, não corrige. O bug alvo é
-  [sotc-jit-page-fault-addr-12218](../bugs/open/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md)
+  [sotc-jit-page-fault-addr-12218](../bugs/open/legado-version1/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md)
   e continua aberto; declarar que a task o resolve seria mentira registrada.
 - **Commit:** — (o vínculo é o prefixo `TASK-0013:` no assunto)
 - **Revertida por:** —

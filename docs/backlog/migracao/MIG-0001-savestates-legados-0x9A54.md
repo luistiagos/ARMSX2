@@ -6,7 +6,7 @@
 - **Origem:** Transplante de árvore (`version1` → `feature/fork-upstream-android`)
 - **Documentos de referência:** 
   - [`docs/savestates-preservar-no-transplante.md`](../../savestates-preservar-no-transplante.md)
-  - [`docs/bugs/open/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md`](../../bugs/open/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md)
+  - [`docs/bugs/open/armsx2-fork/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md`](../../bugs/open/armsx2-fork/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md)
 
 ---
 

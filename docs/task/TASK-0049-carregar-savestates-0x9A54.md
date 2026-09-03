@@ -5,7 +5,7 @@
 - **Concluída em:** —
 - **Feature:** nenhuma
 - **Backlog:** [MIG-0001](../backlog/migracao/MIG-0001-savestates-legados-0x9A54.md)
-- **Bugs que resolve:** [savestate-formato-9a54-rejeitado-pelo-fork](../bugs/open/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md)
+- **Bugs que resolve:** [savestate-formato-9a54-rejeitado-pelo-fork](../bugs/open/armsx2-fork/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0049:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —

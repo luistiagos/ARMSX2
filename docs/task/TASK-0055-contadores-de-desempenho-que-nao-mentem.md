@@ -164,7 +164,7 @@ fazendo nada" quando o correto era "não há medição". Agora o campo **some**,
 uma pergunta.
 
 A pergunta virou registro próprio:
-[`gpu-timing-do-opengl-no-android-nunca-produz-leitura`](../bugs/open/gpu-timing-do-opengl-no-android-nunca-produz-leitura_2026-09-01T10-50.md).
+[`gpu-timing-do-opengl-no-android-nunca-produz-leitura`](../bugs/open/armsx2-fork/gpu-timing-do-opengl-no-android-nunca-produz-leitura_2026-09-01T10-50.md).
 Resumo: a extensão `GL_EXT_disjoint_timer_query` **existe** neste aparelho, o ciclo begin/end está
 correto, e mesmo assim o acumulador fica em zero. A hipótese (não confirmada) é que o código usa os
 entry points do **core** (`glBeginQuery`, `glGetQueryObjectuiv`) com um alvo que em GLES pertence

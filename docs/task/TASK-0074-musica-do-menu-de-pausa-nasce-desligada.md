@@ -112,8 +112,8 @@ GSRenderer.cpp:758: assertion failed in GSRenderer::BeginPresentFrame(bool):
 ```
 
 É device-lost da GPU Mali, na mesma família dos bugs de Mali já abertos
-([tela vermelha](../bugs/open/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md),
-[tela preta A07](../bugs/open/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)).
+([tela vermelha](../bugs/open/legado-version1/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md),
+[tela preta A07](../bugs/open/legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)).
 Esta task mexe em dois literais booleanos de `PauseMusic.kt` e não alcança o core; a verificação do
 item 1 foi feita com o app vivo, entre os dois crashes. **Não investiguei** — fica dito para não
 passar por achado desta task nem por regressão dela.

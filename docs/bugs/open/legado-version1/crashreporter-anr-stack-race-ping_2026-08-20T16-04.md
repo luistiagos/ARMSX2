@@ -20,7 +20,7 @@ Esse frame é a própria sonda que o watchdog postou na main thread, não a oper
 
 ## Causa raiz
 
-Em [`CrashReporter.watchdogLoop`](../../../app/src/main/java/kr/co/iefriends/pcsx2/utils/CrashReporter.java#L240),
+Em [`CrashReporter.watchdogLoop`](../../../../app/src/main/java/kr/co/iefriends/pcsx2/utils/CrashReporter.java#L240),
 o watchdog mantém `synchronized(lock)` enquanto detecta timeout e chama `captureAnr`. Se a main
 thread recuperar exatamente nessa janela, ela começa a executar o Runnable postado e bloqueia ao
 tentar entrar no mesmo `synchronized(lock)`. `getStackTrace()` então fotografa a sonda, apagando a

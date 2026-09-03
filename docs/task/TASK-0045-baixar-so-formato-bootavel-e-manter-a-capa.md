@@ -5,8 +5,8 @@
 - **Concluída em:** 2026-08-28
 - **Feature:** nenhuma
 - **Bugs que resolve:**
-  [download entrega formato não bootável](../bugs/open/catalogo-download-entrega-formato-nao-bootavel_2026-08-28T10-27.md),
-  [jogo baixado perde a capa](../bugs/open/biblioteca-jogo-baixado-perde-a-capa_2026-08-28T10-27.md)
+  [download entrega formato não bootável](../bugs/open/armsx2-fork/catalogo-download-entrega-formato-nao-bootavel_2026-08-28T10-27.md),
+  [jogo baixado perde a capa](../bugs/open/armsx2-fork/biblioteca-jogo-baixado-perde-a-capa_2026-08-28T10-27.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0045:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —

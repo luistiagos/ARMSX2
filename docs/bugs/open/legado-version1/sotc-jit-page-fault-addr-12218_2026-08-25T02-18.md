@@ -50,7 +50,7 @@ Abrir Shadow of the Colossus e deixar rodando ~2 minutos. Verificar com
 
 ## Hipótese eliminada — MFIFO/SPR (2026-08-25)
 
-A [TASK-0008](../../task/TASK-0008-port-mfifo-spr-upstream.md) portou o commit upstream
+A [TASK-0008](../../../task/TASK-0008-port-mfifo-spr-upstream.md) portou o commit upstream
 `8aca0fe288` — *"VIF/MFIFO: Respect MFIFO empty condition on SPR transfers"* — que estava ausente da
 nossa árvore e removia, entre outras coisas, uma reescrita incondicional de `spr0ch.madr`:
 
@@ -67,7 +67,7 @@ upstream, não como correção deste bug.
 
 ## Instrumentação disponível — 2026-08-25 (TASK-0013)
 
-A [TASK-0013](../../task/TASK-0013-detector-valor-veneno-dma.md) acrescentou um **detector de
+A [TASK-0013](../../../task/TASK-0013-detector-valor-veneno-dma.md) acrescentou um **detector de
 valor-veneno**: `DebugTools/GuestPoisonWatch`, ligado em `hwDmacIrq()` — o único ponto por onde
 toda sinalização de canal de DMA passa. Depois de cada sinalização ele lê 32 bits da RAM guest em
 `0x19430` e, se encontrarem `0x44bb910d`, emite no logcat o canal, `madr`, `qwc`, `tadr`, `chcr`,
@@ -101,4 +101,4 @@ adb logcat -s NDK_LOG | grep PoisonWatch
 4. **Reavaliar depois do transplante.** O upstream reescreveu o JIT ARM64 inteiro
    (`3e077eff9b`, *"Merge yaps2: arm64 JIT transplant"*), e `pcsx2/arm64` é a área com mais arquivos
    tocados. Este crash é candidato a sumir sozinho — hipótese, não promessa, e testável no spike
-   descrito em [`avaliacao-rebase-sobre-upstream.md`](../../avaliacao-rebase-sobre-upstream.md).
+   descrito em [`avaliacao-rebase-sobre-upstream.md`](../../../avaliacao-rebase-sobre-upstream.md).

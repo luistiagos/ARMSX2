@@ -41,7 +41,7 @@ Por que vale o custo. Se a feature nasceu de bugs, citá-los aqui.
 
 ## Bugs que motivaram
 
-- [<slug>](../bugs/open/<arquivo>.md) — resumo de uma linha
+- [<slug>](../bugs/open/armsx2-fork/<arquivo>.md) — resumo de uma linha
 
 ## Tasks
 

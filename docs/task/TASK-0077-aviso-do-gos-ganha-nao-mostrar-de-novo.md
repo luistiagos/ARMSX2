@@ -4,7 +4,7 @@
 - **Criada em:** 2026-09-02
 - **Concluída em:** 2026-09-02
 - **Feature:** nenhuma
-- **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
+- **Bugs que resolve:** [gos-samsung-limita-clock-a-metade-em-jogo](../bugs/open/armsx2-fork/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md)
   (paliativo — o defeito é do aparelho)
 - **Commit:** ed3e7e7c46 (o vínculo é o prefixo `TASK-0077:` no assunto)
 - **Revertida por:** —

@@ -303,7 +303,7 @@ divergência de `getGameCRC` e o custo real da Opção A não sairiam de um buil
 
 O upstream reescreveu o JIT ARM64 inteiro (`3e077eff9b`, *"Merge yaps2: arm64 JIT transplant"*), e
 `pcsx2/arm64` é a área com mais ficheiros tocados. O crash de JIT do Shadow of the Colossus
-([bug](bugs/open/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md)) é candidato a sumir sozinho.
+([bug](bugs/open/legado-version1/sotc-jit-page-fault-addr-12218_2026-08-25T02-18.md)) é candidato a sumir sozinho.
 
 **Hipótese, não promessa.** E agora há uma forma mais barata de a testar antes do transplante: o
 detector de valor-veneno da [TASK-0013](task/TASK-0013-detector-valor-veneno-dma.md), que precisa de

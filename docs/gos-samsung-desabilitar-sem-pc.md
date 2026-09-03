@@ -5,7 +5,7 @@ caminho sem PC pede opções do desenvolvedor e pareamento por código, e isso n
 quem é leigo — é abandono. O que o cliente leigo recebe é o aviso dentro do app.
 
 Registro técnico completo, com as medições:
-[`bugs/open/gos-samsung-limita-clock-a-metade-em-jogo`](bugs/open/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md).
+[`bugs/open/gos-samsung-limita-clock-a-metade-em-jogo`](bugs/open/armsx2-fork/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md).
 
 ---
 

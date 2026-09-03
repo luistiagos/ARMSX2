@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-25
 - **Concluída em:** —
 - **Feature:** [FEAT-0002](../features/FEAT-0002-rastreabilidade-verificavel.md)
-- **Bugs que resolve:** [rastreabilidade-sem-verificacao-de-git-para-task](../bugs/open/rastreabilidade-sem-verificacao-de-git-para-task_2026-08-25T22-44.md)
+- **Bugs que resolve:** [rastreabilidade-sem-verificacao-de-git-para-task](../bugs/open/armsx2-fork/rastreabilidade-sem-verificacao-de-git-para-task_2026-08-25T22-44.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0011:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** — (não altera o aplicativo)

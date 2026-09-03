@@ -6,7 +6,7 @@
 - **Classe:** fail
 - **Reincidência:** o defeito que a rede cobria já aconteceu em campo (Motorola, 1.0.17)
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0066](../../task/TASK-0066-rede-de-seguranca-do-renderer-automatico.md) — **parcialmente**, ver "O que a TASK-0066 não cobre"
+- **Tasks que o resolvem:** [TASK-0066](../../../task/TASK-0066-rede-de-seguranca-do-renderer-automatico.md) — **parcialmente**, ver "O que a TASK-0066 não cobre"
 
 ## Sintoma
 
@@ -28,12 +28,12 @@ arquivos em `EmuFolders::Cache`:
 O raciocínio, do comentário original: *"Finding it at startup means the previous run died before
 ever presenting one"* — um crash não é valor de retorno, então nenhum `if (!GSopen())` consegue
 detectá-lo. O registro do A07 já tinha catalogado por que os três mecanismos existentes não pegavam
-esse caso ([gs-tela-preta-silenciosa-sem-diagnostico-a07](gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md), item 4).
+esse caso ([gs-tela-preta-silenciosa-sem-diagnostico-a07](../legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md), item 4).
 
 Ele foi escrito em 2026-08-21 depois de um relato real: **Motorola, 1.0.17 — Vulkan crashava ao
 abrir o jogo, OpenGL na mão funcionava.**
 
-O passo 4 do [plano de convergência](../../plano-grafico-mali-convergencia-upstream.md) mandou
+O passo 4 do [plano de convergência](../../../plano-grafico-mali-convergencia-upstream.md) mandou
 aposentá-lo junto com `IsAllowlistedAndroidVulkanGPU`, chamando-o de *"a nossa versão cega do mesmo
 problema"*. A parte de aposentar foi feita. **A parte de substituir não.**
 
@@ -60,7 +60,7 @@ de dentro do emulador, uma sessão preta é **indistinguível** de uma sessão b
 Distinguir exigiria amostrar pixels, e isso está proibido com número medido no plano: *"Classificar
 saúde gráfica por amostra de pixel. Já produziu 38 falsos positivos em 6 modelos."* — o
 `GraphicsHealthMonitor` já foi por esse caminho e o registro do falso positivo está em
-[graphicshealthmonitor-falso-positivo-cenas-escuras](graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md).
+[graphicshealthmonitor-falso-positivo-cenas-escuras](../legado-version1/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md).
 
 **A saída honesta é perguntar, não adivinhar:** uma ação visível durante o jogo (no menu que já
 existe) do tipo *"a imagem não apareceu"*, que troca o backend e reinicia. Custa um toque do usuário

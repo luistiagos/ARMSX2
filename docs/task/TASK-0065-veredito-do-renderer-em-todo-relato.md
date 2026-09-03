@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-31
 - **Concluída em:** —
 - **Feature:** nenhuma
-- **Bugs que resolve:** [veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash](../bugs/open/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md)
+- **Bugs que resolve:** [veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash](../bugs/open/armsx2-fork/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0065:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -22,11 +22,11 @@ justificar ou aposentar uma decisão dessas a partir de um comentário de códig
 
 Dois registros escritos nesta task:
 
-- [gl-mali-g52-r38-tela-preta-contornada-nao-corrigida](../bugs/open/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md)
+- [gl-mali-g52-r38-tela-preta-contornada-nao-corrigida](../bugs/open/armsx2-fork/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md)
   — o defeito que a regra contorna, o A/B de campo, o que já foi descartado, e a pista não
   verificada de que a tela preta é **regressão do transplante 1.0.23 → 1.0.24**. **Esta task não o
   corrige**, e o registro diz isso em voz alta.
-- [veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash](../bugs/open/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md)
+- [veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash](../bugs/open/armsx2-fork/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md)
   — a lacuna de observabilidade, que **é** corrigida aqui.
 
 > **Correção de uma afirmação minha anterior:** eu disse que a regra entrou "sem evidência". Isso

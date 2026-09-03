@@ -5,8 +5,8 @@
 - **Errors (serviço):** nenhum — falha de processo, não do aplicativo
 - **Classe:** fail
 - **Reincidência:** primeira vez
-- **Feature:** [FEAT-0002](../../features/FEAT-0002-rastreabilidade-verificavel.md)
-- **Tasks que o resolvem:** [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md)
+- **Feature:** [FEAT-0002](../../../features/FEAT-0002-rastreabilidade-verificavel.md)
+- **Tasks que o resolvem:** [TASK-0011](../../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md)
 
 ## Sintoma
 
@@ -18,7 +18,7 @@ Dois commits passam sem qualquer aviso:
 
 1. `TASK-0042: faz alguma coisa` sem `docs/task/TASK-0042-*.md` — a task nunca foi escrita.
 2. `chore: ajuste rápido` alterando `app/src/`, `scripts/` ou arquivos de build — exatamente o que a
-   [exceção `chore`](../../README.md) proíbe.
+   [exceção `chore`](../../../README.md) proíbe.
 
 ## Causa raiz
 
@@ -51,7 +51,7 @@ isso verdadeiro.
 
 ## Próximos passos
 
-Ver [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md). Em resumo:
+Ver [TASK-0011](../../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md). Em resumo:
 
 1. Modo `--commits <range>` no validador, que parte do `git log` e reprova assunto `TASK-NNNN:` sem
    arquivo de task.

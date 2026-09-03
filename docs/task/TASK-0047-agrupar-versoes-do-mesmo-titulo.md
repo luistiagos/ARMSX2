@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-28
 - **Concluída em:** —
 - **Feature:** nenhuma
-- **Bugs que resolve:** [biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao](../bugs/open/biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao_2026-08-28T11-30.md)
+- **Bugs que resolve:** [biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao](../bugs/open/armsx2-fork/biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao_2026-08-28T11-30.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0047:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —

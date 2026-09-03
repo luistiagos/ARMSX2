@@ -9,17 +9,17 @@
 - **Classe:** fail (performance), causa externa
 - **Reincidência:** sistêmico — atinge todo aparelho Samsung com o GOS ativo
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0050](../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md)
-  (detecta e explica), [TASK-0051](../../task/TASK-0051-acao-para-o-limite-do-aparelho.md) (leva o
+- **Tasks que o resolvem:** [TASK-0050](../../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md)
+  (detecta e explica), [TASK-0051](../../../task/TASK-0051-acao-para-o-limite-do-aparelho.md) (leva o
   usuário ao botão que desarma) e
-  [TASK-0052](../../task/TASK-0052-avisar-do-limite-a-cada-sessao.md) (avisa a cada jogo, não uma
-  vez só) e [TASK-0053](../../task/TASK-0053-aviso-do-limite-vira-dialogo.md) (o aviso vira
+  [TASK-0052](../../../task/TASK-0052-avisar-do-limite-a-cada-sessao.md) (avisa a cada jogo, não uma
+  vez só) e [TASK-0053](../../../task/TASK-0053-aviso-do-limite-vira-dialogo.md) (o aviso vira
   diálogo com os passos) e
-  [TASK-0054](../../task/TASK-0054-assistente-do-limite-do-aparelho.md) (assistente passo a
+  [TASK-0054](../../../task/TASK-0054-assistente-do-limite-do-aparelho.md) (assistente passo a
   passo que cabe deitado) e
-  [TASK-0059](../../task/TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) (o assistente
+  [TASK-0059](../../../task/TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) (o assistente
   abre no início do app e ensina o `pm disable-user`, que é o que funciona) e
-  [TASK-0077](../../task/TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) (o aviso ganha
+  [TASK-0077](../../../task/TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) (o aviso ganha
   "não mostrar de novo", e o item de Configurações vira a porta de volta) —
   **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
   desabilitar o GOS nem forçar a parada dele
@@ -145,7 +145,7 @@ com o app em background: o valor sobe.
 
 ## Próximos passos
 
-- [TASK-0050](../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md) — detectar o corte
+- [TASK-0050](../../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md) — detectar o corte
   dentro do app e dizer ao usuário o que está acontecendo. É paliativo declarado: o defeito é do
   aparelho.
 - **O "Forçar parada" a partir do aviso está entregue, mas é auto-derrotante — rever.** As
@@ -155,11 +155,11 @@ com o app em background: o valor sobe.
   Nas medições em que ele ficou morto (88 s, 58 s, 15 s), o app **já estava** em primeiro plano —
   nunca houve a volta. O texto do assistente promete conserto onde há, no melhor caso, alívio
   inconstante.
-- **Instrução de suporte escrita:** [`docs/gos-samsung-desabilitar-sem-pc.md`](../../gos-samsung-desabilitar-sem-pc.md)
+- **Instrução de suporte escrita:** [`docs/gos-samsung-desabilitar-sem-pc.md`](../../../gos-samsung-desabilitar-sem-pc.md)
   — o `pm disable-user` por USB e o caminho equivalente sem PC (LADB, depuração sem fio), mais a
   tabela do que já foi testado e **não** funciona.
 - **Trilha de desempenho**, a única que ajuda quem não vai fazer nada disso:
-  [`docs/backlog/desempenho-com-clock-cortado-a55.md`](../../backlog/desempenho-com-clock-cortado-a55.md).
+  [`docs/backlog/desempenho-com-clock-cortado-a55.md`](../../../backlog/desempenho-com-clock-cortado-a55.md).
 - Reteste quando houver um aparelho Samsung de linha superior à mão: lá o Game Booster expõe o
   seletor de desempenho, que pode ser um caminho que o A12 não tem.
 
@@ -169,15 +169,15 @@ Nenhum dos dois causa esta lentidão — ambos foram medidos e descartados —, 
 
 - **A thread `MTVU` fica 100% ocupada em estado `R` com a VM PAUSADA e o telefone bloqueado**
   (724 ticks em ~7 s). É o mesmo defeito de família da
-  [`mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm`](../done/mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm_2026-08-28T15-24.md),
-  que a [TASK-0046](../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) fechou **só para o
-  shutdown**. O fork usa `WaitForWorkWithSpin()` em [`pcsx2/MTVU.cpp:136`](../../../pcsx2/MTVU.cpp)
+  [`mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm`](../../done/mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm_2026-08-28T15-24.md),
+  que a [TASK-0046](../../../task/TASK-0046-encerrar-thread-mtvu-no-shutdown.md) fechou **só para o
+  shutdown**. O fork usa `WaitForWorkWithSpin()` em [`pcsx2/MTVU.cpp:136`](../../../../pcsx2/MTVU.cpp)
   onde a 1.0.23 usava `WaitForWork()`. Custa um núcleo e calor; não causa o teto de clock
   (medido: com a VM pausada e a MTVU girando, o clock estava em 2002 MHz).
   **Causa determinada e CORRIGIDA em 2026-08-30:** `CNTFRQ_EL0` lê 0 neste SoC, então
   `ShortSpinOn()` devolve `(elapsed * 1e9) / 0 == 0` — `udiv` por zero no AArch64 não tem exceção —
   e o orçamento de 50 µs de `WaitForWorkWithSpin()` nunca é alcançado. Medido depois da
-  [TASK-0060](../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md): `R`/90% → `S`/0%, e
+  [TASK-0060](../../../task/TASK-0060-relogio-de-ticks-quando-cntfrq-le-zero.md): `R`/90% → `S`/0%, e
   `voluntary_ctxt_switches` sai de `0` (na vida inteira da thread) para crescer normalmente. A
   MTVU passa a dormir **durante o jogo** também, o que mostra que os ~100% dela eram o giro e não
   trabalho de VU1 — um núcleo de oito recuperado o tempo todo.
@@ -189,4 +189,4 @@ Nenhum dos dois causa esta lentidão — ambos foram medidos e descartados —, 
   procurando a tela em `SaveManagerScreen.kt`, o gerenciador de arquivos de save; era a tela
   errada.) O `gfxinfo` mostrou o mecanismo: **100% dos quadros** com `Slow issue draw commands`, e
   34–46 ms cada. Tratado na
-  [TASK-0057](../../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md).
+  [TASK-0057](../../../task/TASK-0057-limitar-a-taxa-do-fundo-2d-da-biblioteca.md).

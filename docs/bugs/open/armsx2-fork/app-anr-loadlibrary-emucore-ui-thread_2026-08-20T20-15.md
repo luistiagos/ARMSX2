@@ -19,9 +19,9 @@ A carga do núcleo nativo ultrapassou 5 segundos antes de qualquer Activity abri
 
 ## Causa raiz
 
-[`App.onCreate`](../../../app/src/main/java/kr/co/iefriends/pcsx2/App.java#L46) acessa
+[`App.onCreate`](../../../../app/src/main/java/kr/co/iefriends/pcsx2/App.java#L46) acessa
 `NativeApp.hasNoNativeBinary`; isso inicializa a classe e executa imediatamente os dois
-`System.loadLibrary` de [`NativeApp.java:17-31`](../../../app/src/main/java/kr/co/iefriends/pcsx2/NativeApp.java#L17).
+`System.loadLibrary` de [`NativeApp.java:17-31`](../../../../app/src/main/java/kr/co/iefriends/pcsx2/NativeApp.java#L17).
 Toda a carga e relocação de `libemucore.so` ocorre na main thread.
 
 ## Como reproduzir
@@ -44,3 +44,17 @@ callback e mantém a navegação bloqueada até a inicialização terminar. Uma 
 atômica real, evitando reinicialização posterior na UI.
 
 `assembleUnrestrictedDebug` passou. Aguardando validação em cold start e telemetria.
+
+## Auditoria no ARMSX2-fork — 2026-09-03
+
+O evento original é da linha antiga, mas a causa voltou a existir no fork. O inicializador estático
+de [`NativeApp`](../../../../platforms/android/app/src/main/java/kr/co/iefriends/pcsx2/NativeApp.java#L26)
+continua chamando `System.loadLibrary`. E
+[`kickoffEmucoreInit`](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L1973)
+faz chamadas a `NativeApp` para decidir/registrar o renderer **antes** do `invoke {}` que despacha
+para `eScope`. Como `kickoffEmucoreInit` nasce de `onCreate`/`LaunchedEffect`, o primeiro acesso à
+classe e a carga do `.so` continuam podendo ocorrer na thread da UI.
+
+Portanto este relatório fica entre os bugs do fork atual: a correção descrita acima não foi portada
+por completo. Severidade **alta**; correção possível movendo todo primeiro acesso a `NativeApp` para
+o worker e mantendo a UI bloqueada apenas por estado, não por `System.loadLibrary`.

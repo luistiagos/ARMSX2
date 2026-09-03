@@ -133,7 +133,7 @@ que trave o boot seguinte. Esse é o risco real da mudança, e é o teste que o 
 
 Portada da `feature/handoff-end-to-end`, onde a mesma correção foi escrita, compilada e validada
 no A12 em 2026-08-28 (TASK-0020 **daquele ramo** — número que aqui significa outra coisa, ver
-[colisão de números](../bugs/open/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md)). Lá o
+[colisão de números](../bugs/open/armsx2-fork/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md)). Lá o
 laço usa `WaitForWork()` bloqueante e a thread vazada dorme; aqui usa `WaitForWorkWithSpin()` e
 gira a 100%. O `ShutdownCPUProviders()` também difere — esta árvore tem o guarda
 `s_cpu_providers_initialized` e o `dVifRelease` dentro de `if (newVifDynaRec)` —, então a chamada

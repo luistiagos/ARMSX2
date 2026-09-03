@@ -15,7 +15,7 @@ de renderer e levou à causa real.
 ## Causa raiz (confirmada no código)
 
 Na 1.0.17 a cópia de assets saiu da thread de UI e passou a rodar concorrente com o boot
-([MainActivity.onCreate](../../../app/src/main/java/kr/co/iefriends/pcsx2/activities/MainActivity.java#L433)):
+([MainActivity.onCreate](../../../../app/src/main/java/kr/co/iefriends/pcsx2/activities/MainActivity.java#L433)):
 
 ```java
 Executors.newSingleThreadExecutor().execute(() -> {
@@ -25,7 +25,7 @@ Initialize();          // <-- antes, a copia terminava aqui
 ```
 
 O que essa cópia faz com os shaders, em
-[DataDirectoryManager.copyFile](../../../app/src/main/java/kr/co/iefriends/pcsx2/utils/DataDirectoryManager.java#L363):
+[DataDirectoryManager.copyFile](../../../../app/src/main/java/kr/co/iefriends/pcsx2/utils/DataDirectoryManager.java#L363):
 
 ```java
 boolean exists = outFile.exists();
@@ -38,15 +38,15 @@ if (!exists) {
 ```
 
 E do outro lado, quem lê esses mesmos arquivos é o emulador, durante a criação do device gráfico
-([GSDevice::ReadShaderSource](../../../app/src/main/cpp/pcsx2/GS/Renderers/Common/GSDevice.cpp#L315)):
+([GSDevice::ReadShaderSource](../../../../app/src/main/cpp/pcsx2/GS/Renderers/Common/GSDevice.cpp#L315)):
 
 ```cpp
 return FileSystem::ReadFileToString(Path::Combine(EmuFolders::Resources, filename).c_str());
 ```
 
 `EmuFolders::Resources` é exatamente `<DataRoot>/resources`, o destino do `copyAssetAll`. Os dois
-backends leem de lá na criação do device — [GSDeviceOGL](../../../app/src/main/cpp/pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L344)
-(`shaders/opengl/*.glsl`) e [GSDeviceVK](../../../app/src/main/cpp/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L2176)
+backends leem de lá na criação do device — [GSDeviceOGL](../../../../app/src/main/cpp/pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp#L344)
+(`shaders/opengl/*.glsl`) e [GSDeviceVK](../../../../app/src/main/cpp/pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp#L2176)
 (`shaders/vulkan/*.glsl`).
 
 Resultado: o emulador lê um shader vazio ou pela metade → compilação falha → criação do device
@@ -61,7 +61,7 @@ Isto explica as três coisas que nenhuma hipótese de renderer explicava:
 | Funcionava dia 18, quebrou depois | A cópia assíncrona é nova na 1.0.17 |
 | Intermitente, só alguns aparelhos | É corrida: depende da velocidade do storage |
 
-`Host::EnsureResourceSubdirectory` ([Host.cpp:41](../../../app/src/main/cpp/pcsx2/Host.cpp#L41)) não
+`Host::EnsureResourceSubdirectory` ([Host.cpp:41](../../../../app/src/main/cpp/pcsx2/Host.cpp#L41)) não
 protege: só checa se o **diretório** existe, nunca a integridade dos arquivos.
 
 ## Correção aplicada

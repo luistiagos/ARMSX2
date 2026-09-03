@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-31
 - **Concluída em:** —
 - **Feature:** nenhuma
-- **Bugs que resolve:** [mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta](../bugs/open/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md)
+- **Bugs que resolve:** [mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta](../bugs/open/armsx2-fork/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0064:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -39,7 +39,7 @@ m_features.no_ps2_z_quantization =
 
 O comentário do lado Vulkan promete *"opt-out via INI for Z-precision-sensitive titles"*. Não
 existe: `DisablePS2DepthQuantization` só empurra o valor para `true`. Diagnóstico completo no
-[registro do bug](../bugs/open/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
+[registro do bug](../bugs/open/armsx2-fork/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
 
 ## Objetivo
 

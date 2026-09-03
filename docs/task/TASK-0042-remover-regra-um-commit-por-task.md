@@ -89,7 +89,7 @@ Ao conferir hash por hash antes de fechar:
 
 São **duas tasks diferentes com o mesmo número**, em ramos sem história comum, e `commits_for_task`
 procura em `--all`. A reprovação nunca foi "uma task commitada duas vezes"; era colisão de
-numeração. Registrado em [`numeros-de-task-colidem-entre-ramos`](../bugs/open/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md).
+numeração. Registrado em [`numeros-de-task-colidem-entre-ramos`](../bugs/open/armsx2-fork/numeros-de-task-colidem-entre-ramos_2026-08-28T10-40.md).
 
 Isso **não** invalida a remoção da regra — o custo real dela (empurrar para `--amend`, medido na
 TASK-0040) continua valendo, e era esse o pedido. Invalida a justificativa que eu tinha dado com os

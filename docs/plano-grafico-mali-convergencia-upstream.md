@@ -6,9 +6,9 @@
   *"Agora o jogo nem abre mais. Aparece uma tela branca e fecha o app."*
 - **Escopo:** decisão de renderer, features de blending (framebuffer fetch / texture barrier),
   cache de shader e diagnóstico gráfico no Android.
-- **Bugs relacionados:** [tela preta A07](bugs/open/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md),
-  [tela vermelha + page fault Mali](bugs/open/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md),
-  [falso positivo do GraphicsHealthMonitor](bugs/open/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md)
+- **Bugs relacionados:** [tela preta A07](bugs/open/legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md),
+  [tela vermelha + page fault Mali](bugs/open/legado-version1/gs-mali-tela-vermelha-e-page-fault-driver_2026-08-21T07-39.md),
+  [falso positivo do GraphicsHealthMonitor](bugs/open/legado-version1/graphicshealthmonitor-falso-positivo-cenas-escuras_2026-08-23T13-57.md)
 
 ---
 

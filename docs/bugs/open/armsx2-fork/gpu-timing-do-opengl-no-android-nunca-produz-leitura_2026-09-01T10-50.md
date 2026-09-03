@@ -10,7 +10,7 @@
 ## Sintoma
 
 Com o renderizador **OpenGL** no Android, `PerformanceMetrics` nunca recebe tempo de GPU. Antes da
-[TASK-0055](../../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md) isso aparecia como um
+[TASK-0055](../../../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md) isso aparecia como um
 `GPU 0%` permanente no `PerfLog` — um número que parece medição e não é. Depois dela o campo é
 **omitido**, que é o comportamento correto, mas o dado continua não existindo:
 
@@ -69,5 +69,5 @@ campo aparece com valores plausíveis.
 
 Porque o sintoma era um `0%`, e `0%` lê-se como "a GPU não está fazendo nada" — não como "não há
 medição". Foi preciso separar as duas coisas no log
-([TASK-0055](../../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md)) para o defeito ficar
+([TASK-0055](../../../task/TASK-0055-contadores-de-desempenho-que-nao-mentem.md)) para o defeito ficar
 visível: agora o campo some, e um campo que some é uma pergunta; um `0%` não era.
