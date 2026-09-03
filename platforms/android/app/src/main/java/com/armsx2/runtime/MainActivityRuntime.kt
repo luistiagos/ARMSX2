@@ -2583,6 +2583,13 @@ open class MainActivityRuntime : ComponentActivity() {
         // em `seedNativeGates()`, no worker — ver o comentário lá. Esses caminhos escrevem em campo
         // estático de `NativeApp`, e escrever num campo estático inicializa a classe: era daqui
         // que saía o `System.loadLibrary` na thread da UI.)
+        // Direct USB rumble for a PlayStation pad. Asks for USB permission only when one is
+        // actually attached, so nobody sees a prompt for a controller they do not own.
+        com.armsx2.input.UsbRumble.start(this)
+        com.armsx2.input.UsbRumble.loadTakeover()
+        // Player-slot pins, so a controller the user assigned by hand is on its slot
+        // before the first button press rather than after it.
+        com.armsx2.input.PadRouter.loadPins()
         // Seed the pad-router's multitap gate before any in-game input is dispatched, so
         // slot routing (2 vs 8 slots) is correct from the first controller event.
         com.armsx2.input.PadRouter.multitapEnabled = ControllerMappings.multitapEnabled()
