@@ -1998,6 +1998,32 @@ open class MainActivityRuntime : ComponentActivity() {
      * setContent LaunchedEffect (first-time user, setupComplete just
      * flipped).
      */
+    /**
+     * Empurra para o nativo as preferências que precisam estar valendo **antes de um jogo rodar**:
+     * o interruptor mestre do rumble, a força do háptico, o volume do som de conquista e a dica de
+     * clock do ADPF.
+     *
+     * Roda no worker, e é aí que está o ponto. Os três primeiros escrevem em **campo estático** de
+     * `NativeApp` (`sRumbleEnabled`, `sHapticScale`) e o quarto chama um método estático dela —
+     * e tanto ler quanto escrever um campo estático **inicializa a classe**, o que executa o
+     * `static {}` de `NativeApp`, que é `System.loadLibrary` do `libemucore.so` inteiro.
+     *
+     * Estavam em `onCreate`, ou seja, na thread da UI. O comentário do ADPF chegava a dizer, com
+     * todas as letras, *"Referencing NativeApp also loads the native lib (static init)"* — e a
+     * linha ficou lá mesmo assim. Foi o que a primeira medição em aparelho da TASK-0079 mostrou:
+     * com o corpo de `kickoffEmucoreInit` já movido, o `PCSX2_LOAD` continuava saindo na thread
+     * principal, porque estas linhas rodavam antes.
+     *
+     * "Antes de um jogo rodar" continua garantido: nada aqui pode ser exercitado antes de a
+     * biblioteca existir, e a biblioteca só aparece depois deste worker.
+     */
+    private fun seedNativeGates() {
+        runCatching { NativeApp.sRumbleEnabled = ControllerMappings.rumbleEnabled() }
+        runCatching { ControllerMappings.syncHapticIntensity() }
+        runCatching { com.armsx2.ui.achievements.AchievementsViewModel.syncSoundVolume() }
+        runCatching { NativeApp.setAdpfEnabled(prefs.getBoolean("ui.adpf", false)) }
+    }
+
     private fun kickoffEmucoreInit() {
         if (emucoreInitDone) return
         emucoreInitDone = true
@@ -2027,6 +2053,7 @@ open class MainActivityRuntime : ComponentActivity() {
         // O latch `emucoreInitDone` fica FORA de proposito: ele impede o despacho duplo, e para
         // isso tem de ser decidido no ponto de chamada, nao no worker.
         invoke {
+            seedNativeGates()
             // Record the root native is about to pin (same resolution as
             // NativeApp.initializeOnce's dataPath) so a later storage change can be
             // detected and trigger a restart instead of silently not taking effect.
@@ -2486,12 +2513,10 @@ open class MainActivityRuntime : ComponentActivity() {
         // esperar o usuário apanhar. Não faz nada fora de um Samsung com o serviço habilitado.
         com.armsx2.ThrottleWatcher.maybeShowStartupNotice()
         startAutosaveIntervalJob()
-        // Restore the saved rumble master toggle into the native gate (NativeApp.onPadRumble).
-        NativeApp.sRumbleEnabled = ControllerMappings.rumbleEnabled()
-        // Push the saved haptic strength + achievement-sound volume into their native gates before
-        // any rumble or unlock sound can fire (both default to 1.0 = as authored until set here).
-        ControllerMappings.syncHapticIntensity()
-        com.armsx2.ui.achievements.AchievementsViewModel.syncSoundVolume()
+        // (Rumble, força do háptico e volume do som de conquista são semeados em
+        // `seedNativeGates()`, no worker — ver o comentário lá. Todos os três escrevem em campo
+        // estático de `NativeApp`, e escrever num campo estático inicializa a classe: era daqui
+        // que saía o `System.loadLibrary` na thread da UI.)
         // Seed the pad-router's multitap gate before any in-game input is dispatched, so
         // slot routing (2 vs 8 slots) is correct from the first controller event.
         com.armsx2.input.PadRouter.multitapEnabled = ControllerMappings.multitapEnabled()
@@ -2597,9 +2622,9 @@ open class MainActivityRuntime : ComponentActivity() {
             runCatching { window.setSustainedPerformanceMode(true) }
         }
 
-        // ADPF CPU clock hint (experimental, default OFF): re-assert the saved state to native
-        // before any game runs. Referencing NativeApp also loads the native lib (static init).
-        runCatching { kr.co.iefriends.pcsx2.NativeApp.setAdpfEnabled(prefs.getBoolean("ui.adpf", false)) }
+        // (A dica de clock do ADPF também foi para `seedNativeGates()`. O comentário que estava
+        // aqui já dizia a parte importante — "Referencing NativeApp also loads the native lib
+        // (static init)" — e mesmo assim a linha ficava na thread da UI.)
 
         // Defer asset copy + emucore init until setup is complete. On the
         // first-ever run, `systemDir` isn't picked yet at onCreate time —

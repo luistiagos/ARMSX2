@@ -5,7 +5,7 @@ atualizar as referências remotas. O `upstream/master` verificado estava em `5fd
 
 Havia **29 relatórios**, não 18 como dizia o índice anterior. Eles agora estão separados em:
 
-- [`armsx2-fork/`](armsx2-fork/README.md): **18** bugs que afetam, ou cuja causa continua presente,
+- [`armsx2-fork/`](armsx2-fork/README.md): **15** bugs que afetam, ou cuja causa continua presente,
   na árvore atual do fork (eram 22; os quatro de rastreabilidade foram fechados em 2026-09-03 pelas
   [TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md) e
   [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) e
@@ -32,13 +32,11 @@ neles.
 
 | Bug | Origem | Status verificado | Correção possível? | Severidade | Evidência/ação |
 |---|---|---|---|---|---|
-| [`loadLibrary` na UI](armsx2-fork/app-anr-loadlibrary-emucore-ui-thread_2026-08-20T20-15.md) | legado **reintroduzido** | **Sem correção no fork.** `kickoffEmucoreInit()` chama `NativeApp` antes do despacho ao `eScope`, disparando o inicializador estático na UI. | Sim | **Alta** | Mover o primeiro acesso a `NativeApp` e a carga do `.so` para o worker; o conserto antigo não foi portado por completo. |
 | [Capa perdida após download](armsx2-fork/biblioteca-jogo-baixado-perde-a-capa_2026-08-28T10-27.md) | delta do fork | **Implementada**, falta validação em aparelho. | Sim, já implementada | **Média** | TASK-0045 preserva `catalogCoverUrl`; há código e teste, mas o próprio relatório exige teste de ponta a ponta. |
 | [Título repetido por região](armsx2-fork/biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao_2026-08-28T11-30.md) | delta do fork | **Implementada sem fechamento formal**, falta validação. | Sim, já implementada | **Média** | O agrupamento existe no commit `bf45520833` (assunto `*`), mas a TASK-0047 segue “em andamento” e sem resultado. |
 | [Download salvo em formato não bootável](armsx2-fork/catalogo-download-entrega-formato-nao-bootavel_2026-08-28T10-27.md) | delta do fork | **Implementada**, falta validação de ponta a ponta. | Sim, já implementada | **Alta** | TASK-0045 filtra/nomeia o formato; TASK-0048 acrescentou extração de 7z/zip. Os testes locais existem, mas não substituem baixar e bootar no aparelho. |
 | [`CNTFRQ_EL0=0` zera relógio](armsx2-fork/cntfrq-el0-lido-como-zero-zera-todo-relogio-de-ticks_2026-08-30T21-30.md) | herdado do upstream | **Implementada e task concluída.** O relatório está obsoleto em `open`. | Sim, já implementada | **Alta** | TASK-0060 adicionou fallback para `clock_gettime`; deve ir a `done` quando a validação exigida estiver registrada. |
 | [Configuração reescrita na UI](armsx2-fork/configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread_2026-08-31T18-40.md) | delta do fork | **Parcial.** Recomposição da navegação foi corrigida; gravação/JNI síncronos e loop de quadros continuam. | Sim | **Média** | Coalescer/debounçar persistência com flush no `onPause` e suspender `ControllerAutoScroll` quando parado. |
-| [`getExternalFilesDir` na UI](armsx2-fork/datadirectorymanager-anr-getexternalfilesdir-a07_2026-08-20T14-17.md) | legado **reintroduzido** | **Sem correção no fork.** A classe antiga sumiu, mas `assetCopyRoot()` ainda é chamado na UI e usa a mesma API. | Sim | **Alta** | Resolver/cachear o diretório em worker antes de liberar o fluxo que inicializa o core. |
 | [Digitação de 97–450 ms](armsx2-fork/digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui_2026-08-31T21-30.md) | delta do fork | **Parcial.** TASK-0068 reduziu o realce; piso residual e custo proporcional ao catálogo seguem sem causa fechada. | Sim, após perfilar | **Média** | Reperfilar a versão atual; isolar texto/host e o custo do catálogo antes de outra alteração. |
 | [Tela preta GL, Mali-G52 r38](armsx2-fork/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md) | fork sobre núcleo upstream | **Sem correção.** Reproduzido após o merge e a regra global de desvio foi removida. | Provavelmente; causa ainda aberta | **Alta** | Instrumentar present/surface/swap depois do FMV; o upstream novo até `5fd85d7fc9` não traz correção correspondente. |
 | [GOS limita clock](armsx2-fork/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md) | ambiente Samsung | **Causa não corrigível pelo app; mitigação concluída.** Detector, aviso, assistente e opt-out já existem. | Não para a causa | — | Manter como limitação de plataforma; não mascarar como bug do emulador. |
@@ -49,7 +47,6 @@ neles.
 | [Savestate `0x9A54` rejeitado](armsx2-fork/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md) | incompatibilidade fork ↔ version1 | **Implementada**, bloqueada na validação. | Sim, já implementada | **Alta** | TASK-0049 implementou leitor e proteção de consumo integral; falta um `.p2s` real da 1.0.23. |
 | [Scrim do teclado 0×0](armsx2-fork/teclado-virtual-scrim-de-tamanho-zero_2026-08-31T00-00.md) | delta do fork | **Implementada**, falta validação de interação. | Sim, já implementada | **Baixa** | `fillMaxSize()` está fora do `AnimatedVisibility`; confirmar toque fora no aparelho. |
 | [Veredito do renderer ausente no relato](armsx2-fork/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md) | delta do fork | **Implementada**, falta comprovar num relato real sem crash. | Sim, já implementada | **Baixa** | JNI separado e `graphicsBootSummary` já carregam o veredito; a TASK-0065 ainda está em andamento. |
-| [Shader XMB usa `length`](armsx2-fork/xmb-gl-nao-compila-shader-uniform-chamado-length_2026-09-01T10-45.md) | delta do fork | **Sem correção.** O uniform proibido ainda existe no shader atual. | Sim | **Baixa** | Renomear uniform e usos; TASK-0070 já removeu a animação contínua, então o risco de custo descrito no relatório diminuiu. |
 
 ## Linha antiga / version1
 

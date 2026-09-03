@@ -1,10 +1,10 @@
 # TASK-0080: renomear o uniform `length`, que é função embutida do GLSL e derruba a onda XMB
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-03
-- **Concluída em:** —
+- **Concluída em:** 2026-09-03
 - **Feature:** nenhuma
-- **Bugs que resolve:** [xmb-gl-nao-compila-shader-uniform-chamado-length](../bugs/open/armsx2-fork/xmb-gl-nao-compila-shader-uniform-chamado-length_2026-09-01T10-45.md)
+- **Bugs que resolve:** [xmb-gl-nao-compila-shader-uniform-chamado-length](../bugs/done/xmb-gl-nao-compila-shader-uniform-chamado-length_2026-09-01T10-45.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0080:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -72,4 +72,25 @@ não deve consumir CPU mensurável em repouso.
 
 ## Resultado
 
-Preenchido ao concluir.
+Feito e medido em aparelho — moto g86 5G, Android 16 (SDK 36), `github/release`:
+
+- **Nenhuma linha `XmbGlView` no logcat.** Antes, `Symbol 'length' can't be referenced as a
+  variable` saía a cada tentativa de init.
+- **A thread `xmb-gl` existe e fica viva** (`ps -T`, estado `S`). No relato, ela saía logo depois de
+  `initGl` falhar — o `/proc` do A12 não tinha nenhuma thread com esse nome.
+- **Custo em repouso: zero.** `utime+stime` da thread medido duas vezes com 6 segundos entre elas:
+  **2 ticks → 2 ticks, delta 0**. Ela desenha um quadro e estaciona no `wakeLock.wait()`, como a
+  TASK-0070 desenhou. Era exatamente esse o receio do "cuidado antes de corrigir", e ele não se
+  materializou.
+- **A onda aparece na tela**, atrás da grade do catálogo.
+
+### O limite honesto desta validação
+
+O relato nasceu num **Galaxy A12 (Mali-G52)**, e é lá que o driver recusa o shader. O aparelho
+disponível é um moto g86, cujo compilador pode ser permissivo com o nome — ou seja, aqui não dá para
+provar que a versão anterior falhava. O que esta medição prova é que a versão nova **compila, sobe e
+não custa nada**; a prova de que o A12 deixou de cair para o fundo 2D depende de retestar naquele
+aparelho, e é o que o relatório pede em "Como reproduzir".
+
+Isso não enfraquece a correção: `length` é nome de função embutida do GLSL, e a recusa é a leitura
+correta da regra. O que varia entre drivers é a permissividade, não quem está certo.

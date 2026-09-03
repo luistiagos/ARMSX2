@@ -1,12 +1,12 @@
 # TASK-0079: tirar da thread da UI a carga do `.so` e a resolução do data root no boot
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-03
-- **Concluída em:** —
+- **Concluída em:** 2026-09-03
 - **Feature:** nenhuma
 - **Bugs que resolve:**
-  [app-anr-loadlibrary-emucore-ui-thread](../bugs/open/armsx2-fork/app-anr-loadlibrary-emucore-ui-thread_2026-08-20T20-15.md),
-  [datadirectorymanager-anr-getexternalfilesdir-a07](../bugs/open/armsx2-fork/datadirectorymanager-anr-getexternalfilesdir-a07_2026-08-20T14-17.md)
+  [app-anr-loadlibrary-emucore-ui-thread](../bugs/done/app-anr-loadlibrary-emucore-ui-thread_2026-08-20T20-15.md),
+  [datadirectorymanager-anr-getexternalfilesdir-a07](../bugs/done/datadirectorymanager-anr-getexternalfilesdir-a07_2026-08-20T14-17.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0079:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -70,4 +70,51 @@ Em aparelho, `githubRelease`:
 
 ## Resultado
 
-Preenchido ao concluir.
+Validado em aparelho. **E a primeira medição derrubou a primeira versão da correção.**
+
+### O que a medição mostrou, e o escopo não previa
+
+Com o corpo de `kickoffEmucoreInit` já inteiro no worker, o log do arranque continuou assim:
+
+```
+09-03 19:18:28.978 12722 12722 I System.out: PCSX2_LOAD emucore_4k pageSize=4096
+09-03 19:18:29.743 12722 12782 I System.out: PCSX2_INIT
+```
+
+`PCSX2_INIT` no worker (tid 12782), mas **`PCSX2_LOAD` com tid igual ao pid — a thread principal**.
+Havia dois toques em `NativeApp` **antes** de `kickoffEmucoreInit`, ambos no `onCreate`:
+
+- `NativeApp.sRumbleEnabled = ControllerMappings.rumbleEnabled()` — escrever em campo estático
+  **inicializa a classe**, o que é suficiente para disparar o `static {}` e o `System.loadLibrary`.
+  Era o mais cedo dos dois, e o mais fácil de não ver: parece uma atribuição, não uma chamada.
+- `NativeApp.setAdpfEnabled(...)`, cujo comentário **já dizia** *"Referencing NativeApp also loads
+  the native lib (static init)"* — e a linha estava na thread da UI mesmo assim.
+
+Os dois, mais `syncHapticIntensity()` e `syncSoundVolume()` (que escrevem em `sHapticScale` e no
+gate de som), foram para `seedNativeGates()`, chamada como primeira coisa do worker. A garantia que
+o comentário original pedia — "antes de um jogo rodar" — continua valendo: nada disso pode ser
+exercitado antes de a biblioteca existir, e a biblioteca só aparece depois deste worker.
+
+### Medição depois da correção completa
+
+moto g86 5G, Android 16 (SDK 36), `arm64-v8a`, `github/release` `versionCode 2000`:
+
+```
+09-03 19:26:37.045 16382 16441 I System.out: PCSX2_LOAD emucore_4k pageSize=4096
+09-03 19:26:37.476 16382 16441 I ARMSX2  : @@ANGLE@@ off renderer=opengl ...
+09-03 19:26:37.516 16382 16441 I System.out: PCSX2_INIT
+```
+
+pid **16382**, tudo na tid **16441**. A carga do `.so` saiu da thread da UI.
+
+- `ANR in come.nanodata.armsx2` no logcat: **0**.
+- Nenhum `Choreographer: Skipped` atribuído ao nosso pid.
+- O app abre, o catálogo aparece com 6313 títulos e as capas carregam — a prova de que a reordenação
+  não quebrou a sequência que `initializeOnce` exige.
+
+### O que fica registrado como não medido
+
+O ANR original do A07 (`getExternalFilesDir` → `mkdirs`) depende de armazenamento externo lento sob
+pressão; num moto g86 com armazenamento rápido ele não reproduzia nem antes. O que se prova aqui é
+que **a chamada saiu da thread da UI**, que é a causa. A confirmação de campo é telemetria limpa
+para `armsx2/anr` nessa assinatura.
