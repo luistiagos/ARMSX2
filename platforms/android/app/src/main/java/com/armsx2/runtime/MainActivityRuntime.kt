@@ -2065,11 +2065,11 @@ open class MainActivityRuntime : ComponentActivity() {
      */
     /**
      * Empurra para o nativo as preferências que precisam estar valendo **antes de um jogo rodar**:
-     * o interruptor mestre do rumble, a força do háptico, o volume do som de conquista e a dica de
-     * clock do ADPF.
+     * o interruptor mestre do rumble, a força do háptico, o fallback de rumble, o volume do som de
+     * conquista e a dica de clock do ADPF.
      *
-     * Roda no worker, e é aí que está o ponto. Os três primeiros escrevem em **campo estático** de
-     * `NativeApp` (`sRumbleEnabled`, `sHapticScale`) e o quarto chama um método estático dela —
+     * Roda no worker, e é aí que está o ponto. Esses caminhos escrevem em **campo estático** de
+     * `NativeApp` (`sRumbleEnabled`, `sHapticScale`) ou chamam métodos estáticos dela —
      * e tanto ler quanto escrever um campo estático **inicializa a classe**, o que executa o
      * `static {}` de `NativeApp`, que é `System.loadLibrary` do `libemucore.so` inteiro.
      *
@@ -2085,6 +2085,7 @@ open class MainActivityRuntime : ComponentActivity() {
     private fun seedNativeGates() {
         runCatching { NativeApp.sRumbleEnabled = ControllerMappings.rumbleEnabled() }
         runCatching { ControllerMappings.syncHapticIntensity() }
+        runCatching { ControllerMappings.syncRumbleFallback() }
         runCatching { com.armsx2.ui.achievements.AchievementsViewModel.syncSoundVolume() }
         runCatching { NativeApp.setAdpfEnabled(prefs.getBoolean("ui.adpf", false)) }
     }
@@ -2578,8 +2579,8 @@ open class MainActivityRuntime : ComponentActivity() {
         // esperar o usuário apanhar. Não faz nada fora de um Samsung com o serviço habilitado.
         com.armsx2.ThrottleWatcher.maybeShowStartupNotice()
         startAutosaveIntervalJob()
-        // (Rumble, força do háptico e volume do som de conquista são semeados em
-        // `seedNativeGates()`, no worker — ver o comentário lá. Todos os três escrevem em campo
+        // (Rumble, força do háptico, fallback de rumble e volume do som de conquista são semeados
+        // em `seedNativeGates()`, no worker — ver o comentário lá. Esses caminhos escrevem em campo
         // estático de `NativeApp`, e escrever num campo estático inicializa a classe: era daqui
         // que saía o `System.loadLibrary` na thread da UI.)
         // Seed the pad-router's multitap gate before any in-game input is dispatched, so
