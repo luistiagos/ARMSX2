@@ -93,3 +93,37 @@ O relato acrescenta dois defeitos que não estavam registrados:
 
 Isto reforça o ponto 3 dos próximos passos: enquanto o `--check` não reprovar, o `--fix` continua
 podendo anunciar sucesso sem ter feito o trabalho, e quem lê a saída acredita.
+
+## Correção — 2026-09-03 ([TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md))
+
+`fill_index()` foi reescrito. Deixou de ser uma substituição de regex sobre a linha inteira e
+passou a trabalhar por **célula**, com o índice de cada coluna lido do cabeçalho da tabela:
+
+1. **Insere** a linha da task que não tem nenhuma, montada a partir do próprio arquivo da task
+   (título do `#`, `Status`, `Feature`, bugs de `Bugs que resolve`) e do git. A inserção respeita a
+   ordem numérica. Efeito imediato: o índice saiu de 53 para **77 linhas, uma por task**.
+2. **Atualiza o `Status`**, que antes ficava congelado — o `--fix` gravava hash em linha marcada
+   `aberta` e produzia uma linha internamente contraditória.
+3. **Não assume que `Commit` é a última coluna.** O regex antigo ancorava em `$`; a suposição já
+   tinha produzido quatro linhas (TASK-0074 a TASK-0077) com o hash gravado na coluna `Feature`,
+   agora corrigidas.
+4. **Distingue as três saídas:** `N linha(s) inserida(s), N atualizada(s)` ou
+   `nada a fazer, o indice ja descreve as tasks`. O `indice ja estava atualizado` que mentia
+   deixou de existir.
+5. O espaço duplo antes do hash acabou: a célula é reconstruída, não emendada.
+
+**E o `--check` agora reprova.** `check_index()` faz task concluída sem linha no índice falhar a
+validação, com exit code 1. Era o ponto 3 dos próximos passos, e é o que impede o `--fix` de voltar
+a anunciar sucesso sem ter feito o trabalho — o defeito que reincidiu em 26/08.
+
+**Uma exceção deliberada:** a célula `Commit` só é reescrita quando o git *deste ramo* tem o que
+escrever. Os commits das TASK-0001 a TASK-0015 nasceram na linha anterior do produto, que não tem
+história comum com o fork; `HEAD` não os alcança, e sobrescrever com `—` apagaria o único registro
+daqueles hashes. Descoberto ao rodar a primeira versão da correção, que fez exatamente isso.
+
+Provado por seis testes em `scripts/tests/test_check_traceability.py`:
+`test_fix_insere_linha_ausente`, `test_task_concluida_fora_do_indice_reprova`,
+`test_fix_nao_deixa_espaco_duplo_e_e_idempotente`,
+`test_fix_nao_assume_que_commit_e_a_ultima_coluna`,
+`test_fix_preserva_hash_que_head_nao_alcanca` e `test_status_divergente_entre_feature_e_task_reprova`.
+Todos falham contra a versão anterior do script.

@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-31
 - **Concluída em:** —
 - **Feature:** nenhuma
-- **Bugs que resolve:** `teclado-virtual-scrim-de-tamanho-zero`
+- **Bugs que resolve:** [teclado-virtual-scrim-de-tamanho-zero](../bugs/open/armsx2-fork/teclado-virtual-scrim-de-tamanho-zero_2026-08-31T00-00.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0062:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -185,7 +185,7 @@ estatísticas; não era o teto dele. Sem ele, o quadro mediano passa a ser um qu
 Nenhum quadro abaixo de 53 ms, e um pico de 318 ms na fase de gravar a display list. Há um piso de
 ~97 ms por tecla que **não depende do tamanho da biblioteca** — logo não é o filtro nem a ordenação,
 que é o que esta task atacou. Registrado em
-[`digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui`](../bugs/open/digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui_2026-08-31T21-30.md),
+[`digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui`](../bugs/open/armsx2-fork/digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui_2026-08-31T21-30.md),
 com as duas hipóteses e o teste que decide entre elas.
 
 **O que esta task entregou continua de pé** — toque fora, emitir na descida, menos leituras de

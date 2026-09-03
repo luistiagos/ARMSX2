@@ -1,10 +1,10 @@
 # TASK-0010: Corrigir o validador de rastreabilidade para verificar o que ele afirma verificar
 
-- **Status:** aberta
+- **Status:** concluída
 - **Criada em:** 2026-08-25
-- **Concluída em:** —
+- **Concluída em:** 2026-09-03
 - **Feature:** [FEAT-0002](../features/FEAT-0002-rastreabilidade-verificavel.md)
-- **Bugs que resolve:** [checktraceability-grep-casa-corpo-do-commit](../bugs/open/checktraceability-grep-casa-corpo-do-commit_2026-08-25T22-44.md), [checktraceability-fix-nao-insere-task-ausente-do-indice](../bugs/open/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md)
+- **Bugs que resolve:** [checktraceability-grep-casa-corpo-do-commit](../bugs/done/checktraceability-grep-casa-corpo-do-commit_2026-08-25T22-44.md), [checktraceability-fix-nao-insere-task-ausente-do-indice](../bugs/done/checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0010:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** — (não altera o aplicativo)
@@ -21,7 +21,7 @@ task numa linha do corpo.
 
 - **`commits_for_task()` passa a filtrar pelo assunto.** Trocar `--grep=^TASK-NNNN:` por leitura de
   `%h%x00%s` e comparação `subject.startswith(tid + ":")` em Python. É a correção do
-  [bug do `--grep`](../bugs/open/checktraceability-grep-casa-corpo-do-commit_2026-08-25T22-44.md).
+  [bug do `--grep`](../bugs/done/checktraceability-grep-casa-corpo-do-commit_2026-08-25T22-44.md).
 - **`fill_index()` passa a inserir**, não só substituir. Quando a task concluída não tem linha no
   índice, montar a linha a partir dos campos da própria task. Distinguir as saídas `inseridas N`,
   `atualizadas N` e `nada a fazer`, e parar de assumir que `Commit` é a última coluna.
@@ -67,4 +67,37 @@ E os quatro casos negativos, que devem **reprovar** depois desta task e passam a
 
 ## Resultado
 
-Preenchido ao concluir.
+Feito, e com uma descoberta que não estava prevista.
+
+**O que entrou como planejado:**
+
+- `commits_for_task()` filtra pelo **assunto**, lendo `%h%x00%s` uma vez por revisão e comparando
+  em Python. O `--grep` saiu.
+- `fill_index()` **insere** a linha ausente e trabalha por célula, com o índice de cada coluna lido
+  do cabeçalho. O índice saiu de 53 para **77 linhas — uma por task**, e quatro linhas que tinham o
+  hash gravado na coluna `Feature` foram para a coluna certa.
+- `check_index()` **reprova** task concluída fora do índice. Sem isso o `--fix` continuaria podendo
+  anunciar sucesso sem ter feito o trabalho.
+- Status cruzado feature↔task, `Publicado em`, link bug→task bidirecional, exigência do campo
+  declarado em `done/` e varredura de feature restrita à tabela: todos entraram.
+- 18 testes em `scripts/tests/test_check_traceability.py`, cada um montando um repositório git de
+  verdade. **10 deles falham contra a versão anterior do script** — é a prova de que testam o
+  defeito e não a implementação.
+
+**O que não estava previsto, e mudou o desenho:**
+
+1. **A célula `Commit` não pode ser sempre reconstruída.** A primeira versão da correção apagou os
+   hashes das TASK-0001 a TASK-0015, porque os commits delas estão na linha anterior do produto e
+   `HEAD` não os alcança. O `--fix` passou a só reescrever essa célula quando o git deste ramo tem
+   o que escrever.
+2. **`— (comentário)` é campo vazio.** Metade dos campos vazios do repositório é escrita assim.
+   Lidos como valor, a TASK-0075 (`— (o publicador existe, mas nada foi publicado)`) virava
+   fronteira de publicação e reprovava quatro tasks que nunca foram ao ar.
+3. **`field()` precisava ler linhas de continuação.** A TASK-0045 lista os dois bugs que resolve em
+   linhas indentadas; ler só a primeira escondia o segundo link e fazia aquele bug parecer órfão.
+4. **Um bug pode citar uma task para NEGAR o vínculo.** `**nenhuma** — a TASK-0065 registra o
+   defeito e **não o corrige**` é informação, não erro. Exigir backlink dali levaria a apagar a
+   explicação, que é justamente o que vale ali.
+
+**Correção de documento encontrada pelo caminho:** a TASK-0062 nomeava o bug que resolve entre
+crases em vez de linkar. Agora é link, e o par fecha nos dois sentidos.

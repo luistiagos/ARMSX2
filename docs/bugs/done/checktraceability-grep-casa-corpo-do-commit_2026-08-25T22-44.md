@@ -65,3 +65,22 @@ return [h for h, s in (l.split("\0", 1) for l in (out or "").splitlines() if "\0
 
 Um teste de regressão deve cobrir o caso acima — commit `chore:` com a menção no corpo não pode ser
 retornado. Ver [TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md).
+
+## Correção — 2026-09-03 ([TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md))
+
+`commits_for_task()` deixou de delegar o filtro ao `git log --grep`. Passou a ler
+`git log --format=%h%x00%s` uma vez por revisão, guardar o resultado, e comparar em Python
+`assunto.startswith(tid + ":")`. `%s` é o **assunto** e nada mais — o corpo do commit não chega a
+ser lido, então não há como uma menção nele contar.
+
+O `:` no prefixo também é o que impede `TASK-0099` de ser satisfeita por um commit de `TASK-00991`.
+
+Provado por três testes em `scripts/tests/test_check_traceability.py`, que montam um repositório
+git de verdade:
+
+- `test_mencao_no_corpo_nao_conta_como_commit_da_task` — reproduz exatamente o `chore:` do relato
+  acima e exige a reprovação;
+- `test_assunto_de_verdade_conta` — o caso legítimo continua passando;
+- `test_prefixo_maior_nao_casa`.
+
+Os três **falham** contra a versão anterior do script e passam contra a atual.

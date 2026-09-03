@@ -2,6 +2,17 @@
 
 Pasta contendo os relatórios de bugs que foram corrigidos no código e validados na prática via testes em dispositivos físicos conectados ou telemetria limpa.
 
+## Bugs de processo e ferramenta (validados por teste automatizado)
+
+Não rodam no aplicativo, então não há aparelho onde observá-los. A validação equivalente é o teste
+de regressão que **falha contra a versão anterior do código** — sem isso, o teste prova apenas que
+a implementação concorda consigo mesma.
+
+| Relatório | Componente | Causa Raiz / Resumo do Fix | Validação | Data |
+|---|---|---|---|---|
+| [`checktraceability-grep-casa-corpo-do-commit_2026-08-25T22-44.md`](./checktraceability-grep-casa-corpo-do-commit_2026-08-25T22-44.md) | `scripts/check_traceability.py::commits_for_task` | `git log --grep` aplica a expressão à mensagem inteira e `^` casa o início de qualquer linha do corpo: um `chore:` que citasse `TASK-NNNN:` no corpo era contado como o commit da task. O filtro passou a ser feito em Python sobre `%s`, que é o assunto e nada mais. | `python -m pytest scripts/tests -q` — 3 testes montam um repositório git de verdade e reproduzem o `chore:` do relato; falham contra o script anterior. | 2026-09-03 |
+| [`checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md`](./checktraceability-fix-nao-insere-task-ausente-do-indice_2026-08-25T22-44.md) | `scripts/check_traceability.py::fill_index` | `fill_index()` só sabia substituir a célula de uma linha existente; sem linha, `subn` devolvia 0 e a saída dizia "índice já estava atualizado". Reescrito para trabalhar por célula com o índice de cada coluna lido do cabeçalho, inserindo a linha ausente; e `check_index()` passou a **reprovar** task concluída fora do índice. | `python -m pytest scripts/tests -q` — 6 testes, todos falhando contra o script anterior. O índice saiu de 53 para 77 linhas, uma por task. | 2026-09-03 |
+
 ## Bugs Validados em Device Físico
 
 | Relatório | Componente | Causa Raiz / Resumo do Fix | Validação (Device Físico) | Data |
