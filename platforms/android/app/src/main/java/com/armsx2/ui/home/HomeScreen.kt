@@ -1239,7 +1239,7 @@ private fun LazyGridScope.emptyLibrary(
             EmptyState(
                 title = str("home.saved.empty.title"),
                 message = str("home.saved.empty.body"),
-                actionLabel = str("home.saved.exploreCatalog"),
+                actionLabel = str("home.saved.empty.exploreCatalog"),
                 onAction = onExploreCatalog,
                 modifier = Modifier.fillMaxWidth().height(260.dp),
             )

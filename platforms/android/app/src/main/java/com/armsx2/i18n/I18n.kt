@@ -714,6 +714,8 @@ private val BASE_EN: Map<String, String> = mapOf(
     "catalog.queued" to "Queued",
     "catalog.paused" to "Paused — tap to resume",
     "catalog.downloaded" to "Downloaded",
+    // O ponto de chamada faz .replace("%1$d", n): a string TEM de conter o marcador.
+    "catalog.versions.subtitle" to "%1\$d versions available",
     "catalog.error" to "Download failed — tap to retry",
     "games.empty.noGames.title" to "No games yet",
     "games.empty.noGames.body" to "Browse the ROM catalog to download your first game.",
