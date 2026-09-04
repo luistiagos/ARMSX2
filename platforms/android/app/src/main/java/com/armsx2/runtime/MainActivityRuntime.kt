@@ -883,6 +883,12 @@ open class MainActivityRuntime : ComponentActivity() {
             }
             upscale.value = resolved.upscaleFloat
             renderer.value = resolved.renderer
+            // TASK-0083: ANGLE's EGL library is chosen by an env var that GLContextEGL reads when
+            // the GS thread opens the context, so it has to be set before ANY native call below
+            // can reopen the GS device. This is also the ONLY hook the in-game "Apply & Restart"
+            // passes through — restart() → start() → here, never launchGame — and it is where the
+            // per-game resolution already exists, which is what the setting is stored against.
+            instance?.applicationContext?.let { applyAngleEnv(it, resolved) }
             NativeApp.renderUpscalemultiplier(upscale.value)
             // Pin custom Vulkan driver (if any) BEFORE the renderer write —
             // the renderer JNI may trigger MTGS::ApplySettings which can
@@ -1008,9 +1014,12 @@ open class MainActivityRuntime : ComponentActivity() {
                     "uri=${uri.take(240)} state=${eState.value} runLoop=$vmRunLoopActive " +
                     "stopping=$vmStopInProgress nativeReady=${nativeReady.value}"
             )
-            // Refresh the ANGLE EGL env before the GS thread opens the GL context, so a
-            // just-changed AndroidUseAngleOpenGL / renderer choice takes effect on this boot.
-            instance?.applicationContext?.let { applyAngleEnv(it) }
+            // TASK-0083: the ANGLE env refresh used to live here, and it ran BEFORE
+            // `currentGame.value = info` a few lines below — so a per-game resolution here would
+            // key off the PREVIOUS title. It now happens in applyRendererPrefs(), which every boot
+            // path reaches (including the in-game "Apply & Restart", which never comes through
+            // here) and which already resolves this title's settings, still before the GS thread
+            // opens the GL context.
             // Native GS/settings calls in start()→applyRendererPrefs null-deref if the
             // base settings layer isn't installed yet (initialize() not finished). On a
             // cold first launch — reliably on Samsung DeX — a fast game tap races init
@@ -1376,24 +1385,42 @@ open class MainActivityRuntime : ComponentActivity() {
          *  when the AndroidUseAngleOpenGL setting is on AND the renderer is OpenGL, point the
          *  ARMSX2_ANGLE_EGL_LIBRARY / _GLES_LIBRARY env vars at the bundled ANGLE .so in the
          *  native-lib dir; GLContextEGL::LoadEGL (native) then loads ANGLE's EGL instead of the
-         *  system GLES driver — useful where the native GLES stack is broken (e.g. some MediaTek
-         *  Mali). Cleared otherwise. Env vars are read by native getenv in this same process, so
-         *  this Kotlin call is the whole hook. MUST run before the GS thread opens the GL context,
-         *  so it's invoked at emucore init and before each game launch. Renderer restart applies a
-         *  live toggle (like the GPU-profile override). Uses the GLOBAL settings; per-game renderer
-         *  overrides are out of scope for v1. */
-        fun applyAngleEnv(context: Context) {
-            val settings = runCatching { com.armsx2.config.ConfigStore.loadGlobal() }.getOrNull()
-            val eligible = settings?.useAngleOpenGL == true && settings.renderer == "opengl"
+         *  system GLES driver — useful where the native GLES stack is broken. Cleared otherwise.
+         *  Env vars are read by native getenv in this same process, so this Kotlin call is the
+         *  whole hook. MUST run before the GS thread opens the GL context.
+         *
+         *  TASK-0083: [resolved] is the per-game ∘ global settings for the title about to boot,
+         *  and it is what decides — NOT the global layer. The in-game Renderer tab saves in
+         *  SettingsScope.Game whenever there is a serial, so reading the global layer here meant
+         *  the ANGLE switch in that menu did nothing at all: measured on a Mali-G52 r38p1
+         *  (SM-A127M), toggling it there left GL_VENDOR at `ARM` and emitted no @@ANGLE@@ line,
+         *  while the same key set globally gave `Google Inc. (ARM)` and rendered a title that is
+         *  black on the system driver. Passing null resolves from currentGame, which yields the
+         *  global settings when no game is loaded — the Activity-init call keeps its old meaning.
+         *
+         *  Callers must be on a path that runs before the GS device opens: applyRendererPrefs()
+         *  (every boot, including the in-game "Apply & Restart" → restart() → start(), which never
+         *  goes through launchGame) and Activity init. */
+        fun applyAngleEnv(context: Context, resolved: com.armsx2.config.Settings? = null) {
+            val settings = resolved ?: runCatching {
+                com.armsx2.config.ConfigStore.resolveForGame(currentGame.value?.settingsKey)
+            }.getOrNull()
             val libDir = context.applicationInfo.nativeLibraryDir
             val egl = File(libDir, "libEGL_angle.so")
             val gles = File(libDir, "libGLESv2_angle.so")
+            val decision = AngleDriver.decide(
+                settings?.renderer,
+                settings?.useAngleOpenGL == true,
+                egl.exists(),
+                gles.exists(),
+            )
+            val eligible = decision != AngleDriver.Decision.Off
             // gsBackThread rides on every line: GV7's back thread is the OTHER ANGLE suspect
             // (ANGLE binds an EGL context to a single thread far more strictly than the native
             // GLES drivers do), so the log has to say whether it was engaged.
             val ctx = "renderer=${settings?.renderer} useAngle=${settings?.useAngleOpenGL} gsBackThread=${settings?.gsBackThreadMode}"
             try {
-                if (eligible && egl.exists() && gles.exists()) {
+                if (decision == AngleDriver.Decision.Enabled) {
                     android.system.Os.setenv("ARMSX2_ANGLE_EGL_LIBRARY", egl.absolutePath, true)
                     android.system.Os.setenv("ARMSX2_ANGLE_GLES_LIBRARY", gles.absolutePath, true)
                     android.util.Log.i("ARMSX2", "ANGLE OpenGL enabled: ${egl.absolutePath}")

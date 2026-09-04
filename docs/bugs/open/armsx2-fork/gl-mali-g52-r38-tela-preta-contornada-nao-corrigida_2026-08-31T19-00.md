@@ -10,8 +10,12 @@
   ([gs-tela-preta-silenciosa-sem-diagnostico-a07](../legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)),
   em outro aparelho e outro backend
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** **nenhuma** — a [TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
-  registra o defeito e instrumenta o diagnóstico; **não o corrige**
+- **Tasks que o resolvem:** **nenhuma corrige a causa**, e a partir de 2026-09-04 sabe-se por quê:
+  a causa está **no driver GLES da ARM**, fora do nosso código e fora do core (ver
+  *"A causa: é o driver"* abaixo). A [TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
+  registra o defeito e instrumenta o diagnóstico; a
+  [TASK-0083](../../../task/TASK-0083-escolha-de-angle-por-jogo-chega-ao-core.md) faz o contorno
+  medido (ANGLE por jogo) **funcionar**, porque a chave existia e era inerte
 
 ## Sintoma
 
@@ -38,7 +42,7 @@ Mas ela é um desvio, não um conserto, e tem três custos que precisam estar es
    r38.x**, no mundo inteiro. A evidência é um jogo, num telefone.
 2. **Ela troca semântica de emulação de carona.** Mali no Vulkan descarta o piso de Z de 32 bits do
    PS2, e no OpenGL não — registrado em
-   [mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta](mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
+   [mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta](../../done/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
    Ninguém decidiu isso; veio junto com a troca de backend.
 3. **É o terceiro movimento igual.** [`plano-grafico-mali-convergencia-upstream.md`](../../../plano-grafico-mali-convergencia-upstream.md),
    seção *"O que explicitamente NÃO fazer"*: *"Trocar OpenGL ↔ Vulkan globalmente como 'correção'.
@@ -128,3 +132,150 @@ As duas pistas que ficaram, e que são melhores do que tudo que se tinha antes:
 2. **A apresentação PARA, não deixa de começar.** O FMV aparece por volta de +80 s e só então
    congela. Isso descarta falha de criação de device ou de shader e aponta para superfície/swapchain
    perdida, ou para a thread do GS presa no present.
+
+## A causa: é o driver — medido em 2026-09-04
+
+Aparelho `SM-A127M`, Mali-G52, driver ARM **r38p1**, Android 13 (SDK 33). APK `githubDebug`
+(versionCode 2004). Jogo 007: Everything or Nothing (`SLUS-20751`, CRC `6848699B`), `renderer=opengl`
+fixado por jogo, upscale 1,25x. Boot por intent externo, para ser repetível:
+
+```
+adb shell "am start -n come.nanodata.armsx2/com.armsx2.Main -a android.intent.action.VIEW \
+  --es path '/sdcard/Android/data/come.nanodata.armsx2/files/roms/007 - Everything or Nothing (USA).chd'"
+```
+
+### O instrumento: o OSD do próprio core
+
+Em vez de compilar instrumentação nova (~14 min de build nativo), a sessão ligou o **OSD do core**
+(`OsdShowFPS` / `OsdShowGSStats` / `OsdShowResolution`), que é desenhado por ImGui dentro de
+`GSRenderer::EndPresentFrame` → `ImGuiManager::RenderOSD()` → `GSDeviceOGL::EndPresent()`, ou seja
+**dentro do mesmo passe de present, imediatamente antes do `SwapBuffers`**. Ele responde de graça a
+três perguntas que o relatório vinha fazendo.
+
+### 1. A apresentação está viva — o `SwapBuffers` não é o problema
+
+Com a tela preta, o OSD **desenha e atualiza**, em todas as capturas:
+
+```
+BAT 31°FPS: 17.64 [P] | Speed: 59% (T: 100%) | ARMSX2 2.7
+OpenGL HW | 50216 PRIM | 50 DRW | 53 DRWC | 0 BAR | 11 RP | 0 RB | 5 TC | 12 TU
+VRAM: 194 MB | TGT: 3.1 MB | SRC: 0.0 MB | HC: 185 MB | PL: 6.0 MB
+0 QF | Min: 43.22ms | Avg: 54.04ms | Max: 71.18ms
+640x560 NTSC Interlaced (Field)
+```
+
+Se a superfície EGL estivesse perdida, ou a thread do GS presa no present, esse texto não apareceria
+— ele passa pelo mesmo `eglSwapBuffers`. **Cai a hipótese "superfície/swapchain perdida" e cai
+"thread do GS presa no present"**, que eram as duas que o registro de 2026-09-02 deixou de pé.
+
+### 2. O GS produz saída — `Merge()` retorna verdadeiro e `PresentRect` é chamado
+
+A linha `640x560` do OSD é `GSgetInternalResolution`, que devolve `GSRenderer::GetInternalResolution()`,
+que é literalmente `return m_real_size`. E `m_real_size` só é escrito dentro de `GSRenderer::Merge`,
+que o **zera** (`m_real_size = GSVector2i(0, 0)`) nos seus **dois** caminhos de `return false` — os
+circuitos PCRTC desabilitados, e `GetOutput` devolvendo nulo para os dois circuitos.
+
+Logo, `640x560` com a tela preta significa: `Merge()` **retornou true** → `blank_frame == false` →
+o `if (current && !blank_frame)` da `VSync` é verdadeiro → **`g_gs_device->PresentRect(current, …)`
+é executado com uma textura não nula**.
+
+Isso derruba de uma vez a família inteira de hipóteses "o GS não produziu quadro": PCRTC desligado,
+`GSRendererHW::GetOutput` devolvendo nulo, `LookupDisplayTarget` sem alvo. Nenhuma delas sobrevive a
+`m_real_size != 0`. E o contador do OSD confirma que o GS está desenhando de verdade: **50.216
+primitivas, 50 draws, 53 draw-calls e 11 render passes por quadro**.
+
+Vale corrigir uma leitura do relatório antigo enquanto isso: a fps que se via ("36,7 fps, quadros
+andando") **não** provava que quadros estavam sendo apresentados, porque `DoBeginPresent` limpa o
+alvo com `glClearColor(0,0,0,1)` a cada quadro — um present de nada também produz 37 fps e capturas
+byte a byte idênticas. O que prova a apresentação é o OSD desenhando; o que prova a saída do GS é o
+`m_real_size`.
+
+### 3. Não é o desentrelaçamento
+
+`640x560 NTSC Interlaced (Field)` levantou o `FastMAD` como suspeito natural: o FMV que **aparece**
+roda a `80x78` (progressivo, `shader_mode == -1`, passe direto) e o preto começa exatamente quando a
+saída vira `640x560` entrelaçada, que em `Automatic` cai no `shader_mode == 3` do
+[`GSInterlaceModePolicy.h`](../../../../pcsx2/GS/Renderers/Common/GSInterlaceModePolicy.h) — dois
+passes sobre um buffer MAD de altura dobrada que depende de conteúdo preservado entre quadros, que é
+exatamente o tipo de coisa que uma GPU tile-based erra.
+
+Medido: `deinterlaceMode = 1` (Off) por jogo, **confirmado aplicado** (`deinterlace_mode = 1` no
+`PCSX2-Android.ini` do aparelho, lido depois do boot). Com `GSInterlaceMode::Off`,
+`GSDevice::Interlace` nem chega a ser chamada e `m_current = m_merge`. **A tela continua preta.**
+Hipótese eliminada.
+
+### 4. O que fecha a causa: ANGLE
+
+`useAngleOpenGL` faz `GLContextEGL::LoadEGL` abrir `libEGL_angle.so` (GLES-on-Vulkan) em vez do
+`libEGL.so` do sistema. **Mesmo código de GS, mesma sequência de chamadas GL, mesmo aparelho, mesmo
+jogo, mesma configuração** — só muda a implementação de GL:
+
+| braço | `GL_VENDOR` | `GL_RENDERER` | linha de GS do OSD | resultado |
+|---|---|---|---|---|
+| driver do sistema | `ARM` | `Mali-G52` | `50216 PRIM \| 50 DRW \| 53 DRWC \| 0 BAR \| 11 RP \| 0 RB \| 5 TC \| 12 TU` | **preto** |
+| ANGLE | `Google Inc. (ARM)` | `ANGLE (ARM, Vulkan 1.3.213 (Mali-G52 (0x72120000)), Mali-G52-38.1.0)` | **a mesma linha**, e a mesma linha de memória (`VRAM: 194 MB \| TGT: 3.1 MB \| SRC: 0.0 MB \| HC: 185 MB \| PL: 6.0 MB`) | **imagem** |
+
+Medida da área de render (recorte `(0,150)-(720,570)` da captura de tela, que é a área do
+`SurfaceView`):
+
+| braço | cores distintas | cor dominante | md5 entre capturas |
+|---|---|---|---|
+| driver do sistema | **202** (e 92,7 % delas é o *overlay de toque*, não a imagem: o fundo é uma cor só) | `(19,19,19)` em 92,7 % | **idêntico** em +70/90/110/130/150 s |
+| ANGLE | 12.244 → 32.546 → 43.275 | `(19,19,19)` em 12,9 % | **diferente** a cada captura, por 220 s |
+
+**Conclusão: o emulador emite o mesmo trabalho nos dois braços; quem erra é o driver GLES da ARM
+r38p1.** Não é defeito do fork, não é defeito do core, e não é "o upstream já resolveu" — não há o
+que mandar para o upstream a partir daqui, porque não há linha de código nossa ou deles em falta.
+
+Isso também explica, sem contradição, as duas pistas de 2026-09-02: é "do título" porque só um jogo
+neste aparelho usa a sequência de GL que o driver erra (o *10 Pin* renderiza), e "para depois do
+FMV" porque o FMV usa uma saída de `80x78` e o jogo passa para `640x560` entrelaçada.
+
+### O contorno certo, e por que ele estava inerte
+
+O contorno agora é **ANGLE, mantendo o OpenGL** — e não trocar de backend, que é o que o histórico
+deste bug vinha fazendo. A diferença importa: trocar para Vulkan leva junto uma mudança de semântica
+de emulação que ninguém decidiu (o
+[piso de Z](../../done/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md)), e neste
+par jogo/aparelho o Vulkan ainda perde o device.
+
+Mas ligar ANGLE pelo menu em jogo **não fazia nada**, e isso também foi medido aqui: nenhuma linha
+`@@ANGLE@@` no log e `GL_VENDOR` continuando `ARM`. Duas causas, as duas em código nosso, corrigidas
+na [TASK-0083](../../../task/TASK-0083-escolha-de-angle-por-jogo-chega-ao-core.md): `applyAngleEnv`
+lia só a camada **global** enquanto o menu em jogo grava **por jogo**, e o botão "Aplicar e
+Reiniciar" não passava por `applyAngleEnv` nenhuma. Depois da correção, com o global em `false` e só
+a chave do jogo em `true`:
+
+```
+@@ANGLE@@ off     renderer=opengl useAngle=false     <- init da Activity, sem jogo: global
+@@ANGLE@@ enabled renderer=opengl useAngle=true      <- boot da VM: resolução por jogo
+GL_VENDOR: Google Inc. (ARM)
+```
+
+e a imagem aparece (capturas em +105 s e +160 s, md5 `e8315ec15af85baa5053148f90bb98e6` e
+`d43122017d7d381bd8ac9598244b11ab`, 12.244 e 32.546 cores).
+
+### O que continua aberto
+
+1. **Qual operação de GL o driver r38p1 erra.** Sabe-se que é o driver, não *o quê*. Achar isso
+   exigiria capturar/bissectar o fluxo GL (RenderDoc no aparelho, ou desligar caminhos do
+   `GSDeviceOGL` um a um em builds nativos de ~14 min cada). É o próximo passo mais informativo se
+   alguém quiser a causa raiz — mas ela **não é corrigível por nós**: mesmo achada, a correção seria
+   um contorno de driver.
+2. **A treliça sob ANGLE.** A imagem aparece, mas com uma malha fina visível sobre todo o quadro nas
+   duas capturas. Não investigada. Não impede jogar, e não existe no braço preto porque lá não há
+   imagem nenhuma para comparar.
+3. **O alcance.** A evidência continua sendo **um** jogo em **um** telefone. Nada aqui autoriza
+   ligar ANGLE sozinho para todo Mali r38 — seria repetir o erro da regra
+   `gl-arm-g52-r38-auto-vulkan`, retirada na [TASK-0072](../../../task/TASK-0072-retirar-a-regra-auto-vulkan-do-banco-de-drivers.md)
+   por exatamente isso.
+4. **Pôr ANGLE na escada da TASK-0082.** Hoje a ação "a imagem não apareceu" propõe Vulkan → Software.
+   Com esta medida, o degrau útil para um Mali em OpenGL passa a ser "OpenGL via ANGLE" **antes** de
+   trocar de backend. Muda uma escada já validada em aparelho, então merece task própria.
+
+### Por que o relatório continua em `open/`
+
+Porque a causa não está corrigida: ela está **identificada e fora do nosso alcance**, e o que existe
+é mitigação. A severidade cai na prática — o título é jogável em OpenGL com ANGLE, sem trocar de
+backend — mas quem abrir este arquivo precisa encontrar o defeito descrito, não um "resolvido" que
+some do índice.
