@@ -163,7 +163,8 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0080](TASK-0080-onda-xmb-para-de-usar-nome-reservado-no-shader.md) — renomear o uniform `length`, que é função embutida do GLSL e derruba a onda XMB | concluída | — | xmb-gl-nao-compila-shader-uniform-chamado-length | `0870fdb0e0` `bfdc9cc223` `7e61f69f9c` `6e27fcb7b4` |
 | [TASK-0081](TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md) — nenhuma chave de tradução chega crua à tela, e um teste passa a garantir isso | concluída | — | chave-de-traducao-crua-na-tela | `ed46425a97` `d4e0b024c9` |
 | [TASK-0082](TASK-0082-acao-de-imagem-nao-apareceu-troca-o-backend.md) — ação "a imagem não apareceu" troca o backend por jogo e reinicia | concluída | — | renderer-automatico-sem-rede-de-seguranca-no-fork | `1c4ce126e7` `ad259ac098` `e4ab528f9e` |
-| [TASK-0083](TASK-0083-escolha-de-angle-por-jogo-chega-ao-core.md) — a escolha de ANGLE chega ao core quando ela é por jogo | concluída | — | gl-mali-g52-r38-tela-preta-contornada-nao-corrigida | `08da28eccd` |
+| [TASK-0083](TASK-0083-escolha-de-angle-por-jogo-chega-ao-core.md) — a escolha de ANGLE chega ao core quando ela é por jogo | concluída | — | gl-mali-g52-r38-tela-preta-contornada-nao-corrigida | `08da28eccd` `b2efa13cd1` |
+| [TASK-0084](TASK-0084-ajuste-em-configuracoes-nao-bloqueia-a-thread-da-ui.md) — um ajuste em Configurações deixa de bloquear a thread da UI | concluída | — | configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread | `fc1b37473c` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
