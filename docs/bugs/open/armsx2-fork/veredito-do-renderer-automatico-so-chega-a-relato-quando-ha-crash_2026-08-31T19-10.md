@@ -63,3 +63,35 @@ curta, também serve para a tela de diagnóstico do app. Detalhes e escopo na
 mudar `setAutoRendererGpuStrings` de `void` para devolver `jstring` compila, linka, roda e devolve
 lixo em silêncio — é o defeito que o `CLAUDE.md` manda medir com `compare_jni_surface.py`. O
 veredito sai por um **método novo**.
+
+## Auditoria de 2026-09-03: a ponte que faltava era a terceira
+
+A triagem dava este relatório como "implementada, falta comprovar". A leitura do código mostrou que
+**faltava mais que a comprovação**.
+
+O que de fato já existia, e funciona:
+
+- `NativeApp.getAutoRendererVerdict()` — JNI própria, devolvendo `"<Vulkan|OpenGL> reason=<motivo>"`
+  (`native-lib.cpp:2397`). A primeira das três pontes da tabela acima estava construída.
+- `MainActivityRuntime` já grava esse veredito em `TelemetryReporter.setGraphicsBootSummary`, junto
+  das strings do GPU. A segunda ponte, também.
+
+**O que continuava cortado:** `TelemetryReporter.report(...)` — o caminho de relato **não-crash**,
+usado por tudo que não é `reportCrash` — nunca anexava o `graphicsBootSummary`. Só `reportCrash()`
+o punha no contexto. Ou seja, depois de duas pontes construídas, o veredito continuava chegando a um
+relato **apenas quando havia crash**, que é literalmente o título deste bug.
+
+### Correção
+
+`report()` passa a anexar `gsboot=<resumo>` ao contexto de **todo** relato, num lugar só — e o
+`append` local de `reportCrash()` saiu, senão o campo sairia duplicado. Anexar centralmente é
+deliberado: quem chama `report()` não tem como saber que o veredito importa para quem lê.
+
+### O que está provado, e o que não está
+
+- **Provado:** compila; a lógica é uma linha e está num único ponto; e o `graphicsBootSummary` já é
+  populado no boot (verificado no código e pelo caminho que a TASK-0079 exercitou).
+- **NÃO provado:** um relato real, sem crash, chegando ao `/logErr` com o campo preenchido. E há um
+  detalhe que a validação futura precisa respeitar: o motivo do renderer só existe **depois de o GS
+  abrir** — com o app parado no catálogo, `getAutoRendererVerdict()` responde `reason=not-resolved`.
+  A prova precisa de um jogo bootado e de um relato não-crash na mesma sessão.

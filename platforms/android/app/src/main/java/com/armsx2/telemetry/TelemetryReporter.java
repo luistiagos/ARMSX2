@@ -159,11 +159,11 @@ public final class TelemetryReporter {
             String file = top != null && top.getFileName() != null ? top.getFileName()
                     : (top != null ? top.getClassName() : "unknown");
             String method = top != null ? top.getClassName() + "." + top.getMethodName() : null;
-            String gsBoot = sGraphicsBootSummary;
+            // `gsboot` NAO e anexado aqui: `report()` o acrescenta a todo relato, inclusive a este.
+            // Duplicar sairia como `gsboot=... ; gsboot=...` no mesmo campo.
             String context = "thread=" + (thread != null ? thread.getName() : "?")
                     + "; pkg=" + safePackage() + "; ver=" + safeVersion()
-                    + "; device=" + Build.MANUFACTURER + " " + Build.MODEL
-                    + (TextUtils.isEmpty(gsBoot) ? "" : "; gsboot=" + gsBoot);
+                    + "; device=" + Build.MANUFACTURER + " " + Build.MODEL;
             String[] logs = TextUtils.isEmpty(logcatTail)
                     ? new String[]{stackToString(e)}
                     : new String[]{stackToString(e), logcatTail};
@@ -194,7 +194,21 @@ public final class TelemetryReporter {
             body.put("user_agent", "ARMSX2/" + comp + " " + safeVersion());
             body.put("platform", "Android " + Build.VERSION.RELEASE + " (sdk " + Build.VERSION.SDK_INT + ")");
             body.put("screen", "");
-            body.put("page_url", contextPath == null ? "" : contextPath);
+            // O resumo grafico vai em TODO relato, e nao so no de crash.
+            //
+            // Ele carrega o veredito do renderer automatico (`auto_renderer="OpenGL reason=..."`),
+            // e ate aqui so `reportCrash` o anexava. O defeito que isso deixava aberto esta escrito
+            // no relato `veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash`, e cabe
+            // numa frase: TELA PRETA E IMAGEM CORROMPIDA NAO SAO CRASH. O unico canal que levava a
+            // decisao era o unico que nao dispara na classe de defeito para a qual a decisao e a
+            // pergunta.
+            //
+            // Anexado aqui, num lugar so, em vez de em cada chamador: quem reporta nao tem como
+            // saber que o veredito importa para quem le.
+            final String gsBoot = sGraphicsBootSummary;
+            final String ctx = contextPath == null ? "" : contextPath;
+            body.put("page_url", TextUtils.isEmpty(gsBoot) ? ctx
+                    : (ctx.isEmpty() ? "gsboot=" + gsBoot : ctx + "; gsboot=" + gsBoot));
 
             JSONArray arr = new JSONArray();
             if (logs != null) {
