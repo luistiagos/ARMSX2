@@ -162,7 +162,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0079](TASK-0079-boot-nao-toca-o-nativo-nem-o-disco-na-ui.md) — tirar da thread da UI a carga do `.so` e a resolução do data root no boot | concluída | — | app-anr-loadlibrary-emucore-ui-thread, datadirectorymanager-anr-getexternalfilesdir-a07 | `efe39c6431` `920b51f69d` `42be339905` `bef494be9b` |
 | [TASK-0080](TASK-0080-onda-xmb-para-de-usar-nome-reservado-no-shader.md) — renomear o uniform `length`, que é função embutida do GLSL e derruba a onda XMB | concluída | — | xmb-gl-nao-compila-shader-uniform-chamado-length | `0870fdb0e0` `bfdc9cc223` `7e61f69f9c` `6e27fcb7b4` |
 | [TASK-0081](TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md) — nenhuma chave de tradução chega crua à tela, e um teste passa a garantir isso | concluída | — | chave-de-traducao-crua-na-tela | `ed46425a97` `d4e0b024c9` |
-| [TASK-0082](TASK-0082-acao-de-imagem-nao-apareceu-troca-o-backend.md) — ação "a imagem não apareceu" troca o backend por jogo e reinicia | concluída | — | renderer-automatico-sem-rede-de-seguranca-no-fork | `1c4ce126e7` |
+| [TASK-0082](TASK-0082-acao-de-imagem-nao-apareceu-troca-o-backend.md) — ação "a imagem não apareceu" troca o backend por jogo e reinicia | concluída | — | renderer-automatico-sem-rede-de-seguranca-no-fork | `1c4ce126e7` `ad259ac098` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
