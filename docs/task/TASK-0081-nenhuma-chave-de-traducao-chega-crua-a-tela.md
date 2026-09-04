@@ -1,10 +1,10 @@
 # TASK-0081: nenhuma chave de tradução chega crua à tela, e um teste passa a garantir isso
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-03
-- **Concluída em:** —
+- **Concluída em:** 2026-09-03
 - **Feature:** nenhuma
-- **Bugs que resolve:** [chave-de-traducao-crua-na-tela](../bugs/open/armsx2-fork/chave-de-traducao-crua-na-tela_2026-09-03T19-40.md)
+- **Bugs que resolve:** [chave-de-traducao-crua-na-tela](../bugs/done/chave-de-traducao-crua-na-tela_2026-09-03T19-40.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0081:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -52,4 +52,19 @@ Em aparelho: abrir um cartão do catálogo com o selo `×N` e ver "N versões di
 
 ## Resultado
 
-Preenchido ao concluir.
+As três correções entraram e o teste existe.
+
+**Validado em aparelho** — Galaxy A12 `SM-A127M`, Android 13 (SDK 33), `githubDebug`: o painel de
+versões agora abre com **"5 versões disponíveis"** onde saía `catalog.versions.subtitle`.
+
+**O teste prova o defeito, não a implementação:** reintroduzindo o erro de digitação de
+`home.saved.exploreCatalog`, `:app:testGithubDebugUnitTest --tests '*I18nKeysTest*'` **falha**.
+Restaurada a correção, passa. A auditoria completa é 1.301 usos com literal contra 1.684 chaves
+definidas, e exatamente as duas do relatório faltavam.
+
+**Uma decisão que merece registro:** a mensagem de falha do teste diz *"não adicione a chave errada
+a um JSON de tradução — isso esconde o defeito no idioma que você testa"*. É a lição deste bug
+escrita no único lugar onde ela será lida: na frente de quem está prestes a repeti-lo.
+
+**Nota sobre o nome da task da validação:** a task foi verificada no `githubDebug` porque a release
+não instala neste aparelho (assinatura de debug), e uma desinstalação levaria 14 GB de ROMs junto.

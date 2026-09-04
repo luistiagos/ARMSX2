@@ -118,3 +118,23 @@ O ANR original do A07 (`getExternalFilesDir` → `mkdirs`) depende de armazename
 pressão; num moto g86 com armazenamento rápido ele não reproduzia nem antes. O que se prova aqui é
 que **a chamada saiu da thread da UI**, que é a causa. A confirmação de campo é telemetria limpa
 para `armsx2/anr` nessa assinatura.
+
+### Confirmado também no Galaxy A12, e um achado que não é desta task
+
+O A12 `SM-A127M` (Android 13, SDK 33) é o aparelho fraco, onde ANR de boot de fato acontece. Medido
+nele, com `githubDebug`:
+
+| | `1.0.24` instalado (antes) | esta branch (depois) |
+|---|---|---|
+| `PCSX2_LOAD` | pid 10786, tid **10786** — a thread principal | pid 12558, tid **12631** — worker |
+| `ANR in come.nanodata.armsx2` | — | **0** |
+
+**E um `Choreographer: Skipped 104 frames!` continua saindo na thread principal do nosso processo**,
+cerca de 2 s depois do `PCSX2_LOAD`, já no primeiro desenho do catálogo de 6317 títulos.
+
+Isso **não** é regressão nem sobra desta correção: a carga do `.so` e a resolução do data root saíram
+da UI, e é o que esta task prometia. O que aquele salto mostra é outro custo, no caminho do
+catálogo — o mesmo território do relato
+[digitar-custa-97-a-450ms](../bugs/open/armsx2-fork/digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui_2026-08-31T21-30.md),
+que segue aberto. Fica registrado aqui para não ser confundido com o que esta task fechou.
+

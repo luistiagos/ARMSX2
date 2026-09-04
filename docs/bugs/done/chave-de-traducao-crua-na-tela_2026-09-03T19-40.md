@@ -7,7 +7,7 @@
 - **Classe:** fail
 - **Reincidência:** primeira vez
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0081](../../../task/TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md)
+- **Tasks que o resolvem:** [TASK-0081](../../task/TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md)
 
 ## Sintoma
 
@@ -32,7 +32,7 @@ São **dois defeitos diferentes**, com o mesmo sintoma.
 
 ### 1. `catalog.versions.subtitle` não existe em lugar nenhum
 
-[`GameVersionsModal.kt:82`](../../../../platforms/android/app/src/main/java/com/armsx2/ui/catalog/GameVersionsModal.kt#L82):
+[`GameVersionsModal.kt:82`](../../../platforms/android/app/src/main/java/com/armsx2/ui/catalog/GameVersionsModal.kt#L82):
 
 ```kotlin
 str("catalog.versions.subtitle").replace("%1\$d", variants.size.toString())
@@ -44,7 +44,7 @@ comportamento certo para um fallback, e é o que se vê na tela.
 
 ### 2. `home.saved.exploreCatalog` é erro de digitação no ponto de chamada
 
-[`HomeScreen.kt:1242`](../../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeScreen.kt#L1242)
+[`HomeScreen.kt:1242`](../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeScreen.kt#L1242)
 pede `home.saved.exploreCatalog`. A chave canônica, definida no `BASE_EN`, é
 `home.saved.empty.exploreCatalog` — **falta o `.empty.`**. As duas linhas vizinhas do mesmo
 `EmptyState` (`home.saved.empty.title`, `home.saved.empty.body`) usam o nome certo.
@@ -85,7 +85,44 @@ do estado vazio sai escrito `home.saved.exploreCatalog`.
 
 ## Próximos passos
 
-Ver [TASK-0081](../../../task/TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md). Em resumo:
+Ver [TASK-0081](../../task/TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md). Em resumo:
 acrescentar a chave que falta, corrigir o ponto de chamada (e não a tradução), renomear a chave
 errada no `pt-BR.json`, e — o que impede a reincidência — **um teste que reprova qualquer chave
 usada e não definida**, já que o fallback nunca vai reclamar sozinho.
+
+## Corrigido e validado em aparelho — 2026-09-03 ([TASK-0081](../../task/TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md))
+
+Galaxy A12 `SM-A127M`, Android 13 (SDK 33), `githubDebug`. Mesmo painel, mesmo caminho:
+
+```
+007 - Everything or Nothing
+5 versões disponíveis                     <- era `catalog.versions.subtitle`
+─────────────────────────────────────
+  007 - Everything or Nothing (USA)                    CHD · Baixado
+  007 - Everything or Nothing (Europe) (En,Es,It,Nl,Sv)  ISO
+  007 - Everything or Nothing (Europe) (Fr,De)           ISO
+  007 - Everything or Nothing (Japan)                    ISO
+  007 - Everything or Nothing (Korea)                    ISO
+```
+
+As três correções:
+
+1. `catalog.versions.subtitle` acrescentada ao `BASE_EN` (`"%1$d versions available"`) e ao
+   `pt-BR.json` (`"%1$d versões disponíveis"`).
+2. O **ponto de chamada** de `home.saved.exploreCatalog` passou a pedir
+   `home.saved.empty.exploreCatalog`, que é a chave canônica. A tradução não foi tocada para
+   acomodar o erro — foi o erro que saiu.
+3. A chave de nome errado saiu do `pt-BR.json`, para não ficar lixo que ninguém sabe de onde veio.
+
+### O que impede a reincidência
+
+`I18nKeysTest` lê `src/main/java` atrás de `str("…")` e `I18n.get("…")` com literal e reprova
+qualquer chave não definida. Ele **falha** contra o erro de digitação — verificado reintroduzindo-o
+de propósito — e a mensagem de falha diz o que fazer:
+
+> Corrija o PONTO DE CHAMADA se for erro de digitacao; acrescente a chave ao BASE_EN se ela
+> realmente faltar. Nao adicione a chave errada a um JSON de traducao — isso esconde o defeito no
+> idioma que voce testa.
+
+Essa última frase é a lição deste relatório escrita onde ela vai ser lida: dentro da falha do teste,
+por quem estiver prestes a repetir o erro.

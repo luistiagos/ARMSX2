@@ -102,3 +102,47 @@ moto g86 5G, Android 16 (SDK 36), `github/release`:
 driver recusa. No moto g86 o compilador pode ser permissivo, então aqui não dá para provar que a
 versão anterior falhava — só que a nova compila, sobe e é gratuita. O reteste no A12 continua sendo
 o que fecha o "Alcance" descrito acima.
+
+## A/B no aparelho do relato — Galaxy A12 `SM-A127M`, Mali-G52, 2026-09-03
+
+O "limite honesto" registrado acima **foi fechado**: o aparelho do relato apareceu, e o antes/depois
+foi medido nele.
+
+**Antes** — o que estava instalado (`1.0.24`, versionCode 38), abrindo a biblioteca:
+
+```
+21:57:39.677 10786 10864 W XmbGlView: GL init failed
+21:57:39.677 10786 10864 W XmbGlView: java.lang.RuntimeException: shader compile:
+                                      0:9: S0022: Symbol 'length' redeclared
+21:57:39.677 10786 10864 W XmbGlView: 0:35: L0001: Symbol 'length' can't be referenced as a variable
+21:57:39.677 10786 10864 W XmbGlView: 0:39: L0001: Symbol 'length' can't be referenced as a variable
+21:57:39.677 10786 10864 W XmbGlView: 0:39: L0001: Symbol 'length' can't be referenced as a variable
+```
+
+`ps -T` não lista nenhuma thread `xmb-gl` — ela saiu, exatamente como o relatório descreve. Note que
+o driver dá **duas** queixas distintas: `S0022: redeclared` na declaração e `L0001: can't be
+referenced as a variable` em cada uso.
+
+**Depois** — `githubDebug` desta branch, mesmo aparelho, mesma tela:
+
+```
+(nenhuma linha XmbGlView no logcat)
+
+u0_a263  12204 12323  588  7878088 233140  0  0  S  xmb-gl
+```
+
+Sem erro nenhum, e a thread **viva** em estado `S`. Custo em repouso, medido no aparelho fraco que é
+onde a preocupação do "cuidado antes de corrigir" mais valia: `utime+stime` **3 → 3 ticks em 8
+segundos, delta 0**.
+
+### Duas notas de método
+
+1. **A instalação da release falhou aqui**, com `INSTALL_FAILED_UPDATE_INCOMPATIBLE`: o que está
+   neste aparelho é um build **de debug** (assinatura de debug), e a release do fork usa a chave de
+   produção. Foi por isso que a validação usou `assembleGithubDebug` — e ainda bem: a pasta de dados
+   tem **14 GB de ROMs**, que um `adb uninstall` teria levado junto.
+
+2. **O GL nem sempre roda.** Este aparelho tinha `library.background.animated2d = true` nas
+   preferências, e nesse modo o `HomeScreen` pula o `XmbGlView` inteiro — sem thread e sem erro, o
+   que à primeira vista parecia a correção não fazendo nada. A preferência foi desligada para a
+   medição e **devolvida ao valor original** depois.

@@ -84,13 +84,21 @@ Feito e medido em aparelho — moto g86 5G, Android 16 (SDK 36), `github/release
   materializou.
 - **A onda aparece na tela**, atrás da grade do catálogo.
 
-### O limite honesto desta validação
+### E o A/B no aparelho do relato, que fecha a questão
 
-O relato nasceu num **Galaxy A12 (Mali-G52)**, e é lá que o driver recusa o shader. O aparelho
-disponível é um moto g86, cujo compilador pode ser permissivo com o nome — ou seja, aqui não dá para
-provar que a versão anterior falhava. O que esta medição prova é que a versão nova **compila, sobe e
-não custa nada**; a prova de que o A12 deixou de cair para o fundo 2D depende de retestar naquele
-aparelho, e é o que o relatório pede em "Como reproduzir".
+O Galaxy A12 `SM-A127M` (Mali-G52) apareceu no mesmo dia, e o antes/depois foi medido nele:
 
-Isso não enfraquece a correção: `length` é nome de função embutida do GLSL, e a recusa é a leitura
-correta da regra. O que varia entre drivers é a permissividade, não quem está certo.
+| | `1.0.24` instalado (antes) | `githubDebug` desta branch (depois) |
+|---|---|---|
+| logcat | `GL init failed` + `S0022: Symbol 'length' redeclared` + `L0001: … can't be referenced as a variable` ×3 | **nenhuma linha** |
+| thread `xmb-gl` | ausente — saiu, como o relatório descreve | **viva**, tid 12323, estado `S` |
+| CPU em repouso | — | `utime+stime` **3 → 3 ticks em 8 s**, delta 0 |
+
+Duas notas de método que valem mais que o resultado:
+
+- **A release não instalou aqui** (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`): este aparelho tem um build
+  **de debug**, e a release usa a chave de produção. A validação passou a usar `assembleGithubDebug`
+  — e ainda bem, porque a pasta de dados tem **14 GB de ROMs** que um `uninstall` levaria junto.
+- **O GL nem sempre roda.** O aparelho tinha `library.background.animated2d = true`, e nesse modo o
+  `HomeScreen` pula o `XmbGlView` inteiro: sem thread e sem erro, o que parecia a correção não
+  fazendo efeito. A preferência foi desligada para medir e **devolvida ao valor original** depois.
