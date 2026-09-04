@@ -8,7 +8,7 @@
 - **Classe:** dado corrompido por construção (o arquivo no disco não é o que o nome diz)
 - **Reincidência:** primeira vez registrada; existe desde que o retry por variantes entrou
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0045](../../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md)
+- **Tasks que o resolvem:** [TASK-0045](../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md)
 
 ## Sintoma
 
@@ -69,7 +69,50 @@ funciona é o bloco `.chd` curado.
 
 ## Situação
 
-Endereçado pela [TASK-0045](../../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md), que
+Endereçado pela [TASK-0045](../../task/TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md), que
 para de aceitar fonte que o emulador não abre e passa a gravar com a extensão do conteúdo recebido.
 Continua **aberto** até a validação no aparelho, e **não** cobre a limpeza do manifesto (as ~9k
 entradas `.iso` sem fonte utilizável seguem no catálogo, agora falhando cedo em vez de baixar lixo).
+
+## Validado em aparelho — 2026-09-04
+
+Galaxy A12 `SM-A127M`, `githubDebug`. A prova está no próprio disco do aparelho, e ela é datada.
+
+**A TASK-0045 entrou em 2026-08-28** (`186cdde1c6`). Listando `roms/` por data e extensão:
+
+| data | extensão | arquivo |
+|---|---|---|
+| **2026-08-28** | **`7z`** | `10.000 Bullets (Europe) (En,Fr,De,Es,It).7z` — 1,4 GB |
+| **2026-08-28** | **`part`** | `10.000 Bullets (Europe) (En,Fr,De,Es,It).iso.part` — 1,1 GB |
+| 2026-08-28 | `bin`, `chd` | 10 Pin Champions Alley, 007 Everything or Nothing |
+| 2026-08-31 | `chd` ×4, `iso` | 007 Agent Under Fire, Delta Force ×2, Lara Croft, God of War 2 |
+| 2026-09-03 | `chd`, `iso` ×2 | Adventures of Darwin, 120円の春, 3LDK |
+| 2026-09-04 | `bin`, `iso` | 3D Kakutou Tkool 2, _summer Double Sharp |
+
+Duas leituras, e as duas importam:
+
+1. **A impressão digital do defeito está lá, e é do dia da correção.** O único `.7z` do aparelho e um
+   `.iso.part` órfão são **do mesmo jogo** — `10.000 Bullets`, que é literalmente um dos dois títulos
+   nomeados no relato do usuário. Um `.7z` baixado ao lado de um `.iso` parcial do mesmo jogo é
+   exatamente o que este relatório descreve: a fonte comprimida escolhida, e o conteúdo indo para o
+   nome `.iso` do manifesto.
+
+2. **Depois da correção, nada mais caiu fora da lista.** Doze downloads completos entre 31/08 e
+   04/09 — `chd` ×5, `iso` ×4, `bin` ×2 —, **todos** em extensão que o `GetFileReader` do
+   `InputIsoFile.cpp` sabe abrir. Dois deles foram baixados **hoje**. Nenhum `.7z` ou `.zip` novo.
+
+**E um deles boota.** Lara Croft Tomb Raider — Anniversary (`SLUS-21555`, CHD, CRC `B639EB17`),
+baixado em 31/08, abre e renderiza: OSD com `OpenGL HW`, 25,9 fps, `640x448 NTSC Interlaced`. Um CHD
+gravado sob nome `.iso` cairia no `FlatFileReader` e falharia como disco corrompido — que era o
+segundo modo de falha descrito aqui.
+
+### O limite desta validação
+
+**Não exercitei o caminho de extração da [TASK-0048](../../task/TASK-0048-descompactar-7z-e-zip-no-download.md)**
+— aquele em que a cascata inteira falha, um comprimido é a única fonte, e ele precisa ser baixado e
+descompactado. Ele está em `VARIANT_EXTENSIONS` no fim da lista de propósito, e nenhum dos downloads
+recentes precisou dele. Provar esse caminho exige um título cuja única fonte seja `.7z`, e a
+TASK-0048 segue `em andamento` por isso.
+
+O `3LDK ... .iso.part` de 31/08 é download interrompido, não este defeito — e o mesmo título aparece
+completo como `.iso` em 03/09, ou seja, a retomada gravou na extensão certa.

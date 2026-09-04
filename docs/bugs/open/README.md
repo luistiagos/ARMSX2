@@ -5,7 +5,7 @@ atualizar as referências remotas. O `upstream/master` verificado estava em `5fd
 
 Havia **29 relatórios**, não 18 como dizia o índice anterior. Eles agora estão separados em:
 
-- [`armsx2-fork/`](armsx2-fork/README.md): **10** bugs que afetam, ou cuja causa continua presente,
+- [`armsx2-fork/`](armsx2-fork/README.md): **8** bugs que afetam, ou cuja causa continua presente,
   na árvore atual do fork (eram 22; os quatro de rastreabilidade foram fechados em 2026-09-03 pelas
   [TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md) e
   [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) e
@@ -32,8 +32,6 @@ neles.
 
 | Bug | Origem | Status verificado | Correção possível? | Severidade | Evidência/ação |
 |---|---|---|---|---|---|
-| [Capa perdida após download](armsx2-fork/biblioteca-jogo-baixado-perde-a-capa_2026-08-28T10-27.md) | delta do fork | **Implementada**, falta validação em aparelho. | Sim, já implementada | **Média** | TASK-0045 preserva `catalogCoverUrl`; há código e teste, mas o próprio relatório exige teste de ponta a ponta. |
-| [Download salvo em formato não bootável](armsx2-fork/catalogo-download-entrega-formato-nao-bootavel_2026-08-28T10-27.md) | delta do fork | **Implementada**, falta validação de ponta a ponta. | Sim, já implementada | **Alta** | TASK-0045 filtra/nomeia o formato; TASK-0048 acrescentou extração de 7z/zip. Os testes locais existem, mas não substituem baixar e bootar no aparelho. |
 | [Configuração reescrita na UI](armsx2-fork/configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread_2026-08-31T18-40.md) | delta do fork | **Parcial.** Itens 1 e 3 fechados e medidos na TASK-0084: o ajuste caiu de 145,8 ms para 3,4 ms de thread da UI (escopo Jogo com VM) e o laço de quadros dorme (62,7 → 2,2 trocas/s). Item 2 (recomposição) segue na TASK-0071. | Sim | **Média** | Resta o item 2 e o resíduo de 61–76 ms do apply coalescido, que só sai da thread da UI com trava no `MemorySettingsInterface` (core/upstream). |
 | [Digitação de 97–450 ms](armsx2-fork/digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui_2026-08-31T21-30.md) | delta do fork | **Parcial.** TASK-0068 reduziu o realce; piso residual e custo proporcional ao catálogo seguem sem causa fechada. | Sim, após perfilar | **Média** | Reperfilar a versão atual; isolar texto/host e o custo do catálogo antes de outra alteração. |
 | [Tela preta GL, Mali-G52 r38](armsx2-fork/gl-mali-g52-r38-tela-preta-contornada-nao-corrigida_2026-08-31T19-00.md) | fork sobre núcleo upstream | **Sem correção.** Reproduzido após o merge e a regra global de desvio foi removida. | Provavelmente; causa ainda aberta | **Alta** | Instrumentar present/surface/swap depois do FMV; o upstream novo até `5fd85d7fc9` não traz correção correspondente. |

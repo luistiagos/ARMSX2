@@ -5,8 +5,8 @@
 - **Concluída em:** 2026-08-28
 - **Feature:** nenhuma
 - **Bugs que resolve:**
-  [download entrega formato não bootável](../bugs/open/armsx2-fork/catalogo-download-entrega-formato-nao-bootavel_2026-08-28T10-27.md),
-  [jogo baixado perde a capa](../bugs/open/armsx2-fork/biblioteca-jogo-baixado-perde-a-capa_2026-08-28T10-27.md)
+  [download entrega formato não bootável](../bugs/done/catalogo-download-entrega-formato-nao-bootavel_2026-08-28T10-27.md),
+  [jogo baixado perde a capa](../bugs/done/biblioteca-jogo-baixado-perde-a-capa_2026-08-28T10-27.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0045:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -89,3 +89,21 @@ cima do 1.0.24 e refazer um download real.
 Os arquivos já baixados errado continuam no aparelho (~9,5 GB): quatro 7z e um CHD, todos com nome
 `.iso`. Depois desta task eles voltam a mostrar capa, e continuam sem rodar — apagá-los é decisão
 do usuário, não do app.
+
+## Validação em aparelho — 2026-09-04
+
+Os dois relatórios que esta task resolve foram fechados hoje, com prova medida no Galaxy A12
+`SM-A127M` (`githubDebug`).
+
+**Capa:** a aba "Salvos" traz 12 jogos baixados e **os 12 mostram capa**, incluindo os que vieram do
+catálogo pelo caminho exato onde a fusão perdia o `catalogCoverUrl`.
+
+**Formato:** a prova é datada, e está no disco do aparelho. Esta task entrou em **2026-08-28**; o
+único `.7z` do aparelho e um `.iso.part` órfão são **do mesmo jogo** (`10.000 Bullets`, um dos dois
+títulos nomeados no relato) e **daquele mesmo dia**. De 31/08 em diante são 12 downloads completos —
+`chd` ×5, `iso` ×4, `bin` ×2 —, todos em extensão que o `GetFileReader` abre, dois deles baixados
+hoje. E um deles boota: Lara Croft Anniversary (CHD, `SLUS-21555`) renderiza a 25,9 fps.
+
+**Não exercitado:** o caminho de extração da [TASK-0048](TASK-0048-descompactar-7z-e-zip-no-download.md),
+para o caso em que um comprimido é a única fonte. Ele está no fim da cascata de propósito e nenhum
+download recente precisou dele; aquela task segue `em andamento` por isso.
