@@ -71,6 +71,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.armsx2.i18n.str
 import com.armsx2.runtime.MainActivityRuntime
+import com.armsx2.runtime.RendererRecovery
 import com.armsx2.ui.InGameOverlay
 import com.armsx2.ui.achievements.AchievementItem
 import com.armsx2.ui.common.GameCoverArt
@@ -171,6 +172,32 @@ fun EmulationMenuScreen(viewModel: EmulationMenuViewModel = viewModel()) {
             idPrefix = "hardcore",
             onConfirm = viewModel::confirmToggleHardcore,
             onDismiss = viewModel::cancelToggleHardcore,
+        )
+    }
+
+    // "A imagem nao apareceu" (TASK-0082). A confirmacao existe por dois motivos, e nenhum deles e
+    // cerimonia: ela DIZ qual backend vai ser usado antes de qualquer coisa acontecer, e reiniciar
+    // a VM descarta o progresso desde o ultimo save -- o mesmo custo do Reiniciar logo acima, e o
+    // mesmo tratamento.
+    state.pendingNoImageBackend?.let { target ->
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            com.armsx2.MenuSfx.play(com.armsx2.MenuSfx.Event.POPUP_OPEN)
+            onDispose { com.armsx2.MenuSfx.play(com.armsx2.MenuSfx.Event.POPUP_CLOSE) }
+        }
+        val label = backendLabel(target)
+        com.armsx2.ui.common.ConfirmOverlay(
+            title = str("recovery.noImage.title"),
+            // Escopo dito na cara: o menu grava em Game quando ha serial e em Global quando nao ha
+            // (boot de BIOS, disco avulso). Prometer "so para este jogo" nos dois casos seria mentira
+            // num deles.
+            message = str(
+                if (InGameOverlay.currentSerial.value != null) "recovery.noImage.body"
+                else "recovery.noImage.body.global",
+            ).format(label),
+            confirmLabel = str("recovery.noImage.confirm").format(label),
+            idPrefix = "noimage",
+            onConfirm = viewModel::confirmNoImageRecovery,
+            onDismiss = viewModel::cancelNoImageRecovery,
         )
     }
 
@@ -530,6 +557,19 @@ private fun tabGlyph(tab: EmulationMenuTab): String = when (tab) {
     EmulationMenuTab.Achievements -> "🏆"
 }
 
+/**
+ * Nome do backend para a ação "a imagem não apareceu". Vulkan e OpenGL são nomes próprios e não se
+ * traduzem; "Software" e "Automático" são palavras e vêm da tabela, reaproveitando as chaves que o
+ * seletor de renderizador já usa em vez de criar um segundo par que pode divergir dele.
+ */
+@Composable
+private fun backendLabel(backend: String): String = when (backend) {
+    RendererRecovery.VULKAN -> "Vulkan"
+    RendererRecovery.OPENGL -> "OpenGL"
+    RendererRecovery.SOFTWARE -> str("backend.renderer.software")
+    else -> str("backend.renderer.auto")
+}
+
 @Composable
 private fun MenuHeader(
     compact: Boolean,
@@ -654,6 +694,17 @@ private fun SessionPane(state: EmulationMenuUiState, viewModel: EmulationMenuVie
                 if (MainActivityRuntime.fastForwardToggleActive) Success else null,
             ) { MainActivityRuntime.instance?.toggleFastForward(); viewModel.resume() },
             MenuAction(str("memcard.restart"), str("action.reset"), "↻", null, MainActivityRuntime::restart),
+            // A saida assistida da tela preta. Fica AQUI, na aba que o menu abre por padrao, e nao
+            // so na aba Renderer: quem cai neste defeito nao sabe o que e "backend grafico" -- se
+            // soubesse, a saida manual de tres telas que ja existia teria bastado. O rotulo diz o
+            // proximo backend, entao a acao e legivel antes do toque.
+            MenuAction(
+                str("recovery.noImage.action"),
+                str("recovery.noImage.detail").format(backendLabel(viewModel.noImageTarget())),
+                "▨",
+                null,
+                viewModel::requestNoImageRecovery,
+            ),
             MenuAction(str("action.swapDisc"), str("action.swapDisc.detail"), "⏏", null, MainActivityRuntime::promptSwapDisc),
             MenuAction(str("action.close"), MainActivityRuntime.currentGame.value?.title.orEmpty(), "■", Danger) {
                 MainActivityRuntime.closeGame()
@@ -869,6 +920,14 @@ private fun GraphicsPane(state: EmulationMenuUiState, viewModel: EmulationMenuVi
         viewModel.updateSettings { it.copy(coalesceRenderPasses = on) }
     }
     CompactAction(str("backend.applyRestart"), "↻", Modifier.fillMaxWidth(), MainActivityRuntime::restart)
+    // A mesma acao da aba Sessao, repetida aqui de proposito: esta e a tela onde quem ja sabe que
+    // o problema e o renderizador vem procurar, e as duas chamam o mesmo viewModel.
+    CompactAction(
+        str("recovery.noImage.action") + " — " + backendLabel(viewModel.noImageTarget()),
+        "▨",
+        Modifier.fillMaxWidth(),
+        viewModel::requestNoImageRecovery,
+    )
     HorizontalOptions(
         title = str("renderer.upscale.label"),
         // Share the full settings-tab list so the sub-native 0.25/0.5/0.75/Native

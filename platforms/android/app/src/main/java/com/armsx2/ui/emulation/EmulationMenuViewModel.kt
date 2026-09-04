@@ -6,6 +6,7 @@ import com.armsx2.config.Settings
 import com.armsx2.i18n.I18n
 import com.armsx2.input.ControllerMappings
 import com.armsx2.runtime.MainActivityRuntime
+import com.armsx2.runtime.RendererRecovery
 import com.armsx2.ui.InGameOverlay
 import com.armsx2.ui.achievements.AchievementItem
 import com.armsx2.ui.achievements.parseAchievementItems
@@ -45,6 +46,17 @@ data class EmulationMenuUiState(
     val richPresence: String = "",
     // Current boot ELF CRC — the value that goes in a <SERIAL>_<CRC>.pnach filename.
     val gameCRC: String = "",
+    /**
+     * O veredito cru do renderizador automático (`"OpenGL reason=platform-default"`), lido uma vez
+     * ao abrir o menu.
+     *
+     * Guardado aqui, e não consultado onde é usado, porque quem o usa é a composição da ação "a
+     * imagem não apareceu" — chamar JNI a cada recomposição para uma string que não muda durante a
+     * sessão é o tipo de custo que já apareceu como digitação de 97 ms nesta mesma UI.
+     */
+    val autoRendererVerdict: String = "",
+    /** Backend proposto pela recuperação "a imagem não apareceu"; não-nulo enquanto o diálogo está de pé. */
+    val pendingNoImageBackend: String? = null,
 )
 
 class EmulationMenuViewModel(application: Application) : AndroidViewModel(application) {
@@ -89,6 +101,8 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
             achievements = items,
             richPresence = richPresence,
             gameCRC = gameCRC,
+            autoRendererVerdict = runCatching { NativeApp.getAutoRendererVerdict().orEmpty() }
+                .getOrDefault(""),
         )
     }
 
@@ -287,6 +301,43 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
 
     /** Open the full RetroAchievements screen (list + options) over the paused game. */
     fun openAchievements() = com.armsx2.ui.WindowImpl.openInGameScreen(com.armsx2.ui.InGameScreen.Achievements)
+
+    /**
+     * O backend que a recuperação "a imagem não apareceu" vai propor agora.
+     *
+     * Puro e barato (ver [RendererRecovery]), então pode ser lido direto da composição para
+     * rotular o botão — o rótulo diz o que vai acontecer ANTES do toque, que é o que separa esta
+     * ação de um "conserta aí" opaco.
+     */
+    fun noImageTarget(): String =
+        RendererRecovery.nextBackend(state.value.settings.renderer, state.value.autoRendererVerdict)
+
+    /** Abre a confirmação, fixando o backend proposto para que ele não mude sob o diálogo. */
+    fun requestNoImageRecovery() {
+        state.value = state.value.copy(pendingNoImageBackend = noImageTarget())
+    }
+
+    fun cancelNoImageRecovery() {
+        state.value = state.value.copy(pendingNoImageBackend = null)
+    }
+
+    /**
+     * Grava o backend proposto e reinicia a VM.
+     *
+     * A gravação vai por [updateSettings] -> `InGameOverlay.saveSettings`, que persiste no escopo
+     * que o menu abriu: **Game** quando há serial, Global no boot de BIOS. E o reinício é o que
+     * aplica: `MainActivityRuntime.start()` chama `applyRendererPrefs()`, que resolve
+     * per-game ∘ global e empurra `renderVulkan` / `renderOpenGL` / `renderSoftware` / `renderAuto`
+     * antes de a VM subir. Nada aqui troca o renderizador ao vivo — trocar backend com o device
+     * aberto é justamente o caminho que não sobrevive numa sessão que já está quebrada.
+     */
+    fun confirmNoImageRecovery() {
+        val target = state.value.pendingNoImageBackend ?: return
+        state.value = state.value.copy(pendingNoImageBackend = null)
+        updateSettings { it.copy(renderer = target) }
+        MainActivityRuntime.renderer.value = target
+        MainActivityRuntime.restart()
+    }
 
     fun updateSettings(transform: (Settings) -> Settings) {
         // ★ Transform the LIVE shared settings, not this screen's snapshot. state.value.settings is

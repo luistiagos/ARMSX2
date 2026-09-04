@@ -6,7 +6,10 @@
 - **Classe:** fail
 - **Reincidência:** o defeito que a rede cobria já aconteceu em campo (Motorola, 1.0.17)
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0066](../../../task/TASK-0066-rede-de-seguranca-do-renderer-automatico.md) — **parcialmente**, ver "O que a TASK-0066 não cobre"
+- **Tasks que o resolvem:** [TASK-0066](../../../task/TASK-0066-rede-de-seguranca-do-renderer-automatico.md)
+  (a classe "morreu antes do primeiro quadro") e
+  [TASK-0082](../../../task/TASK-0082-acao-de-imagem-nao-apareceu-troca-o-backend.md)
+  (a classe "apresenta quadros que ninguém vê")
 
 ## Sintoma
 

@@ -477,6 +477,16 @@ private val BASE_EN: Map<String, String> = mapOf(
     "backend.graphicsApi.label" to "Graphics API",
     "backend.renderer.auto" to "Auto",
     "backend.renderer.software" to "Software",
+    // "A imagem nao apareceu" (TASK-0082): a saida assistida da tela preta. O emulador nao consegue
+    // ver esse defeito por dentro -- os quadros sao apresentados normalmente -- e classificar por
+    // amostra de pixel ja produziu 38 falsos positivos em 6 modelos aqui. Entao quem responde e o
+    // usuario, que esta olhando para a tela.
+    "recovery.noImage.action" to "The image didn't appear",
+    "recovery.noImage.detail" to "Restart on %s",
+    "recovery.noImage.title" to "The image didn't appear?",
+    "recovery.noImage.body" to "Some devices show a black screen with one graphics backend and work normally on another. This restarts the game on %s and keeps that choice for this game only. Progress since your last save is lost, as with any restart.",
+    "recovery.noImage.body.global" to "Some devices show a black screen with one graphics backend and work normally on another. This restarts on %s and keeps that choice for every game, because this session has no game to attach it to. Progress since your last save is lost, as with any restart.",
+    "recovery.noImage.confirm" to "Restart on %s",
     "common.off" to "Off",
     "common.on" to "On",
     "fixes.alignSprite.desc" to "Fixes vertical lines/gaps in some 2D games when upscaling.",
