@@ -5502,6 +5502,13 @@ open class MainActivityRuntime : ComponentActivity() {
     }
 
     override fun onPause() {
+        // Land the coalesced settings work before Android can reap the process (TASK-0084).
+        // saveSettings persists to SharedPreferences immediately, so no user choice is at risk
+        // here — what is pending is the per-game INI regeneration and the live native apply, and
+        // a stale gamesettings/<serial>_<CRC>.ini SHADOWS the base layer on the next boot. The
+        // mirror flush is bounded (500 ms) because onPause has an ANR budget.
+        runCatching { com.armsx2.config.SettingsApplyQueue.flush() }
+        runCatching { com.armsx2.config.ConfigStore.flushBackupMirror() }
         // Take the second-display panel down with the app. A Presentation is not torn down by the
         // activity stopping, so it otherwise stayed on the external screen while the user was off
         // doing something else (reported).

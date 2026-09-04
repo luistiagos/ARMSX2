@@ -8,7 +8,10 @@
 - **Classe:** fail (desempenho)
 - **Reincidência:** primeira vez registrada
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0071](../../../task/TASK-0071-passo-do-direcional-nao-recompoe-a-pagina.md) — **item 2 apenas**; itens 1 e 3 seguem abertos
+- **Tasks que o resolvem:**
+  [TASK-0071](../../../task/TASK-0071-passo-do-direcional-nao-recompoe-a-pagina.md) — **item 2 apenas**,
+  em andamento · [TASK-0084](../../../task/TASK-0084-ajuste-em-configuracoes-nao-bloqueia-a-thread-da-ui.md) — **itens 1 e 3**,
+  concluída. **Continua aberto pelo item 2**, e pelo resíduo do item 1 medido abaixo.
 
 ## Sintoma
 
@@ -49,11 +52,19 @@ Quanto disso roda depende do escopo, e as guardas estão em `InGameOverlay.kt:10
 | Escopo Global, sem jogo | `save` + `writeBackupMirror` (1 parse, `prefs.all`, 1 escrita de arquivo) |
 
 **O mecanismo para não fazer isso já existe e está morto.**
-`config/LiveGsApplyQueue.kt` é exatamente a fila coalescente fora da UI thread que este caso pede
-(`AtomicReference` do último valor + executor de uma thread). Um `grep` no `app/src` inteiro
-encontra o nome **só em comentários** — `LiveGsApplyQueue.applySettings` e `Settings.applyGsLive()`
-(`Settings.kt:1616`) não têm nenhum call-site. Foram escritos, documentados no
-`NativeApp.java:669` ("call it off the UI thread (via LiveGsApplyQueue)") e nunca ligados.
+`config/LiveGsApplyQueue.kt` é uma fila coalescente fora da UI thread (`AtomicReference` do último
+valor + executor de uma thread). Um `grep` no `app/src` inteiro encontra o nome **só em
+comentários** — `LiveGsApplyQueue.applySettings` e `Settings.applyGsLive()` não têm nenhum
+call-site. Foram escritos, documentados no `NativeApp.java` ("call it off the UI thread (via
+LiveGsApplyQueue)") e nunca ligados. O mesmo vale para `Settings.gsDiffersFrom()`; e
+`InGameOverlay.applySafeLiveDelta`, citada em dois comentários, **não existe em lugar nenhum**.
+
+> ⚠️ **Correção da TASK-0084: essa fila NÃO é o que este caso pede.** Ela roda
+> `settings.applyGsLive()`, que é `writeGsToNative() + applyGSSettingsLive()` — só a seção
+> `EmuCore/GS`, sem `commitSettings()`. `applyTo()` escreve muito além disso (speedhacks, clamps do
+> recompilador, SPU2, `Framerate/NominalScalar`, USB) e termina no commit. Ligar uma no lugar da
+> outra pararia de empurrar **todo ajuste que não é de GS** para o core, em silêncio. A fila segue
+> morta de propósito; a coalescência foi feita em `config/SettingsApplyQueue.kt`.
 
 ### 2. Mover o destaque recompõe a página inteira
 
@@ -144,6 +155,65 @@ não afete a apresentação, e faça backup de `shared_prefs/ARMSX2.xml` antes (
 debuggable). Vale também que `IntSliderRow` chama `onChange` **mesmo quando o valor satura no
 limite** — cada tecla no batente ainda dispara o `saveSettings` inteiro sem mudar nada.
 
+## O que a TASK-0084 mediu, e o que ela mudou (2026-09-04)
+
+O item 1 estava descrito **por leitura** e este relatório dizia, corretamente, que "o caminho de
+gravação não foi isolado". Foi isolado: `saveSettings` instrumentado com `elapsedRealtimeNanos` em
+volta do corpo e de cada etapa, APK debug, **SM-A127M**, jogo `SLUS-21414` a ~13 fps.
+
+### Antes
+
+| Variante | `ui_ms` na thread da UI | `store_ms` | `ini_ms` | `apply_ms` |
+|---|---|---|---|---|
+| Global, sem VM | 13,6–16,1 (med. **14,6**) | 13,1–15,4 | 0 | 0 |
+| Jogo, sem VM | 22,6–29,3 (med. **26,3**) | 12,1–14,6 | 9,6–15,6 | 0 |
+| Jogo, VM rodando | 136,1–157,8 (med. **145,8**) | 9,9–12,4 | 9,1–11,0 | **114,2–136,3** |
+
+**A lista de causas deste relatório está certa; a proporção estava errada.** Na variante pesada,
+`applyTo()` sozinho é ~80 % do custo, e o que domina dentro dele não são as 254 chamadas JNI: é
+`NativeApp.commitSettings()`, que no nativo é `Host::RunOnCPUThread(…, block=true)`
+(`native-lib.cpp:1616`) e **bloqueia** até a thread da CPU drenar no limite de vsync — ~83 ms num
+jogo a 12 fps. O custo escala com a lentidão do jogo, que é por que o relato veio de um A12. Os 3
+parses, o `writeBackupMirror` e as escritas de disco somam ~20 ms dos ~146.
+
+### Depois
+
+| Variante | antes | depois | fator |
+|---|---|---|---|
+| Global, sem VM | 14,6 ms | **9,1 ms** | 1,6× |
+| Jogo, sem VM | 26,3 ms | **4,9 ms** | 5,4× |
+| Jogo, VM rodando | 145,8 ms | **3,4 ms** | **43×** |
+
+As três variantes passaram a caber no quadro de 16,7 ms. Rajada de 8 × Direita num seletor de 5
+opções: **8 teclas → 4 gravações** (as 4 do batente saem cedo, custo zero) **→ 1 apply**
+(`coalesced=4`). ~1,17 s de thread da UI viraram ~0,09 s.
+
+Item 3, A/B limpo com `git stash` de um arquivo, tela de Configurações aberta e intocada por 10 s,
+trocas de contexto voluntárias da thread principal: **627 (62,7/s, vsync exato) → 22–23 (2,2/s)**,
+−96 %.
+
+Nenhum ajuste se perde: valor mudado → HOME → `am force-stop` (SIGKILL) → reaberto, e o valor está
+lá, na tela e no `shared_prefs/ARMSX2.xml`. `ConfigStore.save` **não** foi adiado, justamente para
+que isso não dependesse do flush.
+
+### O que continua aberto
+
+1. **Item 2** — é da TASK-0071, ainda em andamento (p90 de 85 ms na aba App após o merge, alvo
+   16,7 ms), e o `EmulationMenuScreen.kt:1508` com o mesmo `isSelected` direto.
+2. **Resíduo do item 1:** o apply coalescido ainda custa **61–76 ms de thread principal** quando
+   dispara — uma vez por gesto, não nove por segundo, mas ainda um quadro estourado por gesto.
+   Apagá-lo exige tirar `applyTo()`/`commitSettings()` da thread da UI, e isso está bloqueado:
+   `NativeApp.setSetting` escreve num `MemorySettingsInterface` **sem mutex**
+   (`common/MemorySettingsInterface.h`) e há escritores diretos na thread da UI fora do `applyTo`
+   (`MainActivityRuntime`: BIOS, pads, frame limit; `MemoryCardViewModel`). Mover hoje troca um
+   problema de desempenho por uma corrida de dados. Precisa de trava no lado nativo — mudança de
+   core, portanto contribuição ao upstream.
+3. **Janela de durabilidade do `apply()`:** um SIGKILL nos primeiros milissegundos após o toque
+   ainda perde o valor. É a latência de escrita do `SharedPreferences.apply()`, **igual no código
+   antigo**; o que mudou é que `saveSettings` deixou de gastar 143 ms depois dela e o `apply()`
+   perdeu essa folga de brinde. Nenhum encerramento real do app (HOME, recentes, deslizar) passa por
+   essa janela — todos entregam `onPause`, onde o framework drena o `QueuedWork`.
+
 ## Próximos passos
 
 Ordem revista **pela medição**: o item 2 é o que está confirmado como causa de primeira ordem, e é
@@ -158,7 +228,12 @@ mas não foi isolado no aparelho.
      (`SettingsScreen.kt:148`) — ler dentro do `LaunchedEffect` via `snapshotFlow`. É o que explica
      os 57 ms de piso com só 10 linhas na tela.
    Medir de novo com o mesmo protocolo (as três abas, 10 × Baixo, p90) — o alvo é p90 < 16,7 ms.
-2. **Item 1.** Separar "aplicar o que o usuário vê" de "persistir". O estado em memória e o poke ao
+2. ~~**Item 1.**~~ **Feito na TASK-0084**, com um desvio deliberado do plano abaixo: a
+   **persistência não foi adiada** (ela custava ~10 ms de ~146 e adiá-la abriria janela de perda e
+   de leitura velha); o que foi coalescido é o INI + `applyTo()`. Números acima. O plano original
+   dizia:
+
+   Separar "aplicar o que o usuário vê" de "persistir". O estado em memória e o poke ao
    vivo continuam imediatos; `ConfigStore.save` + `writeBackupMirror` + `writeGameSettingsIni` vão
    para a `LiveGsApplyQueue` (coalescente: só o último valor sobrevive) ou para um debounce de
    ~300 ms, com flush obrigatório ao sair da tela e no `onPause` — a persistência não pode ser
@@ -168,4 +243,5 @@ mas não foi isolado no aparelho.
    `ConfigStore` diz "No caching — ... reads happen at game launch (once per launch)"; essa
    premissa deixou de valer. E `IntSliderRow` deveria sair cedo quando o valor satura, em vez de
    gravar tudo de novo para escrever o mesmo número.
-3. **Item 3.** Suspender o laço de `withFrameNanos` enquanto a velocidade é zero.
+3. ~~**Item 3.** Suspender o laço de `withFrameNanos` enquanto a velocidade é zero.~~ **Feito na
+   TASK-0084**, com A/B medido: 62,7 → 2,2 trocas de contexto voluntárias por segundo.

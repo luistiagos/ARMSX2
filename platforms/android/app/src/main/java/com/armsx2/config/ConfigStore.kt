@@ -19,9 +19,12 @@ import java.io.File
  * [resolveForGame] is the only method anyone outside the settings UI
  * should call. It returns the merged Settings to push at VM launch.
  *
- * No caching — load on demand. Writes are rare (user clicked Save) and
- * reads happen at game launch (once per launch). Both well within
- * SharedPreferences' overhead.
+ * ~~No caching — load on demand. Writes are rare (user clicked Save) and
+ * reads happen at game launch (once per launch).~~ **That premise was wrong and is retired**
+ * (TASK-0084). Every settings row writes here, and the D-pad auto-repeat fires one every 110 ms;
+ * a single edit called [loadGlobal] three times. [loadGlobal] now keeps a one-entry parse cache
+ * keyed on the raw stored string, and the in-folder mirror is written off the caller's thread —
+ * see the two doc blocks below for why each is safe.
  */
 /**
  * Where overlay setting changes land. The overlay header picks one at
@@ -61,8 +64,41 @@ object ConfigStore {
     private const val BACKUP_FILENAME = "armsx2-settings.json"
     private fun keyForGame(serial: String) = "config.game.$serial"
 
+    /**
+     * One-entry parse cache for [loadGlobal], keyed on the RAW string as stored in prefs.
+     *
+     * The class doc above says "No caching -- ... reads happen at game launch (once per launch)".
+     * That premise is dead: a single settings edit called loadGlobal THREE times (ConfigStore.save,
+     * then resolveForGame, then the global baseline for writeGameSettingsIni), and the D-pad
+     * auto-repeat fires an edit every 110 ms. config.global is 7,5 KB of JSON on the measuring
+     * device, and Settings has ~300 fields.
+     *
+     * Keyed on the raw string rather than an invalidation flag ON PURPOSE: that makes the cache
+     * self-correcting against every writer, including ones that never go through this object --
+     * the factory reset's `prefs.edit().clear()` (MainActivityRuntime), reconcileReusedFolder
+     * restoring from the in-folder mirror, and a settings import. A stale entry is impossible
+     * because a different stored string can never match. Reading the raw string back out of
+     * SharedPreferences is an in-memory map lookup, so the check itself is free.
+     *
+     * Settings is an immutable data class, so handing the same instance to several callers is
+     * safe; overrides are deliberately NOT cached here because loadOverrides returns a MUTABLE
+     * JSONObject that callers (SettingsViewModel.resetCurrentScope) prune in place.
+     */
+    @Volatile private var cachedGlobalRaw: String? = null
+    @Volatile private var cachedGlobal: Settings? = null
+    /** True once a parse has actually been cached, so a genuine `null` raw (fresh install) is
+     *  told apart from "nothing cached yet". */
+    @Volatile private var cachedGlobalValid = false
+
+    private fun invalidateGlobalCache() {
+        cachedGlobalValid = false
+        cachedGlobal = null
+        cachedGlobalRaw = null
+    }
+
     fun loadGlobal(): Settings {
         val raw = MainActivityRuntime.prefs.getString(KEY_GLOBAL, null)
+        cachedGlobal?.let { hit -> if (cachedGlobalValid && cachedGlobalRaw == raw) return hit }
         var parsed = if (raw != null) {
             try { Settings.fromJson(JSONObject(raw)) } catch (_: Exception) { Settings() }
         } else {
@@ -171,7 +207,13 @@ object ConfigStore {
             MainActivityRuntime.prefs.edit { putBoolean(KEY_OSD_SCALE_MIGRATED, true) }
         }
 
+        // saveGlobal below re-writes prefs, so cache against whatever ended up STORED rather than
+        // against `raw` -- otherwise the next call would compare the new stored string to the old
+        // key and re-parse forever (correct, but pointless).
         if (dirty) saveGlobal(parsed)
+        cachedGlobalRaw = MainActivityRuntime.prefs.getString(KEY_GLOBAL, null)
+        cachedGlobal = parsed
+        cachedGlobalValid = true
         return parsed
     }
 
@@ -191,6 +233,10 @@ object ConfigStore {
 
     fun saveGlobal(s: Settings) {
         MainActivityRuntime.prefs.edit { putString(KEY_GLOBAL, s.toJson().toString()) }
+        // Drop the parse cache rather than priming it with `s`: toJson -> fromJson is not proven
+        // lossless field-for-field, and every caller today gets whatever that round trip produces.
+        // Priming with `s` would quietly change what they read.
+        invalidateGlobalCache()
         writeBackupMirror()
     }
 
@@ -383,9 +429,46 @@ object ConfigStore {
         return File(root, BACKUP_FILENAME)
     }
 
-    /** Write the in-folder settings mirror (global + every per-game blob). Cheap; called
-     *  on each save. Silently no-ops until the data root is known. */
+    /**
+     * Write the in-folder settings mirror (global + every per-game blob), OFF the caller's thread.
+     *
+     * "Cheap" was wrong. It iterates `prefs.all`, re-parses a JSONObject per game that carries an
+     * override, and then writes a file -- real disk I/O, scaling with library size, on whatever
+     * thread called save(). That was most of the ~14 ms every single settings edit cost on an
+     * SM-A127M (TASK-0084), and settings edits arrive every 110 ms under D-pad auto-repeat.
+     *
+     * It can move because of what it IS: a recovery mirror, read in exactly one place
+     * ([reconcileReusedFolder]) and only when `config.global` is absent, i.e. on a fresh install
+     * over a reused data folder. Nothing in a running app reads it back, so it has no ordering
+     * relationship with anything but itself.
+     *
+     * Coalescing plus a single worker thread are what make that safe: only one thread ever writes
+     * the file, and a burst of edits collapses to one write of the final state. `prefs.all` and
+     * `getString` are safe off the main thread -- SharedPreferencesImpl synchronises its own map.
+     */
+    private val mirrorExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "SettingsMirror").apply { isDaemon = true }
+    }
+    private val mirrorPending = java.util.concurrent.atomic.AtomicBoolean(false)
+
     private fun writeBackupMirror() {
+        // One queued write at a time: whoever is already scheduled reads the CURRENT prefs when it
+        // runs, so a second request would only rewrite the same bytes.
+        if (!mirrorPending.compareAndSet(false, true)) return
+        runCatching {
+            mirrorExecutor.execute {
+                mirrorPending.set(false)
+                writeBackupMirrorNow()
+            }
+        }.onFailure {
+            // Executor rejected (shutdown): clear the latch and write inline rather than silently
+            // dropping the mirror.
+            mirrorPending.set(false)
+            writeBackupMirrorNow()
+        }
+    }
+
+    private fun writeBackupMirrorNow() {
         val file = backupFile() ?: return
         runCatching {
             val root = JSONObject()
@@ -402,11 +485,28 @@ object ConfigStore {
         }
     }
 
+    /**
+     * Block until any queued mirror write has landed, up to [timeoutMs].
+     *
+     * Called from `Activity.onPause`, where the process can be killed right afterwards. Bounded
+     * because onPause has an ANR budget, and it is only a mirror: SharedPreferences (the
+     * authoritative store) was never deferred, and the next save rebuilds the file anyway.
+     */
+    fun flushBackupMirror(timeoutMs: Long = 500L) {
+        val done = java.util.concurrent.CountDownLatch(1)
+        val queued = runCatching { mirrorExecutor.execute { done.countDown() } }.isSuccess
+        if (!queued) return
+        runCatching { done.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) }
+    }
+
     /** One-time, guarded recovery for the fresh-install + reused-folder case. Call once at
      *  app init (after the data root is resolved). Ordered: (1) restore losslessly from the
      *  in-folder mirror a prior new-UI install left; (2) else seed config.global from the
      *  folder's PCSX2-Android.ini. NEVER runs when config.global already exists. */
     fun reconcileReusedFolder() {
+        // Runs once at app init, before any settings edit, so there is no queued mirror write to
+        // race. The parse cache needs no hand-holding here either: it is keyed on the raw stored
+        // string, so the prefs writes below invalidate it by themselves.
         if (MainActivityRuntime.prefs.getBoolean(KEY_FOLDER_RECONCILE, false)) return
         MainActivityRuntime.prefs.edit { putBoolean(KEY_FOLDER_RECONCILE, true) }
         // Hard guard: an existing new-UI user (has config.global) is off-limits.

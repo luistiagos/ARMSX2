@@ -49,6 +49,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      * fields are a no-op; Controls keeps its own reset row for binds/tunables.
      */
     fun resetCurrentScope(category: SettingsCategory) {
+        // A settings edit may still be coalesced in SettingsApplyQueue (TASK-0084), and this
+        // method writes the SAME native/INI state from the UI thread. Landing the pending job
+        // first keeps the two in the order the user performed them — otherwise an edit made just
+        // before Reset would apply AFTER it and quietly undo the reset.
+        com.armsx2.config.SettingsApplyQueue.flush()
         // Takes the category the SCREEN is showing, not uiState.category: the screen remaps
         // General -> Performance under a game scope, so reading it here would reset the wrong
         // (or no) tab.

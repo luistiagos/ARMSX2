@@ -5,6 +5,7 @@ import com.armsx2.EmuState
 import com.armsx2.runtime.MainActivityRuntime
 import com.armsx2.config.ConfigStore
 import com.armsx2.config.Settings
+import com.armsx2.config.SettingsApplyQueue
 import com.armsx2.config.SettingsScope
 import kr.co.iefriends.pcsx2.NativeApp
 
@@ -93,8 +94,37 @@ object InGameOverlay {
      *  snapping back to the top. Keyed by EmulationMenuTab.name to avoid coupling to that enum. */
     val menuTabScroll = HashMap<String, Int>()
 
+    /**
+     * Persist a settings change and get it into the emulator.
+     *
+     * ## What runs now and what is coalesced (TASK-0084)
+     *
+     * Measured on an SM-A127M: this function used to cost **14,6 ms** (Global, no VM), **26,3 ms**
+     * (Game, no VM) and **145,8 ms** (Game, VM running) of UI thread, per edit — and the D-pad
+     * auto-repeat fires one every 110 ms. All three blow a frame; the last one by 9×.
+     *
+     * Split accordingly:
+     *
+     *  - **Immediate**, because it is cheap and because nothing may be lost or read stale: the
+     *    in-memory state, `ConfigStore.save` (~10 ms of the 146 — not worth a data-loss window),
+     *    and the two single-JNI delta pokes the user feels instantly (frame limit, upscale).
+     *  - **Coalesced** into [SettingsApplyQueue], in the SAME order as before: the per-game INI
+     *    regeneration, then [Settings.applyTo], then the OSD-mode re-assert. Those are the ~125 ms,
+     *    dominated by `commitSettings()` blocking on the CPU thread.
+     *
+     * A held direction therefore queues one job per repeat and applies once, when the sweep stops
+     * (or every 600 ms while it is held). [SettingsApplyQueue.flush] closes the pending job on
+     * `onPause` and when the pause menu is dismissed.
+     */
     fun saveSettings(updated: Settings) {
+        val tSave0 = android.os.SystemClock.elapsedRealtimeNanos()
         val previous = settingsState.value
+        // Nothing changed: every step below would rewrite the same bytes and re-poke the VM for
+        // nothing. Settings is a data class, so this is a field-wise compare. The concrete case
+        // the bug report names is IntSliderRow, which calls onChange even when the value SATURATES
+        // at its limit — each further key at the batten used to run the whole path to write the
+        // number that was already there. Tapping an already-selected chip is the same shape.
+        if (updated == previous) return
         settingsState.value = updated
         // `previous` matters: it's how ConfigStore tells a field the user just changed in
         // Game scope from one they never touched, so setting a per-game value that happens
@@ -115,55 +145,74 @@ object InGameOverlay {
                     NativeApp.renderUpscalemultiplier(updated.upscaleFloat.coerceIn(0.25f, 8.0f))
                     MainActivityRuntime.upscale.value = updated.upscaleFloat.coerceIn(0.25f, 8.0f)
                 }
-                if (MainActivityRuntime.eState.value != EmuState.STOPPED) {
-                    // Regenerate the native per-game INI (gamesettings/<serial>_<CRC>.ini) from the
-                    // resolved settings so a stale key there can't shadow the base layer. Without this a
-                    // legacy per-game key — e.g. TVShader=3 from a reused data folder — survives every
-                    // "Off": VMManager::ApplySettings reloads EmuConfig.GS from base∘game each commit/boot
-                    // and the game layer wins. gameIniBeginWrite uses a fresh (no-Load) interface, so keys
-                    // the user no longer overrides (TVShader once it equals global) are dropped and the
-                    // file is deleted when empty. No-op when no VM (gameIniBeginWrite early-returns).
-                    //
-                    // ★ BEFORE applyTo(), not after. applyTo() is what triggers the commit, and that
-                    // commit re-reads base∘game off disk — so with the write afterwards the commit saw
-                    // the OLD file every time and the game layer clobbered the change that was being
-                    // made. The regenerated file only took effect on the NEXT commit, which is why a
-                    // live shader change appeared to need an app restart, and why it looked
-                    // game-dependent: only games that already had a per-game INI carrying that key
-                    // were affected. ConfigStore.save() above has already stored the new values, so
-                    // resolveForGame() here reads them and nothing depends on applyTo() running first.
-                    currentSerial.value?.takeIf { it.isNotBlank() }?.let { serial ->
-                        ConfigStore.resolveForGame(serial).writeGameSettingsIni(ConfigStore.loadGlobal())
-                    }
-                    updated.applyTo()
-                }
-                // ★ Re-assert the OSD MODE after the commit. The Minimal/Full/Off modes are a
-                // LIVE-only flag apply (deliberately not persisted, so they don't overwrite the
-                // user's per-stat selection) — but VMManager::ApplySettings re-derives all of
-                // EmuConfig.GS from the layered config on every commit, which wiped that live
-                // override. That is the reported "OSD still says Minimal but it's off after
-                // changing upscale" (confirmed by bmdhacks). Re-pushing the current mode restores
-                // exactly what the user had, without touching any saved setting.
-                runCatching { reapplyOsdMode() }
             }
         }
 
-        // ...and the same regeneration when there is NO VM. Without this, editing settings from the
-        // library left a stale gamesettings/<serial>_<CRC>.ini in place, and because that file loads
-        // into a HIGHER-priority layer than anything we write, every key it already contained
-        // silently ignored the user forever. Confirmed the hard way: Local Link came up correctly on
-        // a game with no INI and never initialised on one with an old [DEV9/Eth] block, across six
-        // back-to-back boots. Only the category-Reset path rewrote the INI, which is why Reset was
-        // the only thing that ever "worked". Uses the by-serial overload since there is no running
-        // game to reach it through; a no-op when the game never wrote an INI.
-        if (MainActivityRuntime.eState.value == EmuState.STOPPED) {
-            runCatching {
-                currentSerial.value?.takeIf { it.isNotBlank() }?.let { serial ->
-                    ConfigStore.resolveForGame(serial)
-                        .writeGameSettingsIni(ConfigStore.loadGlobal(), serial)
+        // ---- Everything below is the expensive tail: ~125 ms of the 146 measured on the A12.
+        // It is QUEUED, not run. SettingsApplyQueue keeps only the last job, so a D-pad sweep
+        // that fires one edit every 110 ms produces ONE apply instead of nine per second. The
+        // order inside the job is byte-for-byte the order it had inline, including the ★ note
+        // below about the INI having to precede applyTo(). The guards read live state at APPLY
+        // time on purpose: if the VM went away while the job was pending, the right branch is
+        // the no-VM one. ----
+        SettingsApplyQueue.schedule {
+            if (MainActivityRuntime.nativeReady.value) {
+                runCatching {
+                    if (MainActivityRuntime.eState.value != EmuState.STOPPED) {
+                        // Regenerate the native per-game INI (gamesettings/<serial>_<CRC>.ini) from the
+                        // resolved settings so a stale key there can't shadow the base layer. Without this a
+                        // legacy per-game key — e.g. TVShader=3 from a reused data folder — survives every
+                        // "Off": VMManager::ApplySettings reloads EmuConfig.GS from base∘game each commit/boot
+                        // and the game layer wins. gameIniBeginWrite uses a fresh (no-Load) interface, so keys
+                        // the user no longer overrides (TVShader once it equals global) are dropped and the
+                        // file is deleted when empty. No-op when no VM (gameIniBeginWrite early-returns).
+                        //
+                        // ★ BEFORE applyTo(), not after. applyTo() is what triggers the commit, and that
+                        // commit re-reads base∘game off disk — so with the write afterwards the commit saw
+                        // the OLD file every time and the game layer clobbered the change that was being
+                        // made. The regenerated file only took effect on the NEXT commit, which is why a
+                        // live shader change appeared to need an app restart, and why it looked
+                        // game-dependent: only games that already had a per-game INI carrying that key
+                        // were affected. ConfigStore.save() has already stored the new values, so
+                        // resolveForGame() here reads them and nothing depends on applyTo() running first.
+                        currentSerial.value?.takeIf { it.isNotBlank() }?.let { serial ->
+                            ConfigStore.resolveForGame(serial).writeGameSettingsIni(ConfigStore.loadGlobal())
+                        }
+                        updated.applyTo()
+                    }
+                    // ★ Re-assert the OSD MODE after the commit. The Minimal/Full/Off modes are a
+                    // LIVE-only flag apply (deliberately not persisted, so they don't overwrite the
+                    // user's per-stat selection) — but VMManager::ApplySettings re-derives all of
+                    // EmuConfig.GS from the layered config on every commit, which wiped that live
+                    // override. That is the reported "OSD still says Minimal but it's off after
+                    // changing upscale" (confirmed by bmdhacks). Re-pushing the current mode restores
+                    // exactly what the user had, without touching any saved setting.
+                    runCatching { reapplyOsdMode() }
+                }
+            }
+
+            // ...and the same regeneration when there is NO VM. Without this, editing settings from the
+            // library left a stale gamesettings/<serial>_<CRC>.ini in place, and because that file loads
+            // into a HIGHER-priority layer than anything we write, every key it already contained
+            // silently ignored the user forever. Confirmed the hard way: Local Link came up correctly on
+            // a game with no INI and never initialised on one with an old [DEV9/Eth] block, across six
+            // back-to-back boots. Only the category-Reset path rewrote the INI, which is why Reset was
+            // the only thing that ever "worked". Uses the by-serial overload since there is no running
+            // game to reach it through; a no-op when the game never wrote an INI.
+            if (MainActivityRuntime.eState.value == EmuState.STOPPED) {
+                runCatching {
+                    currentSerial.value?.takeIf { it.isNotBlank() }?.let { serial ->
+                        ConfigStore.resolveForGame(serial)
+                            .writeGameSettingsIni(ConfigStore.loadGlobal(), serial)
+                    }
                 }
             }
         }
+        println(
+            "@@ANDROID_SETTINGS_SAVE@@ ui_ms=%.2f".format(
+                (android.os.SystemClock.elapsedRealtimeNanos() - tSave0) / 1e6,
+            )
+        )
     }
 
     fun open() {
@@ -261,6 +310,12 @@ object InGameOverlay {
     }
 
     private fun closeAndResume() {
+        // Land any coalesced settings apply BEFORE the VM resumes. Two reasons, both concrete:
+        // the user must not walk out of the menu and play on a value that hasn't been pushed yet,
+        // and the per-game INI has to be on disk before the next commit re-reads base∘game off it
+        // (the ★ note in saveSettings). While the VM is still parked this also runs the blocking
+        // commitSettings() at the cheapest possible moment.
+        SettingsApplyQueue.flush()
         WindowImpl.overlayVisible.value = false
         // Resume on PAUSED *or* RUNNING. Opening the menu queues the pause asynchronously —
         // eState only flips to PAUSED once Host::OnVMPaused fires on the CPU thread — so a quick

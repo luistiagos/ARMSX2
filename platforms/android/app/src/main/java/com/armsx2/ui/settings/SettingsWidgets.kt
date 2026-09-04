@@ -457,7 +457,23 @@ internal fun ControllerAutoScroll(scroll: ScrollState) {
     // estimate here (selectedIndex * fixed 44dp row height) over/under-scrolled
     // because rows with descriptions are taller, so it "fought" the selection.
     // This loop only drives the optional right-stick free scroll.
-    LaunchedEffect(scroll) {
+    //
+    // ★ It has to be able to STOP. `while (true) { withFrameNanos { … } }` asks the Recomposer for
+    // a frame at 60 Hz for as long as any settings page is on screen — eleven screens call this —
+    // even with the stick centred and nothing to scroll. An `if` inside the loop decides whether to
+    // do WORK; it cannot decide whether to WAKE UP, and the wake-up is what costs. Same defect and
+    // same fix as the library grid in HomeScreen (TASK-0063), where it measured 618 voluntary
+    // context switches in 10 s of an untouched idle screen — vsync exactly — for zero frames drawn.
+    //
+    // setScrollVelocity writes exactly 0f below the dead zone, so this derived flag is false
+    // whenever the stick is centred: the effect is cancelled, nothing asks for frames, and
+    // deflecting the stick restarts it. While it runs the loop is byte-for-byte the old one —
+    // same rate, same dt, same feel.
+    val stickScrolling by remember {
+        derivedStateOf { abs(SettingsControllerNav.scrollVelocity.floatValue) > 0.08f }
+    }
+    LaunchedEffect(scroll, stickScrolling) {
+        if (!stickScrolling) return@LaunchedEffect
         var lastFrame = withFrameNanos { it }
         while (true) {
             val frame = withFrameNanos { it }
