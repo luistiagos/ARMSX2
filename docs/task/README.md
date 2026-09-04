@@ -127,7 +127,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0044](TASK-0044-telemetria-de-boot-e-de-assets.md) — telemetria de boot e de assets | concluída | FEAT-0001 | — | `ea3c0bddf8` |
 | [TASK-0045](TASK-0045-baixar-so-formato-bootavel-e-manter-a-capa.md) — baixar só formato que o emulador abre, e manter a capa | concluída | — | catalogo-download-entrega-formato-nao-bootavel, biblioteca-jogo-baixado-perde-a-capa | `186cdde1c6` |
 | [TASK-0046](TASK-0046-encerrar-thread-mtvu-no-shutdown.md) — encerrar a thread da MTVU no shutdown da VM | concluída | — | mtvu-thread-gira-a-100-por-cento-apos-fim-da-vm | `c333afa9f1` |
-| [TASK-0047](TASK-0047-agrupar-versoes-do-mesmo-titulo.md) — agrupar versões do mesmo título e escolher a versão num painel | concluída | — | biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao | `eab610925e` |
+| [TASK-0047](TASK-0047-agrupar-versoes-do-mesmo-titulo.md) — agrupar versões do mesmo título e escolher a versão num painel | concluída | — | biblioteca-mesmo-titulo-repetido-uma-vez-por-regiao | `eab610925e` `4615270075` |
 | [TASK-0048](TASK-0048-descompactar-7z-e-zip-no-download.md) — descompactar `.7z` e `.zip` depois do download | em andamento | — | — | — |
 | [TASK-0049](TASK-0049-carregar-savestates-0x9A54.md) — carregar savestates `0x9A54` da 1.0.23 no fork | aberta | — | savestate-formato-9a54-rejeitado-pelo-fork | `62b5fc1a0e` |
 | [TASK-0050](TASK-0050-detectar-limite-de-clock-do-aparelho.md) — avisar quando o aparelho segura o clock da CPU | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | `5c91eb8452` `5e64ed41dd` |
@@ -160,8 +160,8 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0077](TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) — o aviso do GOS ganha "não mostrar de novo", e o item de menu vira a porta de volta | concluída | — | gos-samsung-limita-clock-a-metade-em-jogo | `ed3e7e7c46` `fe66b785f3` |
 | [TASK-0078](TASK-0078-numero-de-task-identifica-neste-ramo.md) — fazer o número da task identificar alguma coisa, ao menos dentro deste ramo | concluída | FEAT-0002 | numeros-de-task-colidem-entre-ramos | `863a7b3ad8` `2251a2bfdf` |
 | [TASK-0079](TASK-0079-boot-nao-toca-o-nativo-nem-o-disco-na-ui.md) — tirar da thread da UI a carga do `.so` e a resolução do data root no boot | concluída | — | app-anr-loadlibrary-emucore-ui-thread, datadirectorymanager-anr-getexternalfilesdir-a07 | `efe39c6431` `920b51f69d` `42be339905` `bef494be9b` |
-| [TASK-0080](TASK-0080-onda-xmb-para-de-usar-nome-reservado-no-shader.md) — renomear o uniform `length`, que é função embutida do GLSL e derruba a onda XMB | concluída | — | xmb-gl-nao-compila-shader-uniform-chamado-length | `0870fdb0e0` `bfdc9cc223` |
-| [TASK-0081](TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md) — nenhuma chave de tradução chega crua à tela, e um teste passa a garantir isso | em andamento | — | chave-de-traducao-crua-na-tela | `ed46425a97` `d4e0b024c9` |
+| [TASK-0080](TASK-0080-onda-xmb-para-de-usar-nome-reservado-no-shader.md) — renomear o uniform `length`, que é função embutida do GLSL e derruba a onda XMB | concluída | — | xmb-gl-nao-compila-shader-uniform-chamado-length | `0870fdb0e0` `bfdc9cc223` `7e61f69f9c` |
+| [TASK-0081](TASK-0081-nenhuma-chave-de-traducao-chega-crua-a-tela.md) — nenhuma chave de tradução chega crua à tela, e um teste passa a garantir isso | concluída | — | chave-de-traducao-crua-na-tela | `ed46425a97` `d4e0b024c9` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
