@@ -5,7 +5,7 @@ atualizar as referências remotas. O `upstream/master` verificado estava em `5fd
 
 Havia **29 relatórios**, não 18 como dizia o índice anterior. Eles agora estão separados em:
 
-- [`armsx2-fork/`](armsx2-fork/README.md): **12** bugs que afetam, ou cuja causa continua presente,
+- [`armsx2-fork/`](armsx2-fork/README.md): **11** bugs que afetam, ou cuja causa continua presente,
   na árvore atual do fork (eram 22; os quatro de rastreabilidade foram fechados em 2026-09-03 pelas
   [TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md) e
   [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) e
@@ -40,10 +40,15 @@ neles.
 | [GOS limita clock](armsx2-fork/gos-samsung-limita-clock-a-metade-em-jogo_2026-08-29T12-40.md) | ambiente Samsung | **Causa não corrigível pelo app; mitigação concluída.** Detector, aviso, assistente e opt-out já existem. | Não para a causa | — | Manter como limitação de plataforma; não mascarar como bug do emulador. |
 | [GPU timing do GL não lê](armsx2-fork/gpu-timing-do-opengl-no-android-nunca-produz-leitura_2026-09-01T10-50.md) | herdado do upstream | **Sem correção.** O código atual ainda usa entry points core com o alvo da extensão. | Sim, hipótese precisa confirmação | **Baixa** | Primeiro medir `glGetError`; se confirmar, usar `EXT_disjoint_timer_query` corretamente. Upstream `5fd85d7fc9` continua igual. |
 | [Mali perde device com upscale](armsx2-fork/mali-g52-r38-vulkan-perde-o-device-com-qualquer-upscale_2026-09-02T11-33.md) | driver/hardware | **Sem correção de causa no app/core.** | Não para a causa; só mitigação | — | Não remover o para-quedas de device-lost. Oferecer renderer software/limite por jogo se houver evidência suficiente. |
-| [Piso de Z desligado em Mali Vulkan](armsx2-fork/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md) | herdado do upstream, controle no fork | **Implementada**, falta A/B em aparelho. | Sim, já implementada | **Média** | TASK-0064 criou `ForcePS2DepthQuantization`; a exposição automática foi reduzida pela TASK-0072. |
 | [Renderer automático sem recuperação completa](armsx2-fork/renderer-automatico-sem-rede-de-seguranca-no-fork_2026-08-31T20-00.md) | delta do fork | **Parcial.** Marcador contra crash-loop foi implementado; tela preta sem crash continua sem ação assistida. | Sim para a recuperação de UX | **Alta** | Adicionar ação “imagem não apareceu” que troca backend por jogo e reinicia, sem classificar pixels. |
 | [Savestate `0x9A54` rejeitado](armsx2-fork/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md) | incompatibilidade fork ↔ version1 | **Implementada**, bloqueada na validação. | Sim, já implementada | **Alta** | TASK-0049 implementou leitor e proteção de consumo integral; falta um `.p2s` real da 1.0.23. |
 | [Veredito do renderer ausente no relato](armsx2-fork/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md) | delta do fork | **Implementada**, falta comprovar num relato real sem crash. | Sim, já implementada | **Baixa** | JNI separado e `graphicsBootSummary` já carregam o veredito; a TASK-0065 ainda está em andamento. |
+
+### Fechado desde a última auditoria
+
+| Bug | Quando | O que a medição disse |
+|---|---|---|
+| [Piso de Z desligado em Mali Vulkan](../done/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md) | 2026-09-04 | A [TASK-0064](../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md) devolveu o opt-out e o A/B rodou no `SM-A127M`: a chave chega ao core (o token `no_ps2_z_quantization` some do log), e **o piso de Z não é a causa das linhas verticais** — a imagem é a mesma nos dois braços. |
 
 ## Linha antiga / version1
 

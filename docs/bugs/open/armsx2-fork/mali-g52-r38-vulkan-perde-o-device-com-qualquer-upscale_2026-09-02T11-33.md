@@ -89,6 +89,21 @@ Somando as duas metades:
 
 Portanto o fix é **inalcançável neste hardware**. Não é uma correção que falta escrever — é um teto.
 
+### Adendo (2026-09-04): uma causa alternativa foi eliminada por medição
+
+A outra hipótese para as mesmas linhas — o piso de Z de 32 bits do PS2, que o `GSDeviceVK`
+desliga em todo Mali — **caiu no aparelho**. Com o opt-out da
+[TASK-0064](../../../task/TASK-0064-devolver-o-controle-do-piso-de-z.md) ligado, o piso volta
+(o token `no_ps2_z_quantization` some do log) e a imagem é a mesma: 0,20 % de diferença na
+métrica de listra no par de quadros mais bem casado. Registro em
+[`done/`](../../done/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
+
+Isso reforça a leitura desta seção, e uma correção de detalhe: a cópia deste aparelho é a
+**NTSC-U `SLUS-20751`**, não a `SLES-52046` do cabeçalho. O GameDB dá as **mesmas** `gsHWFixes`
+aos dois seriais (`halfPixelOffset: 2`, `preloadFrameData: 1`), então o raciocínio acima vale
+igual — mas quem for repetir o teste deve procurar o serial certo. O log dos dois braços do A/B
+mostra `hpo=0` em 1x, exatamente como esta seção prevê.
+
 ## O quadro completo deste aparelho, neste título
 
 | renderizador | 1x nativo | upscale > 1x |

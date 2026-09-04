@@ -1,10 +1,10 @@
 # TASK-0064: devolver o controle do piso de Z do PS2, que o Mali no Vulkan tira sem volta
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-31
-- **Concluída em:** —
+- **Concluída em:** 2026-09-04
 - **Feature:** nenhuma
-- **Bugs que resolve:** [mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta](../bugs/open/armsx2-fork/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md)
+- **Bugs que resolve:** [mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta](../bugs/done/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0064:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -39,7 +39,7 @@ m_features.no_ps2_z_quantization =
 
 O comentário do lado Vulkan promete *"opt-out via INI for Z-precision-sensitive titles"*. Não
 existe: `DisablePS2DepthQuantization` só empurra o valor para `true`. Diagnóstico completo no
-[registro do bug](../bugs/open/armsx2-fork/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
+[registro do bug](../bugs/done/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md).
 
 ## Objetivo
 
@@ -145,3 +145,29 @@ consertar, para que a próxima pessoa não descubra sozinha.
 Vale também o que o `CLAUDE.md` manda: a parte em `pcsx2/` é **correção de motor**, e nasce como
 contribuição ao upstream. Ela foi escrita nessa forma — genérica, sem nada de Android, sem mudar
 default nenhum.
+
+## Resultado da validação (2026-09-04)
+
+O A/B do passo 3 foi executado no `SM-A127M` do relato. **A chave funciona; a hipótese que ela
+serviria para testar caiu.** As duas metades, separadas de propósito:
+
+1. **O opt-out existe e chega ao core.** Com o toggle ligado, o token `no_ps2_z_quantization`
+   **some** da linha `Optional features:` do `GSDeviceVK`, nas mesmas condições
+   (`renderer=14`, `ir=1.00`). É o passo 4 da tabela acima, e é a parte que era nossa para
+   consertar. Confirmado em 4 boots (2 por braço).
+2. **O piso de Z não é a causa das linhas verticais.** Quadros da mesma cena nos dois braços são
+   a mesma imagem: 0,20 % de diferença na métrica de listra e 1,55 níveis de cinza de diferença
+   média pixel a pixel no par mais bem casado. Um controle no renderizador de **software**
+   calibra a métrica — nele a listra desaparece e a razão coluna/linha cai de ~5 para ~0,8.
+
+Números, tabelas e o que ficou sem prova (Apple GPU, custo de desempenho, outros títulos) estão
+no [registro do bug](../bugs/done/mali-vulkan-desliga-o-piso-de-z-do-ps2-sem-volta_2026-08-31T16-30.md),
+seção *"Fechamento — A/B medido no aparelho"*.
+
+O passo 1 (compila) e o passo 2 (default inalterado) também estão cumpridos: o braço
+`false` imprime a mesma linha de antes, com o token presente.
+
+Uma correção ao protocolo, para quem repetir: o item 5 da tabela diz "olhar o cano do revólver".
+Nesta cópia (`SLUS-20751`) as listras aparecem **antes** disso — já nos logos THX e EA Games — e
+seguem na cena 3D do briefing e na "PAMIR MOUNT". Qualquer um desses serve, e os logos são mais
+fáceis de casar entre os dois braços porque acontecem sempre no mesmo ponto do boot.
