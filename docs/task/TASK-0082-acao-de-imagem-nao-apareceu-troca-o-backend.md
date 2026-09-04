@@ -1,10 +1,10 @@
 # TASK-0082: ação "a imagem não apareceu" troca o backend por jogo e reinicia
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-04
-- **Concluída em:** —
+- **Concluída em:** 2026-09-04
 - **Feature:** nenhuma
-- **Bugs que resolve:** [renderer-automatico-sem-rede-de-seguranca-no-fork](../bugs/open/armsx2-fork/renderer-automatico-sem-rede-de-seguranca-no-fork_2026-08-31T20-00.md)
+- **Bugs que resolve:** [renderer-automatico-sem-rede-de-seguranca-no-fork](../bugs/done/renderer-automatico-sem-rede-de-seguranca-no-fork_2026-08-31T20-00.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0082:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -94,3 +94,43 @@ renderizador efetivo pelo JNI, o que é build nativo de ~14 min por um caso que 
    a imagem aparece depois do reinício, com o log dizendo o backend novo.
 3. **O que está gravado é por jogo** — ler `shared_prefs/ARMSX2.xml` antes e depois e mostrar que só
    a chave `config.game.SLUS-20751` mudou, preservando os outros campos já fixados nela.
+
+## O que a validação deu — 2026-09-04
+
+**1. Teste de unidade.** `:app:testGithubDebugUnitTest` com `RendererRecoveryTest`: 8 testes, 0
+falhas. Cobre as quatro linhas da tabela, o ciclo inteiro em três toques, o veredito ausente e um
+valor gravado desconhecido. O `I18nKeysTest` roda junto e passa, ou seja, nenhuma das chaves novas
+chega crua à tela.
+
+**2. No aparelho `SM-A127M` (Mali-G52 r38p1), APK `githubDebug`.** O relato completo, com hashes de
+captura e linhas de log, está no
+[bug fechado](../bugs/done/renderer-automatico-sem-rede-de-seguranca-no-fork_2026-08-31T20-00.md#a-prova-medida--2026-09-04-sm-a127m-mali-g52-r38p1-android-13).
+Em resumo:
+
+- a tela preta do 007 em OpenGL foi **remedida** antes de qualquer toque — duas capturas a 40 s de
+  distância com o mesmo md5 `629192d67bc9d079dd30d6a549d2b453`, e o `PerfLog` em 36,7–37,3 fps com o
+  contador de quadros andando de 4751 para 6985;
+- o menu abre por cima do preto e a ação aparece na primeira aba já com o alvo no rótulo
+  (*"Reiniciar usando Vulkan"*), que é o que a escada calcula para `auto` + veredito OpenGL;
+- confirmando, a VM reinicia com `renderer=14` (VK) e **só** a chave do renderizador muda no
+  `shared_prefs`: `{"renderer":"auto","upscaleFloat":1.25}` vira
+  `{"renderer":"vulkan","upscaleFloat":1.25}`;
+- o Vulkan também não serve para este jogo aqui (é o `VK_ERROR_DEVICE_LOST` do outro relatório), e
+  a ação **já propõe sozinha o degrau seguinte**: *"Reiniciar usando Software"*. Confirmando,
+  `renderer=13` e a imagem aparece, com três capturas de md5 diferentes a ~36 fps.
+
+**3. Só o renderizador é gravado, e no escopo do jogo.** Item acima, com o `diff` do
+`shared_prefs/ARMSX2.xml` antes e depois.
+
+### O que ficou sem provar
+
+- **O caso de canto do veredito defasado.** Com um bloqueio da TASK-0066 ativo,
+  `getAutoRendererVerdict()` não reflete a virada, e o primeiro toque a partir de `auto` pode
+  propor o backend que já está rodando; o segundo corrige. Montar o cenário exige crash-loop **e**
+  tela preta no mesmo aparelho. Não foi feito.
+- **O caminho sem serial** (boot de BIOS / disco avulso), em que a gravação cai no escopo Global e o
+  diálogo mostra o texto `recovery.noImage.body.global`. O texto existe e o teste de chaves garante
+  que ele está definido, mas **essa tela não foi vista no aparelho**.
+- **Navegação por controle.** A ação usa o mesmo `ActionGrid`/`CompactAction` que todas as outras
+  linhas, e o `ConfirmOverlay` é o mesmo do hardcore, então herda o registro de navegação — mas não
+  foi exercitada com um controle físico.

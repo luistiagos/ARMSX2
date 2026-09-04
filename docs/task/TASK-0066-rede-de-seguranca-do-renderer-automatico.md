@@ -4,7 +4,7 @@
 - **Criada em:** 2026-08-31
 - **Concluída em:** 2026-09-04
 - **Feature:** nenhuma
-- **Bugs que resolve:** [renderer-automatico-sem-rede-de-seguranca-no-fork](../bugs/open/armsx2-fork/renderer-automatico-sem-rede-de-seguranca-no-fork_2026-08-31T20-00.md)
+- **Bugs que resolve:** [renderer-automatico-sem-rede-de-seguranca-no-fork](../bugs/done/renderer-automatico-sem-rede-de-seguranca-no-fork_2026-08-31T20-00.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0066:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
