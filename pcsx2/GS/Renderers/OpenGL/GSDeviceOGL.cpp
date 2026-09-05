@@ -1581,9 +1581,33 @@ void GSDeviceOGL::EndPresent()
 		KickPipelineStatisticsQuery();
 }
 
+// GLES: GL_TIME_ELAPSED belongs to GL_EXT_disjoint_timer_query, NOT to the core.
+//
+// The GLES 3.x core validates glBeginQuery's target against its OWN list
+// (GL_ANY_SAMPLES_PASSED*, GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN) and rejects anything else
+// with GL_INVALID_ENUM. The enum value being identical (GL_TIME_ELAPSED_EXT === 0x88BF ===
+// GL_TIME_ELAPSED) does NOT make the core entry point accept the target -- which is what the
+// previous comment here assumed. So the whole cycle has to go through the EXT entry points, not
+// just the result read: a query that never began has no result to wait for, the drain loop breaks
+// on the first iteration every time, and m_accumulated_gpu_time stays 0 forever. That is exactly
+// the reported symptom: no GPU field in PerfLog under OpenGL, real numbers under Vulkan.
+//
+// See docs/bugs/.../gpu-timing-do-opengl-no-android-nunca-produz-leitura.
+#if defined(__ANDROID__)
+#define PCSX2_GL_GEN_QUERIES    glGenQueriesEXT
+#define PCSX2_GL_DELETE_QUERIES glDeleteQueriesEXT
+#define PCSX2_GL_BEGIN_QUERY    glBeginQueryEXT
+#define PCSX2_GL_END_QUERY      glEndQueryEXT
+#else
+#define PCSX2_GL_GEN_QUERIES    glGenQueries
+#define PCSX2_GL_DELETE_QUERIES glDeleteQueries
+#define PCSX2_GL_BEGIN_QUERY    glBeginQuery
+#define PCSX2_GL_END_QUERY      glEndQuery
+#endif
+
 void GSDeviceOGL::CreateTimestampQueries()
 {
-	glGenQueries(static_cast<u32>(m_timestamp_queries.size()), m_timestamp_queries.data());
+	PCSX2_GL_GEN_QUERIES(static_cast<u32>(m_timestamp_queries.size()), m_timestamp_queries.data());
 	KickTimestampQuery();
 }
 
@@ -1593,9 +1617,9 @@ void GSDeviceOGL::DestroyTimestampQueries()
 		return;
 
 	if (m_timestamp_query_started)
-		glEndQuery(GL_TIME_ELAPSED);
+		PCSX2_GL_END_QUERY(GL_TIME_ELAPSED);
 
-	glDeleteQueries(static_cast<u32>(m_timestamp_queries.size()), m_timestamp_queries.data());
+	PCSX2_GL_DELETE_QUERIES(static_cast<u32>(m_timestamp_queries.size()), m_timestamp_queries.data());
 	m_timestamp_queries.fill(0);
 	m_read_timestamp_query = 0;
 	m_write_timestamp_query = 0;
@@ -1605,27 +1629,50 @@ void GSDeviceOGL::DestroyTimestampQueries()
 
 void GSDeviceOGL::PopTimestampQuery()
 {
+	// Close the open query BEFORE polling any result.
+	//
+	// GLES + EXT_disjoint_timer_query rejects a result/availability read while a query of that
+	// target is STILL ACTIVE -- Mali-G52 (r38p1) answers GL_INVALID_OPERATION (0x0502), the read
+	// leaves `available` at 0, the loop breaks on the first iteration, and the accumulator stays
+	// zero forever. Measured on-device: one 0x0502 per frame, five polls in a row with
+	// available=0, and no sample ever produced. Desktop GL tolerates the overlap, which is why
+	// the original ordering (drain first, end afterwards) went unnoticed.
+	//
+	// Ending first is also just correct: the query that closes here becomes eligible on the very
+	// next pass instead of waiting a frame.
+	auto end_open_query = [this]() {
+		if (!m_timestamp_query_started)
+			return;
+		PCSX2_GL_END_QUERY(GL_TIME_ELAPSED);
+		m_write_timestamp_query = (m_write_timestamp_query + 1) % NUM_TIMESTAMP_QUERIES;
+		m_timestamp_query_started = false;
+		m_waiting_timestamp_queries++;
+	};
+
+#if defined(__ANDROID__)
+	end_open_query();
+#endif
+
 	while (m_waiting_timestamp_queries > 0)
 	{
 #if defined(__ANDROID__)
-		// GLES doesn't expose glGetQueryObjectiv / glGetQueryObjectui64v; both
-		// availability and result use the u32 form. Caps at ~4.29s of
-		// nanoseconds — fine for per-frame timing. Provided by the
-		// EXT_disjoint_timer_query extension (GL_TIME_ELAPSED_EXT === 0x88BF
-		// === GL_TIME_ELAPSED here).
+		// EXT_disjoint_timer_query supplies BOTH the availability read and a 64-bit result
+		// reader (glGetQueryObjectui64vEXT). The previous code used the core u32 form and
+		// documented a ~4.29s nanosecond ceiling as the price; with the EXT reader that ceiling
+		// does not exist.
 		//
-		// Prior version of this branch was broken: it called glBeginQuery on
-		// the read slot then immediately tried to read its result (always 0,
-		// query never ended) and incremented m_waiting_timestamp_queries
-		// instead of decrementing — accumulator stayed stuck at 0 in HW
-		// renderer OSD ("GPU: 0%" symptom).
+		// Prior version of this branch was broken in a different way: it called glBeginQuery on
+		// the read slot then immediately tried to read its result (always 0, query never ended)
+		// and incremented m_waiting_timestamp_queries instead of decrementing. That was fixed;
+		// the symptom survived, because the queries were never beginning at all -- see the
+		// entry-point note above.
 		GLuint available = 0;
-		glGetQueryObjectuiv(m_timestamp_queries[m_read_timestamp_query], GL_QUERY_RESULT_AVAILABLE, &available);
+		glGetQueryObjectuivEXT(m_timestamp_queries[m_read_timestamp_query], GL_QUERY_RESULT_AVAILABLE, &available);
 		if (!available)
 			break;
 
-		GLuint result = 0;
-		glGetQueryObjectuiv(m_timestamp_queries[m_read_timestamp_query], GL_QUERY_RESULT, &result);
+		GLuint64 result = 0;
+		glGetQueryObjectui64vEXT(m_timestamp_queries[m_read_timestamp_query], GL_QUERY_RESULT, &result);
 		m_accumulated_gpu_time += static_cast<float>(static_cast<double>(result) / 1000000.0);
 #else
 		GLint available = 0;
@@ -1642,13 +1689,11 @@ void GSDeviceOGL::PopTimestampQuery()
 		m_waiting_timestamp_queries--;
 	}
 
-	if (m_timestamp_query_started)
-	{
-		glEndQuery(GL_TIME_ELAPSED);
-		m_write_timestamp_query = (m_write_timestamp_query + 1) % NUM_TIMESTAMP_QUERIES;
-		m_timestamp_query_started = false;
-		m_waiting_timestamp_queries++;
-	}
+#if !defined(__ANDROID__)
+	// Desktop keeps the original ordering, byte for byte: it has no problem with the overlap, and
+	// this path is shared with every non-Android build.
+	end_open_query();
+#endif
 }
 
 void GSDeviceOGL::KickTimestampQuery()
@@ -1656,7 +1701,51 @@ void GSDeviceOGL::KickTimestampQuery()
 	if (m_timestamp_query_started || m_waiting_timestamp_queries == NUM_TIMESTAMP_QUERIES)
 		return;
 
-	glBeginQuery(GL_TIME_ELAPSED, m_timestamp_queries[m_write_timestamp_query]);
+	// A REJECTED begin must not advance the ring.
+	//
+	// This is the actual defect, and it is not the one the report guessed. Measured on Mali-G52
+	// (r38p1): the FIRST glBeginQuery -- issued from CreateTimestampQueries, before the driver has
+	// drawn anything -- is rejected with GL_OUT_OF_MEMORY (0x0505). Every later one is accepted.
+	// But this function used to set m_timestamp_query_started unconditionally, so slot 0 was
+	// consumed by a query that never ran. PopTimestampQuery then polled that dead id forever,
+	// getting GL_INVALID_OPERATION (0x0502) with available=0 every frame while
+	// m_waiting_timestamp_queries climbed 1, 2, 3, 4 ... and the accumulator stayed at zero for the
+	// life of the process. That is the reported symptom: no GPU field in PerfLog under OpenGL,
+	// real numbers under Vulkan.
+	//
+	// The check stops once one begin succeeds: a couple of glGetError calls at startup, nothing
+	// per frame afterwards.
+	if (!m_timestamp_query_verified)
+	{
+		// glGetError reports the OLDEST pending error and clears one flag per call, so a stale
+		// error would be blamed on the begin below. Draining first is what makes this check mean
+		// anything -- two earlier versions of it skipped the drain and misattributed the code.
+		while (glGetError() != GL_NO_ERROR)
+			;
+
+		PCSX2_GL_BEGIN_QUERY(GL_TIME_ELAPSED, m_timestamp_queries[m_write_timestamp_query]);
+
+		const GLenum err = glGetError();
+		if (err != GL_NO_ERROR)
+		{
+			// Leave m_timestamp_query_started false: the slot stays free, nothing is counted as
+			// waiting, and the next frame retries the same slot.
+			if (m_timestamp_query_failures++ == 0)
+			{
+				Console.Warning("GL: glBeginQuery(GL_TIME_ELAPSED) rejected with 0x%04X; retrying "
+								"next frame without consuming the query slot.",
+					static_cast<unsigned>(err));
+			}
+			return;
+		}
+
+		m_timestamp_query_verified = true;
+	}
+	else
+	{
+		PCSX2_GL_BEGIN_QUERY(GL_TIME_ELAPSED, m_timestamp_queries[m_write_timestamp_query]);
+	}
+
 	m_timestamp_query_started = true;
 }
 
@@ -1664,6 +1753,17 @@ bool GSDeviceOGL::SetGPUTimingEnabled(bool enabled)
 {
 	if (m_gpu_timing_enabled == enabled)
 		return true;
+
+#if defined(__ANDROID__)
+	// Say no instead of arming a mechanism that cannot work. The callers in GS.cpp already read
+	// this return value; answering `true` and then never producing a sample is what made the
+	// missing extension look like a GPU sitting idle.
+	if (enabled && !GLAD_GL_EXT_disjoint_timer_query)
+	{
+		Console.Warning("GL: GL_EXT_disjoint_timer_query is absent; GPU timing unavailable.");
+		return false;
+	}
+#endif
 
 	m_gpu_timing_enabled = enabled;
 	if (m_gpu_timing_enabled)

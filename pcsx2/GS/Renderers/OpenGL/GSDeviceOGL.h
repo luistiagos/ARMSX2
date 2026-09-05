@@ -269,6 +269,10 @@ private:
 	u8 m_write_timestamp_query = 0;
 	u8 m_waiting_timestamp_queries = 0;
 	bool m_timestamp_query_started = false;
+	// Ate um glBeginQuery ser aceito, cada kick e conferido com glGetError. Um begin recusado
+	// nao pode consumir o slot do anel -- ver KickTimestampQuery.
+	bool m_timestamp_query_verified = false;
+	u32 m_timestamp_query_failures = 0;
 	bool m_gpu_timing_enabled = false;
 
 	std::array<std::array<GLuint, 2>, NUM_PIPELINE_STATISTICS_QUERIES> m_pipeline_statistics_queries = {};
