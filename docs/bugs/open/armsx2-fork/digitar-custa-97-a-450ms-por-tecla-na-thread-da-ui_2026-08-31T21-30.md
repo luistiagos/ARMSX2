@@ -318,3 +318,8 @@ Registrado porque a medição mexeu no aparelho e tudo foi devolvido:
   `library.background.animated2d=true` **não foram tocados** — conferidos ao fim.
 - Nenhum arquivo criado em `files/gamesettings`; os arquivos de perfil deixados em
   `/data/local/tmp` foram apagados.
+
+> **O que desbloqueia esta medição:** a [TASK-0088](../../../task/TASK-0088-medir-sem-o-interpretador-do-art.md)
+> acrescentou `-Parmsx2.debug.debuggable=false`, que produz um APK de debug **não-`debuggable`** —
+> assinado com a chave de debug, então instala neste aparelho sem desinstalar nada. É o que tira o
+> interpretador do ART do caminho e permite refazer os números sem esse confundidor.

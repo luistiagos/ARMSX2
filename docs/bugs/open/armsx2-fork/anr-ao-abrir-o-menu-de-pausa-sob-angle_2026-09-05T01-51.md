@@ -78,3 +78,8 @@ adb logcat -d | grep 'ANR in come.nanodata'
    ([TASK-0087](../../../task/TASK-0087-angle-entra-na-escada-de-recuperacao.md)) precisa de
    ressalva. **Ele não foi removido**: no ponto da escada em que ele entra, a alternativa é
    `software`, e o ANGLE renderiza em hardware onde o driver nativo fica preto.
+
+> **O que desbloqueia esta medição:** a [TASK-0088](../../../task/TASK-0088-medir-sem-o-interpretador-do-art.md)
+> acrescentou `-Parmsx2.debug.debuggable=false`, que produz um APK de debug **não-`debuggable`** —
+> assinado com a chave de debug, então instala neste aparelho sem desinstalar nada. É o que tira o
+> interpretador do ART do caminho e permite refazer os números sem esse confundidor.
