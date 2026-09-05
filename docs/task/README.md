@@ -165,7 +165,8 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0082](TASK-0082-acao-de-imagem-nao-apareceu-troca-o-backend.md) — ação "a imagem não apareceu" troca o backend por jogo e reinicia | concluída | — | renderer-automatico-sem-rede-de-seguranca-no-fork | `1c4ce126e7` `ad259ac098` `e4ab528f9e` |
 | [TASK-0083](TASK-0083-escolha-de-angle-por-jogo-chega-ao-core.md) — a escolha de ANGLE chega ao core quando ela é por jogo | concluída | — | gl-mali-g52-r38-tela-preta-contornada-nao-corrigida | `08da28eccd` `b2efa13cd1` |
 | [TASK-0084](TASK-0084-ajuste-em-configuracoes-nao-bloqueia-a-thread-da-ui.md) — um ajuste em Configurações deixa de bloquear a thread da UI | concluída | — | configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread | `fc1b37473c` `2d83dd2d95` |
-| [TASK-0085](TASK-0085-tempo-de-gpu-do-gl-usa-os-entry-points-da-extensao.md) — o tempo de GPU no GLES passa a usar os entry points da extensão, e falha alto se não der | concluída | — | gpu-timing-do-opengl-no-android-nunca-produz-leitura | `fbb937250e` |
+| [TASK-0085](TASK-0085-tempo-de-gpu-do-gl-usa-os-entry-points-da-extensao.md) — o tempo de GPU no GLES passa a usar os entry points da extensão, e falha alto se não der | concluída | — | gpu-timing-do-opengl-no-android-nunca-produz-leitura | `fbb937250e` `c96aba5b8e` |
+| [TASK-0086](TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md) — o eco da busca deixa de recompor a biblioteca inteira | em andamento | — | digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui | `3c09bf4189` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
