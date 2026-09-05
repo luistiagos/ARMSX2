@@ -39,6 +39,14 @@ val armsx2MarchExtra = providers.gradleProperty("armsx2.marchExtra").orElse("")
 // DIAGNOSTIC ONLY (-Parmsx2.recTestHooks=true): compiles the EERecFallback opcode-group
 // interpreter bisect into the EE recompiler. Never set for a shipped build.
 val armsx2RecTestHooks = providers.gradleProperty("armsx2.recTestHooks").orElse("false")
+// MEDICAO (-Parmsx2.debug.debuggable=false): tira o flag `debuggable` do build de debug.
+// O ART RECUSA AOT para app debuggable -- o dexopt fica em `run-from-apk` e `compile -m speed`
+// cai para `verify` --, e por isso 44,8% da CPU da thread da UI medida na TASK-0086 era
+// interpretador. Sem esta flag nao da para medir desempenho neste aparelho: a release nao
+// instala aqui (chave de producao contra build de debug instalado) e desinstalar levaria 14 GB
+// de ROMs junto. Mantendo a assinatura de DEBUG, este APK instala por cima.
+// Custo: `run-as` para de funcionar, entao editar `shared_prefs` por adb sai do cardapio.
+val armsx2DebugDebuggable = providers.gradleProperty("armsx2.debug.debuggable").orElse("true")
 val armsx2ApplicationId = providers.gradleProperty("armsx2.applicationId").orElse("com.armsx2")
 val armsx2SigningPropertiesFile = rootProject.file("armsx2_keystore.properties")
 val armsx2SigningProperties = Properties().apply {
@@ -215,6 +223,8 @@ android {
             }
         }
         debug {
+            // Default inalterado: `true`. Ver o comentario de armsx2DebugDebuggable no topo.
+            isDebuggable = armsx2DebugDebuggable.get() != "false"
             // Keep PCSX2_DEBUG/VIXL_DEBUG defines (via CMAKE_BUILD_TYPE=Debug)
             // but compile at -O3 to match release's
             // codegen. -O0 was exposing a JIT-adjacent crash in MGS2 that
