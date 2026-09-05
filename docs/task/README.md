@@ -166,7 +166,8 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0083](TASK-0083-escolha-de-angle-por-jogo-chega-ao-core.md) — a escolha de ANGLE chega ao core quando ela é por jogo | concluída | — | gl-mali-g52-r38-tela-preta-contornada-nao-corrigida | `08da28eccd` `b2efa13cd1` |
 | [TASK-0084](TASK-0084-ajuste-em-configuracoes-nao-bloqueia-a-thread-da-ui.md) — um ajuste em Configurações deixa de bloquear a thread da UI | concluída | — | configuracoes-cada-ajuste-reescreve-o-config-inteiro-na-ui-thread | `fc1b37473c` `2d83dd2d95` |
 | [TASK-0085](TASK-0085-tempo-de-gpu-do-gl-usa-os-entry-points-da-extensao.md) — o tempo de GPU no GLES passa a usar os entry points da extensão, e falha alto se não der | concluída | — | gpu-timing-do-opengl-no-android-nunca-produz-leitura | `fbb937250e` `c96aba5b8e` |
-| [TASK-0086](TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md) — o eco da busca deixa de recompor a biblioteca inteira | em andamento | — | digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui | `3c09bf4189` `c3b9d09bf0` `68d282aa45` |
+| [TASK-0086](TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md) — o eco da busca deixa de recompor a biblioteca inteira | em andamento | — | digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui | `3c09bf4189` `c3b9d09bf0` `68d282aa45` `03e0ad2dc0` |
+| [TASK-0087](TASK-0087-angle-entra-na-escada-de-recuperacao.md) — o ANGLE entra na escada de "a imagem não apareceu", antes do software | concluída | — | gl-mali-g52-r38-tela-preta-contornada-nao-corrigida | `e33da6a7a5` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
