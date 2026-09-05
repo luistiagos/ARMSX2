@@ -107,3 +107,12 @@ que a recusa do primeiro begin acontece noutros drivers. Desktop não mudou: nad
 
 **Candidato a contribuição upstream:** o defeito do slot consumido por um begin recusado é do código
 do upstream, e `git log upstream/master -- GSDeviceOGL.cpp` não traz nada sobre isso.
+
+### A contraprova que faltava, feita em 2026-09-05
+
+Esta task registrou como **não provado** que o valor varia com a carga — duas amostras, 22% nas
+duas. Durante a validação da [TASK-0087](TASK-0087-angle-entra-na-escada-de-recuperacao.md), com 007
+Everything or Nothing em OpenGL no mesmo aparelho, o campo saiu em **9%, 59%, 61%, 62%, 63% e 67%**.
+
+Varia numa faixa larga: a medição acompanha a carga, não é um número preso. A lacuna está fechada.
+

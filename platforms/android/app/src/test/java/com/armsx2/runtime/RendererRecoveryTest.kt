@@ -86,4 +86,75 @@ class RendererRecoveryTest {
         assertEquals(RendererRecovery.VULKAN, RendererRecovery.nextBackend("d3d12", glVerdict))
         assertEquals(RendererRecovery.VULKAN, RendererRecovery.nextBackend("", glVerdict))
     }
+
+    // ---- a escada com ANGLE (TASK-0087) ------------------------------------
+
+    private fun step(stored: String, angle: Boolean = false, verdict: String? = glVerdict,
+                     available: Boolean = true) =
+        RendererRecovery.nextStep(stored, angle, verdict, available)
+
+    /**
+     * O caminho inteiro no aparelho do relato: o `auto` resolve para OpenGL e fica preto, o Vulkan
+     * perde o device, e o ANGLE é a saída EM HARDWARE que existia e estava fora da escada.
+     */
+    @Test
+    fun `com auto em OpenGL a escada passa por Vulkan, ANGLE e so entao software`() {
+        val primeiro = step(RendererRecovery.AUTO)
+        assertEquals(RendererRecovery.VULKAN, primeiro.renderer)
+        assertEquals(false, primeiro.useAngle)
+
+        val segundo = step(primeiro.renderer)
+        assertEquals(RendererRecovery.OPENGL, segundo.renderer)
+        assertEquals(true, segundo.useAngle)
+
+        val terceiro = step(segundo.renderer, angle = segundo.useAngle)
+        assertEquals(RendererRecovery.SOFTWARE, terceiro.renderer)
+        assertEquals(false, terceiro.useAngle)
+
+        val quarto = step(terceiro.renderer)
+        assertEquals(RendererRecovery.AUTO, quarto.renderer)
+    }
+
+    /** Com o `auto` em Vulkan o degrau do ANGLE mantém o renderizador e só liga a chave. */
+    @Test
+    fun `com auto em Vulkan o degrau do ANGLE e OpenGL com a chave ligada`() {
+        val vk = "Vulkan reason=driver-rule:qualquer"
+        val primeiro = step(RendererRecovery.AUTO, verdict = vk)
+        assertEquals(RendererRecovery.OPENGL, primeiro.renderer)
+        assertEquals(false, primeiro.useAngle)
+
+        val segundo = step(primeiro.renderer, verdict = vk)
+        assertEquals(RendererRecovery.OPENGL, segundo.renderer)
+        assertEquals(true, segundo.useAngle)
+    }
+
+    /**
+     * Sem as `.so` do ANGLE no APK o degrau é PULADO. Propor um passo que nao pode funcionar
+     * transformaria a escada num beco: o usuario tocaria, reiniciaria e veria a mesma tela preta.
+     */
+    @Test
+    fun `sem as bibliotecas do ANGLE o degrau e pulado`() {
+        val semAngle = step(RendererRecovery.VULKAN, available = false)
+        assertEquals(RendererRecovery.SOFTWARE, semAngle.renderer)
+        assertEquals(false, semAngle.useAngle)
+    }
+
+    /** A chave do ANGLE nao pode ficar pendurada no degrau seguinte. */
+    @Test
+    fun `sair do degrau do ANGLE desliga a chave`() {
+        val depois = step(RendererRecovery.OPENGL, angle = true)
+        assertEquals(RendererRecovery.SOFTWARE, depois.renderer)
+        assertEquals(false, depois.useAngle)
+    }
+
+    /**
+     * `useAngle` gravado com um renderizador que nao e OpenGL e estado incoerente -- `AngleDriver`
+     * ja o trata como `Off`. A escada nao pode se perder nele.
+     */
+    @Test
+    fun `chave do ANGLE com renderizador que nao e OpenGL nao trava a escada`() {
+        val vindoDoVulkan = step(RendererRecovery.VULKAN, angle = true)
+        assertEquals(RendererRecovery.OPENGL, vindoDoVulkan.renderer)
+        assertEquals(true, vindoDoVulkan.useAngle)
+    }
 }

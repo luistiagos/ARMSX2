@@ -56,7 +56,7 @@ data class EmulationMenuUiState(
      */
     val autoRendererVerdict: String = "",
     /** Backend proposto pela recuperação "a imagem não apareceu"; não-nulo enquanto o diálogo está de pé. */
-    val pendingNoImageBackend: String? = null,
+    val pendingNoImageBackend: com.armsx2.runtime.RendererRecovery.Step? = null,
 )
 
 class EmulationMenuViewModel(application: Application) : AndroidViewModel(application) {
@@ -309,8 +309,16 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
      * rotular o botão — o rótulo diz o que vai acontecer ANTES do toque, que é o que separa esta
      * ação de um "conserta aí" opaco.
      */
-    fun noImageTarget(): String =
-        RendererRecovery.nextBackend(state.value.settings.renderer, state.value.autoRendererVerdict)
+    fun noImageTarget(): RendererRecovery.Step {
+        val ctx = MainActivityRuntime.instance?.applicationContext
+        val angleAvailable = ctx != null && MainActivityRuntime.angleLibsPresent(ctx)
+        return RendererRecovery.nextStep(
+            state.value.settings.renderer,
+            state.value.settings.useAngleOpenGL,
+            state.value.autoRendererVerdict,
+            angleAvailable,
+        )
+    }
 
     /** Abre a confirmação, fixando o backend proposto para que ele não mude sob o diálogo. */
     fun requestNoImageRecovery() {
@@ -334,8 +342,11 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
     fun confirmNoImageRecovery() {
         val target = state.value.pendingNoImageBackend ?: return
         state.value = state.value.copy(pendingNoImageBackend = null)
-        updateSettings { it.copy(renderer = target) }
-        MainActivityRuntime.renderer.value = target
+        // Os DOIS campos, sempre. `useAngleOpenGL` tem de ser desligado ao sair do degrau do ANGLE
+        // tanto quanto ligado ao entrar nele: deixá-lo pendurado levaria a chave para o degrau
+        // seguinte, onde ela não faz sentido e onde ninguém pediu por ela.
+        updateSettings { it.copy(renderer = target.renderer, useAngleOpenGL = target.useAngle) }
+        MainActivityRuntime.renderer.value = target.renderer
         MainActivityRuntime.restart()
     }
 

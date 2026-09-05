@@ -1401,6 +1401,28 @@ open class MainActivityRuntime : ComponentActivity() {
          *  Callers must be on a path that runs before the GS device opens: applyRendererPrefs()
          *  (every boot, including the in-game "Apply & Restart" → restart() → start(), which never
          *  goes through launchGame) and Activity init. */
+        /**
+         * As duas `.so` do ANGLE estão no diretório nativo deste APK?
+         *
+         * Existe para a escada de recuperação da [RendererRecovery] poder **pular** o degrau do
+         * ANGLE quando ele não pode funcionar — propor um passo impossível transformaria a escada
+         * num beco. Usa exatamente os mesmos dois nomes de arquivo que [applyAngleEnv] consulta,
+         * para as duas respostas não poderem divergir.
+         *
+         * Memorizado: o conteúdo do `nativeLibraryDir` não muda durante o processo, e isto é lido
+         * de composição para rotular um botão.
+         */
+        @Volatile private var angleLibsPresentCache: Boolean? = null
+
+        fun angleLibsPresent(context: Context): Boolean {
+            angleLibsPresentCache?.let { return it }
+            val libDir = context.applicationInfo.nativeLibraryDir
+            val present = File(libDir, "libEGL_angle.so").exists() &&
+                File(libDir, "libGLESv2_angle.so").exists()
+            angleLibsPresentCache = present
+            return present
+        }
+
         fun applyAngleEnv(context: Context, resolved: com.armsx2.config.Settings? = null) {
             val settings = resolved ?: runCatching {
                 com.armsx2.config.ConfigStore.resolveForGame(currentGame.value?.settingsKey)

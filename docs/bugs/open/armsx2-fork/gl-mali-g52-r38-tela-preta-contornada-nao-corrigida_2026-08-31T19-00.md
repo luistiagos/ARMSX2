@@ -279,3 +279,19 @@ Porque a causa não está corrigida: ela está **identificada e fora do nosso al
 é mitigação. A severidade cai na prática — o título é jogável em OpenGL com ANGLE, sem trocar de
 backend — mas quem abrir este arquivo precisa encontrar o defeito descrito, não um "resolvido" que
 some do índice.
+
+## Uma saída em hardware — 2026-09-05 ([TASK-0087](../../../task/TASK-0087-angle-entra-na-escada-de-recuperacao.md))
+
+A causa continua sendo o driver da ARM, e continua **fora do nosso código**: este relatório segue
+aberto. O que mudou é o que o usuário pode fazer quando cai nisto.
+
+O ANGLE entrou na escada de "a imagem não apareceu", imediatamente **antes** do `software`. Num par
+jogo/aparelho em que os dois backends de hardware falham — e este é um, porque o Vulkan aqui dá
+`VK_ERROR_DEVICE_LOST` —, a escada descia direto para o renderizador por software. Agora ela oferece
+`OpenGL (ANGLE)` primeiro, e foi medido no aparelho que ela chega lá e sobe em hardware:
+`GL_RENDERER: ANGLE (ARM, Vulkan 1.3.213 (Mali-G52))`, com imagem na tela.
+
+Um ANR apareceu ao abrir o menu de pausa sob ANGLE, com controle limpo sem ANGLE. Uma ocorrência,
+não reproduzida, com confundidores; virou relatório próprio em
+[`anr-ao-abrir-o-menu-de-pausa-sob-angle`](anr-ao-abrir-o-menu-de-pausa-sob-angle_2026-09-05T01-51.md).
+

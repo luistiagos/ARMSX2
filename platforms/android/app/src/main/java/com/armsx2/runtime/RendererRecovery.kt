@@ -74,4 +74,56 @@ object RendererRecovery {
             else -> other(auto) // AUTO e qualquer valor desconhecido/corrompido
         }
     }
+
+    /**
+     * Um degrau da escada.
+     *
+     * São **dois** campos porque ANGLE não é um backend: é uma implementação de GL, escolhida por
+     * um booleano ortogonal ao `renderer` e que só tem efeito com `renderer == "opengl"` — é o que
+     * [AngleDriver.decide] já diz. Espremer isso numa `String` só criaria um valor mágico que
+     * alguém teria de traduzir de volta na hora de gravar.
+     */
+    data class Step(val renderer: String, val useAngle: Boolean = false)
+
+    /**
+     * O próximo degrau, agora com o ANGLE entre o último backend de hardware e o `software`.
+     *
+     * | gravado | próximo | por quê |
+     * |---|---|---|
+     * | `auto` | o oposto do que o `auto` escolheu | o que falhou foi a escolha do `auto` |
+     * | igual ao que o `auto` escolheria | o oposto | trocar é o passo útil |
+     * | o oposto do `auto` | **OpenGL + ANGLE** | a troca de backend já foi tentada; resta trocar a implementação de GL |
+     * | OpenGL + ANGLE | `software` | acabou o hardware |
+     * | `software` | `auto` | fecha o ciclo |
+     *
+     * O degrau do ANGLE existe porque foi **medido**: no `SM-A127M` (Mali-G52 r38p1) o mesmo jogo,
+     * com as estatísticas de GS byte a byte idênticas, renderiza via ANGLE e fica preto no driver
+     * GLES da ARM. Num par jogo/aparelho em que os dois backends de hardware falham — e este é um,
+     * porque o Vulkan dá `VK_ERROR_DEVICE_LOST` —, sem ele a escada desce direto para `software`.
+     *
+     * [angleAvailable] falso **pula** o degrau: `AngleDriver` distingue `MissingLibs` de `Off`, e
+     * propor um passo que não pode funcionar transformaria a escada num beco sem saída.
+     */
+    fun nextStep(
+        stored: String,
+        storedAngle: Boolean,
+        verdict: String?,
+        angleAvailable: Boolean,
+    ): Step {
+        val auto = autoBackendOf(verdict) ?: OPENGL
+
+        // O ANGLE já foi tentado neste ciclo: o que resta é o software. Testado antes dos demais
+        // ramos porque `stored` aqui é OPENGL, que também casa com eles.
+        if (storedAngle && stored == OPENGL)
+            return Step(SOFTWARE)
+
+        return when (stored) {
+            SOFTWARE -> Step(AUTO)
+            OPENGL, VULKAN ->
+                if (stored == auto) Step(other(auto))
+                else if (angleAvailable) Step(OPENGL, useAngle = true)
+                else Step(SOFTWARE)
+            else -> Step(other(auto)) // AUTO e qualquer valor desconhecido/corrompido
+        }
+    }
 }

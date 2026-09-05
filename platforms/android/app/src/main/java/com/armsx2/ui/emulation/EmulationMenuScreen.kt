@@ -184,7 +184,7 @@ fun EmulationMenuScreen(viewModel: EmulationMenuViewModel = viewModel()) {
             com.armsx2.MenuSfx.play(com.armsx2.MenuSfx.Event.POPUP_OPEN)
             onDispose { com.armsx2.MenuSfx.play(com.armsx2.MenuSfx.Event.POPUP_CLOSE) }
         }
-        val label = backendLabel(target)
+        val label = stepLabel(target)
         com.armsx2.ui.common.ConfirmOverlay(
             title = str("recovery.noImage.title"),
             // Escopo dito na cara: o menu grava em Game quando ha serial e em Global quando nao ha
@@ -570,6 +570,17 @@ private fun backendLabel(backend: String): String = when (backend) {
     else -> str("backend.renderer.auto")
 }
 
+/**
+ * Nome do DEGRAU, que pode ser "OpenGL" ou "OpenGL (ANGLE)".
+ *
+ * O parêntese não se traduz e não vira chave nova de propósito: "ANGLE" é nome próprio, e o rótulo
+ * precisa dizer o que muda, senão o usuário toca duas vezes no que parece a mesma coisa. A ação só
+ * vale se nomear o alvo ANTES do toque.
+ */
+@Composable
+private fun stepLabel(step: RendererRecovery.Step): String =
+    backendLabel(step.renderer) + if (step.useAngle) " (ANGLE)" else ""
+
 @Composable
 private fun MenuHeader(
     compact: Boolean,
@@ -700,7 +711,7 @@ private fun SessionPane(state: EmulationMenuUiState, viewModel: EmulationMenuVie
             // proximo backend, entao a acao e legivel antes do toque.
             MenuAction(
                 str("recovery.noImage.action"),
-                str("recovery.noImage.detail").format(backendLabel(viewModel.noImageTarget())),
+                str("recovery.noImage.detail").format(stepLabel(viewModel.noImageTarget())),
                 "▨",
                 null,
                 viewModel::requestNoImageRecovery,
@@ -923,7 +934,7 @@ private fun GraphicsPane(state: EmulationMenuUiState, viewModel: EmulationMenuVi
     // A mesma acao da aba Sessao, repetida aqui de proposito: esta e a tela onde quem ja sabe que
     // o problema e o renderizador vem procurar, e as duas chamam o mesmo viewModel.
     CompactAction(
-        str("recovery.noImage.action") + " — " + backendLabel(viewModel.noImageTarget()),
+        str("recovery.noImage.action") + " — " + stepLabel(viewModel.noImageTarget()),
         "▨",
         Modifier.fillMaxWidth(),
         viewModel::requestNoImageRecovery,

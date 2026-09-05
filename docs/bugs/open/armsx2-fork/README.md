@@ -1,6 +1,6 @@
 # Bugs aplicáveis ao ARMSX2-fork
 
-Esta pasta contém **7 relatórios** cuja causa afeta ou continua presente na árvore atual.
+Esta pasta contém **8 relatórios** cuja causa afeta ou continua presente na árvore atual.
 
 O status, a viabilidade de correção, a severidade e a evidência de cada item estão no
 [`README` da triagem](../README.md#armsx2-fork-atual).

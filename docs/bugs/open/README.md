@@ -5,7 +5,7 @@ atualizar as referências remotas. O `upstream/master` verificado estava em `5fd
 
 Havia **29 relatórios**, não 18 como dizia o índice anterior. Eles agora estão separados em:
 
-- [`armsx2-fork/`](armsx2-fork/README.md): **7** bugs que afetam, ou cuja causa continua presente,
+- [`armsx2-fork/`](armsx2-fork/README.md): **8** bugs que afetam, ou cuja causa continua presente,
   na árvore atual do fork (eram 22; os quatro de rastreabilidade foram fechados em 2026-09-03 pelas
   [TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md) e
   [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) e
