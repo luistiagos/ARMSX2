@@ -105,3 +105,16 @@ errou a magnitude.
 2. **A/B pelo mesmo roteiro do Contexto**, na busca de Configurações. O esperado é o braço B cair
    para perto do braço A. Se não cair, a hipótese está errada e a task não se justifica.
 3. `:app:compileGithubDebugKotlin`.
+
+## O que o reperfilamento de 2026-09-05 diz sobre os ~19 ms que sobraram
+
+O relato foi reperfilado com `simpleperf` no mesmo A12 ([TASK-0086](TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md)),
+e o número que interessa a esta task é este: durante a digitação no Catálogo,
+**`LibraryKeyboard.KeyCap` responde por 0,91% da CPU da thread da UI**, contra 10,7% de
+`HomeScreenKt.GameGridCard` e 42,5% de `AndroidComposeView.measureAndLayout`.
+
+Ou seja: **os ~19 ms que sobraram não estão dentro da `KeyCap`.** Depois desta task o grid do
+teclado deixou de ser uma parcela relevante do quadro, e a diferença que resta entre os braços A e B
+tem de vir do que a *mudança* de realce dispara fora dele — invalidação de medida/layout que sobe
+pela árvore, não recomposição de duas teclas. Isso continua sem medição própria; o que esta nota
+fecha é a suspeita de que houvesse mais a ganhar dentro da `KeyCap`.

@@ -8,7 +8,13 @@
 - **Reincidência:** primeira vez medido. A [TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
   atacou o teclado e reduziu custo real, mas **não** este.
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** — nenhuma ainda
+- **Tasks que o resolvem:** nenhuma fecha o relato. Parciais, todas medidas:
+  [TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md) (emitir na descida,
+  menos leituras de prefs por tecla),
+  [TASK-0068](../../../task/TASK-0068-realce-do-teclado-sem-recompor-o-grid.md) (realce sem
+  recompor as 40 teclas, −8 ms) e
+  [TASK-0086](../../../task/TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md) (o eco da busca
+  para de recompor a `HomeScreen`, −20% de CPU na thread da UI por tecla)
 
 ## Sintoma
 
@@ -129,3 +135,186 @@ Nenhuma das duas abaixo foi provada; ambas são compatíveis com o pico de 318 m
 **Este era o teste proposto**, e ele foi executado de forma equivalente e mais barata: em vez de
 trocar o fundo por uma imagem fixa (que exigiria o seletor SAF), bastou digitar numa tela que não
 desenha o fundo. O piso **não** caiu — logo não é nenhuma das duas.
+
+---
+
+# Reperfilamento de 2026-09-05, e ele corrige duas leituras do registro acima
+
+A triagem mandava **reperfilar antes de mexer**. Feito no mesmo Galaxy A12 `SM-A127M` (Android 13,
+Mali-G52), `githubDebug` `versionCode 2004`, com dois instrumentos e um braço de controle.
+
+## Protocolo (o mesmo nos três braços, e é ele que torna a comparação válida)
+
+Oito toques, um por segundo, alternando **uma letra e o `⌫`**: `g ⌫ o ⌫ d ⌫ a ⌫`. Alternar mantém a
+consulta em 0–1 caractere — onde o filtro menos corta, ou seja, o pior caso — e faz o realce mudar
+de tecla a cada toque. `dumpsys gfxinfo <pkg> reset` imediatamente antes; `framestats` depois.
+
+Três rodadas por braço. O catálogo hoje tem **6318** títulos (eram 12.305 quando o relato nasceu),
+então os números absolutos abaixo **substituem** os do topo deste arquivo, não os contradizem.
+
+| braço | quadros | quadros/tecla | 50º | 90º |
+|---|---|---|---|---|
+| busca de **Configurações** (sem grade, sem fundo) | 16 | **2** | 93–97 ms | 133–150 ms |
+| **Salvos** (12 jogos) | 24 | **3** | 117–125 ms | 150 ms |
+| **Catálogo** (6318 títulos) | 24–28 | **3** | 150 ms | 250–300 ms |
+
+## Correção 1 — "medida + layout: 0,3 ms" está errado; é a maior fase da thread da UI
+
+O Compose faz sua medida e seu layout dentro de `AndroidComposeView.dispatchDraw`, e o `framestats`
+contabiliza isso como **desenho**. O que mede 0,3 ms é o `performMeasure`/`performLayout` do
+`ViewRootImpl`, que para uma tela Compose não faz quase nada. No `simpleperf`, com a árvore de
+chamadas da thread da UI durante a digitação no Catálogo:
+
+| símbolo (inclusivo) | % da thread da UI |
+|---|---|
+| `Choreographer.doFrame` | 87,9 |
+| `ViewRootImpl.performTraversals` → `dispatchDraw` | 51,2 |
+| **`AndroidComposeView.measureAndLayout`** (dentro do `dispatchDraw`) | **42,5** |
+| `AndroidUiDispatcher…doFrame` (recomposição) | 35,8 |
+| `Recomposer.performRecompose` | 27,8 |
+| `LazyGridMeasureKt.measureLazyGrid` | 31,6 |
+| `CompositionImpl.composeInitial` | 15,1 |
+
+A fase que o relato chamava de "gravar display list" — a que tinha o pico de 318 ms — é, em maioria,
+**medida e layout do Compose**, e dentro dela a `LazyVerticalGrid` recompondo do zero os itens
+visíveis (`composeInitial` 15%) porque a busca trocou os jogos que estão na tela.
+
+E o teclado, que as TASK-0062 e TASK-0068 atacaram, já é a menor parcela do quadro:
+`LibraryKeyboard.KeyCap` responde por **0,91%** da thread da UI, contra 10,7% de
+`HomeScreenKt.GameGridCard`. O host é quem custa.
+
+## Correção 2 — a hipótese "a `HomeScreen` inteira recompõe" nunca foi testada, e agora está sustentada
+
+O relato dá as duas hipóteses originais por refutadas com o argumento *"bastou digitar numa tela que
+não desenha o fundo; o piso não caiu — logo não é nenhuma das duas"*. Aquele teste refutou o **fundo
+e a grade**. Ele não podia testar a primeira hipótese, porque digitar em Configurações **não passa
+por `setQuery` nem pela `HomeScreen`**.
+
+Contando os quadros, a diferença aparece: **a biblioteca gasta três quadros por tecla e
+Configurações gasta dois.** Linha do tempo do `framestats`, uma tecla:
+
+```
+Catálogo:
+  t=   0 ms  total=123  recomposicao=40,6  desenho= 19,3   <- eco: state.copy(query=...)
+  t= 282 ms  total=278  recomposicao=63,5  desenho=166,6   <- resultado: buildState (debounce 100 ms)
+  t= 315 ms  total=275  recomposicao= 7,0  desenho=  0,3   <- quadro vazio
+
+Configurações:
+  t=   0 ms  total= 89  recomposicao=28,7  desenho= 20,1   <- texto E resultados no MESMO quadro
+  t=  33 ms  total= 72  recomposicao= 0,0  desenho=  0,3   <- quadro vazio
+```
+
+O quadro do meio existe porque `HomeViewModel.setQuery` gravava `state.copy(query = value)` de
+imediato e a `HomeScreen` lê esse estado no **topo** (`val state = viewModel.state.value`) — a tela
+inteira recompunha para atualizar uma string. `SettingsSearch.query` é um `mutableStateOf` lido só
+dentro do overlay, e por isso o outro host não tem esse quadro.
+
+## O que a [TASK-0086](../../../task/TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md) mediu
+
+O eco passou a viver em `HomeViewModel.liveQuery`, lido dentro do `item { }` da grade. A/B com 24
+teclas por braço, APKs em sequência no mesmo aparelho, **com a busca de Configurações como controle**
+(código não tocado):
+
+| mediana por quadro da tecla (ms) | Catálogo antes | depois | Salvos antes | depois | **Cfg antes** | **depois** |
+|---|---|---|---|---|---|---|
+| eco — **recomposição** | 36,5 | **17,3** | 33,7 | **16,6** | 31,0 | 29,4 |
+| eco — total | 114,3 | **92,9** | 109,0 | **86,5** | 114,3 | 111,5 |
+| resultado — total | 169,7 | 188,2 | 135,2 | 137,9 | 88,3 | 88,2 |
+| **soma de quadros por tecla** | 507 | 509 | 415 | **390** | 203 | 201 |
+
+CPU da thread da UI no mesmo roteiro (`simpleperf`, `cpu-clock` 1 kHz): **1982 → 1582 amostras**, ou
+seja **248 → 198 ms por tecla (−20%)**. `HomeScreenKt.HomeScreen` cai de 48 para 25 amostras e
+`HomeBottomBar` de 68 para 40 — as duas passam a executar uma vez por tecla em vez de duas.
+
+**O controle não se moveu** (114,3 → 111,5; 203 → 201 ms/tecla), o que garante que o aparelho não
+derivou entre as medições.
+
+**E os percentis do `gfxinfo` não se moveram:** Catálogo 150 ms nos dois lados, Salvos 117–125 →
+117–121. Os ~21 ms tirados do quadro do eco reaparecem no quadro do resultado. A thread da UI está
+**saturada** — 198 ms de CPU por tecla para um orçamento de 16,7 ms —, então redistribuir trabalho
+entre quadros não muda o que o usuário sente. Só a soma por tecla muda, e ela precisa cair de ~500 ms
+para dezenas.
+
+## Um confundidor grande, e ele vale mais que qualquer micro-otimização
+
+**Todo este relato foi medido em `githubDebug`, e o ART se recusa a compilar um pacote `debuggable`.**
+Verificado no aparelho:
+
+```
+dumpsys package come.nanodata.armsx2  ->  arm64: [status=run-from-apk]
+cmd package compile -m speed -f come.nanodata.armsx2  ->  "Success", e o status vira [status=verify]
+```
+
+Não é limitação do comando: o `PackageDexOptimizer` força o filtro de *safe mode* para todo pacote
+`debuggable`, e o comentário do AOSP diz o porquê — *"the runtime ignores their compiled code"*. Ou
+seja, **não existe** APK `debuggable` com código AOT neste aparelho; separar as duas variáveis exige
+instalar um APK não-`debuggable`.
+
+O que isso custa, medido: **44,8% da CPU da thread da UI durante a digitação é o interpretador do
+ART** — `NterpGetMethod`, `ExecuteNterpImpl`, `NterpGetInstanceFieldOffset`, `NterpGetShorty`,
+`Class::FindClassMethod`, `Class::FindInterfaceMethod` e os `nterp_op_*`. É resolução de método e de
+campo, não código nosso. O `libart.so` responde por 50% das amostras da thread da UI e o
+`[JIT app cache]` por 42%.
+
+A [TASK-0058](../../../task/TASK-0058-medir-release-contra-debug.md) já mediu que `githubRelease`
+tira 19% do trabalho da EE em jogo, e já registrou o caminho seguro para instalar um release ao lado
+sem desinstalar nada (`-Parmsx2.applicationId=come.nanodata.armsx2.perf`, semear só o necessário,
+desinstalar o pacote de teste no fim). **Aplicar esse mesmo caminho aqui é o próximo passo mais
+barato deste relato**, e o braço da busca de **Configurações** é o ideal para ele: é o único que não
+precisa de ROM, de catálogo nem de dado nenhum do usuário.
+
+## A pista da TASK-0079 respondida: o salto do boot NÃO é proporcional ao catálogo
+
+O `Choreographer: Skipped 104 frames!` do primeiro desenho reproduz, e o `Davey` que o acompanha diz
+onde ele está:
+
+```
+duration=1893ms   IntendedVsync->HandleInputStart=1,7   ->PerformTraversalsStart=0,30
+                  PerformTraversalsStart->DrawStart = 1805 ms
+```
+
+1,8 s dentro de medida e layout — a **composição inicial** da tela da biblioteca, na thread da UI.
+
+Trocando a aba inicial e reiniciando o app com tudo o mais igual:
+
+| aba inicial | jogos na lista | `Choreographer: Skipped` | primeiro `Davey` |
+|---|---|---|---|
+| Catálogo | 6318 | **103 quadros** | 1893 ms |
+| Salvos | 12 | **104 quadros** | 1890 ms |
+
+**Idêntico.** O salto do boot é **plano** em relação ao tamanho da biblioteca, o que faz sentido: a
+grade é `Lazy` e compõe ~12 células nos dois casos. Ele é o mesmo *território* (composição do Compose
+na thread da UI, num aparelho fraco, sem código AOT) mas **não** é a parcela "proporcional ao
+catálogo" deste relato. Não fundir os dois.
+
+## O que continua sem prova
+
+- **Por que o quadro do resultado do Catálogo absorve os 21 ms** que saíram do quadro do eco
+  (169,7 → 188,2), enquanto o de Salvos não absorve (135,2 → 137,9). Suspeita: a fila da thread da
+  UI, que está saturada. Não medido.
+- **O quadro vazio** que fecha cada tecla nos dois hosts (recomposição ~5 ms, desenho 0,3 ms) —
+  custa uma vaga de quadro por tecla e não tem causa identificada. A suspeita é um `LaunchedEffect`
+  cuja chave muda por tecla agendando um callback no `AndroidUiDispatcher`; não foi provado.
+- **De onde vem exatamente o acréscimo do catálogo** (Salvos 390 → Catálogo 509 ms/tecla). O que se
+  sabe: `buildState` roda em `Dispatchers.Default` e custa **~91 ms de CPU por tecla** com 6318
+  títulos (19% em `GameInfo.sortKey` → `CustomNames.nameFor` → `SharedPreferences.getString`, 9% em
+  `HiddenGames.isHidden`), contra praticamente zero com 12 jogos. Não está provado que essa CPU de
+  fundo é o que aparece na thread da UI — o caminho plausível é GC (`HeapTaskDaemon` a ~5%) e
+  disputa de núcleo, e nenhum dos dois foi isolado.
+- **Quanto disso sobrevive num APK de release.** Ver o confundidor acima. Enquanto não for medido,
+  todo número deste relato é o piso do que o cliente vê, não o que ele vê.
+
+## Estado do aparelho durante e depois desta sessão
+
+Registrado porque a medição mexeu no aparelho e tudo foi devolvido:
+
+- `cmd package compile -m speed -f` foi executado para testar a hipótese do AOT; parou em
+  `verify` e a reinstalação do APK devolveu o estado a `run-from-apk`. Conferido.
+- Um teste de toque inválido caiu na linha **Idioma** de Configurações e trocou `ui.language` de
+  `system` para `it`. **Devolvido para `system`** (app parado, XML editado em Python, `run-as` de
+  volta) e conferido na tela: a interface voltou ao português do sistema.
+- `ui.home.currentTab` voltou a `Saved`, que era o valor de origem.
+- `config.game.SLUS-20751` (`{"renderer":"vulkan","upscaleFloat":1.25}`) e
+  `library.background.animated2d=true` **não foram tocados** — conferidos ao fim.
+- Nenhum arquivo criado em `files/gamesettings`; os arquivos de perfil deixados em
+  `/data/local/tmp` foram apagados.

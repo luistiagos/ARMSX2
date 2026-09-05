@@ -27,6 +27,14 @@ data class HomeUiState(
     val allGames: List<GameInfo> = emptyList(),
     val visibleGames: List<GameInfo> = emptyList(),
     val recentGames: List<GameInfo> = emptyList(),
+    /**
+     * A consulta **aplicada** -- a que produziu [visibleGames], nao a que o dedo acabou de digitar.
+     *
+     * As duas eram a mesma coisa, e era isso que custava um quadro inteiro por tecla: `setQuery`
+     * gravava `copy(query = ...)` na hora, so para ecoar o texto no campo de busca, e como a
+     * `HomeScreen` le este estado no topo, a tela inteira recompunha. O eco vive agora em
+     * [HomeViewModel.liveQuery]; este campo e escrito uma vez so, junto com o resultado.
+     */
     val query: String = "",
     val sort: HomeSort = HomeSort.Title,
     val layout: LibraryLayout = LibraryLayout.Grid,
@@ -154,6 +162,25 @@ class HomeViewModel(application: Application) :
     var state = androidx.compose.runtime.mutableStateOf(HomeUiState())
         private set
 
+    /**
+     * O texto que o campo de busca ECOA enquanto se digita -- separado de [HomeUiState.query].
+     *
+     * Medido no A12 em 2026-09-04 (TASK-0086): uma tecla na biblioteca gastava TRES quadros, e a
+     * busca de Configuracoes, com o mesmo teclado e o mesmo roteiro, gastava DOIS. O quadro a mais
+     * era este eco. `HomeScreen` le `state` no topo (`val state = viewModel.state.value`), entao
+     * gravar `state.copy(query = ...)` a cada tecla recompunha a tela inteira -- grade, barras e
+     * fundo -- para atualizar uma string.
+     *
+     * Um estado proprio muda quem e invalidado, nao o que aparece: o `SearchField` le este valor
+     * dentro do `item { }` da grade, que e escopo reiniciavel proprio, entao o eco invalida aquele
+     * item e mais nada. Continua imediato.
+     *
+     * E tambem a leitura CERTA para quem precisa do texto atual fora da composicao (semear o
+     * teclado ao reabrir): `state.query` so ganha o valor quando o resultado do debounce chega, ou
+     * seja, ate 100 ms depois.
+     */
+    val liveQuery = androidx.compose.runtime.mutableStateOf("")
+
     fun load(romDirectories: List<String>, nativeReady: Boolean) {
         directories = romDirectories
         if (!loaded) {
@@ -235,10 +262,12 @@ class HomeViewModel(application: Application) :
 
     fun setQuery(value: String) {
         queryJob?.cancel()
+        // 1. O eco, imediato como sempre foi -- mas em [liveQuery], que so o campo de busca le.
+        //    Gravar aqui `state.copy(query = ...)` recompunha a HomeScreen inteira e custava um
+        //    quadro por tecla; ver o comentario de [liveQuery].
+        liveQuery.value = value
         val trimmed = value.trim()
         if (trimmed.isEmpty()) {
-            // 1. Atualiza imediatamente a string de busca na UI
-            state.value = state.value.copy(query = "")
             // 2. Reconstrói a lista em thread de background para nunca travar a Main Thread (needs proper testing)
             queryJob = scope.launch {
                 val updated = withContext(Dispatchers.Default) {
@@ -248,9 +277,6 @@ class HomeViewModel(application: Application) :
             }
             return
         }
-
-        // 1. Atualiza imediatamente o texto digitado na UI (0ms de latência no teclado)
-        state.value = state.value.copy(query = value)
 
         // 2. Executa a filtragem de milhares de jogos e ordenação em thread de background com debounce
         queryJob = scope.launch {
@@ -271,6 +297,8 @@ class HomeViewModel(application: Application) :
         MainActivityRuntime.prefs.edit { putString(TabPreference, tab.name) }
         LibraryKeyboard.close()
         // Reset query on tab change and apply tab-appropriate default sort (needs proper testing)
+        // O eco anda junto: é o único outro lugar que limpa a busca.
+        liveQuery.value = ""
         val tabSort = if (tab == HomeTab.Saved) HomeSort.RecentlyPlayed else HomeSort.Title
         state.value = buildState(
             state.value.copy(

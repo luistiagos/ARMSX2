@@ -186,9 +186,9 @@ fun HomeScreen(
     val showRecents = LibraryChromePreferences.showRecents.value
     val searchPlaceholder = str("games.search.placeholder")
     LaunchedEffect(state.initialized, showSearch) {
-        if (!showSearch && viewModel.state.value.query.isNotEmpty()) viewModel.setQuery("")
+        if (!showSearch && viewModel.liveQuery.value.isNotEmpty()) viewModel.setQuery("")
         HomeInputController.setSearchAction(state.initialized && showSearch) {
-            LibraryKeyboard.open(viewModel.state.value.query, viewModel::setQuery, searchPlaceholder)
+            LibraryKeyboard.open(viewModel.liveQuery.value, viewModel::setQuery, searchPlaceholder)
         }
     }
     LaunchedEffect(directories, nativeReady) { viewModel.load(directories, nativeReady) }
@@ -589,9 +589,14 @@ fun HomeScreen(
                 }
                 if (state.initialized && showSearch) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
+                        // `liveQuery` e nao `state.query`, e a leitura mora AQUI DENTRO de proposito:
+                        // o conteudo de um `item { }` e um `ComposableLambdaImpl`, ou seja, escopo
+                        // reiniciavel proprio, entao uma tecla invalida esta linha e nada mais. Lida
+                        // no corpo da HomeScreen, invalidaria a tela inteira -- que era exatamente o
+                        // que custava um quadro por tecla (TASK-0086).
                         SearchField(
-                            value = state.query,
-                            onClick = { LibraryKeyboard.open(viewModel.state.value.query, viewModel::setQuery, searchPlaceholder) },
+                            value = viewModel.liveQuery.value,
+                            onClick = { LibraryKeyboard.open(viewModel.liveQuery.value, viewModel::setQuery, searchPlaceholder) },
                             placeholder = searchPlaceholder,
                             modifier = Modifier.fillMaxWidth(),
                             selected = HomeInputController.zone.value == HomeZone.Search,
