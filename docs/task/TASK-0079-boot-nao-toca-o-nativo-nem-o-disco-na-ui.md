@@ -138,3 +138,25 @@ catálogo — o mesmo território do relato
 [digitar-custa-97-a-450ms](../bugs/open/armsx2-fork/digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui_2026-08-31T21-30.md),
 que segue aberto. Fica registrado aqui para não ser confundido com o que esta task fechou.
 
+### E confirmado em RELEASE, com o R8 ligado — 2026-09-06
+
+As medições anteriores foram em `githubDebug`. O `CLAUDE.md` avisa que **o R8 está ligado no
+release** e que tudo alcançado por nome precisa de regra de `keep` — uma falha assim só aparece em
+runtime, num build de release. Então a correção foi refeita nesse regime.
+
+moto g86 5G, `githubRelease` 2.0.5, `pkgFlags` **sem** `DEBUGGABLE`:
+
+```
+09-06 01:18:31.319 22004 22039 I System.out: PCSX2_LOAD emucore_4k pageSize=4096
+09-06 01:18:31.684 22004 22039 I System.out: PCSX2_INIT
+```
+
+pid **22004**, tudo na tid **22039**. A carga do `.so` continua fora da thread da UI depois do R8, e
+o arranque não produziu **nenhum** ANR nem exceção fatal — o `seedNativeGates` e o corpo movido para
+o worker sobreviveram ao encolhimento.
+
+**O que não foi verificado nesta passada:** o campo `GPU` do `PerfLog`
+([TASK-0085](TASK-0085-tempo-de-gpu-do-gl-usa-os-entry-points-da-extensao.md)) e o rótulo do degrau
+do ANGLE ([TASK-0087](TASK-0087-angle-entra-na-escada-de-recuperacao.md)) em release. Os dois exigem
+um jogo aberto, e o aparelho entrou em **bloqueio de tela seguro** antes disso — sem PIN nem
+biometria não há como seguir. Fica para a próxima sessão com o aparelho destravado.
