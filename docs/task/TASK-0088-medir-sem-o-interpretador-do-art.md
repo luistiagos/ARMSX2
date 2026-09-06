@@ -80,4 +80,40 @@ adb install -r app/build/outputs/apk/github/debug/app-github-debug.apk
 
 ## Resultado
 
-Preenchido ao concluir.
+A propriedade existe, faz o que diz, e o default não mudou — verificado sem depender de aparelho:
+
+```
+aapt2 dump badging   com a flag  -> sem a linha `application-debuggable`
+aapt2 dump xmltree   com a flag  -> o atributo nao esta no manifesto
+manifesto mesclado   sem a flag  -> android:debuggable="true"
+```
+
+### A premissa, confirmada em aparelho
+
+O que faltava era mostrar que um APK não-`debuggable` de fato sai de `run-from-apk`. Medido no
+**moto g86 5G**, que tem uma build de release instalada:
+
+```
+pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP LARGE_HEAP ]   <- sem DEBUGGABLE
+arm64: [status=speed-profile] [reason=cmdline] [primary-abi]
+```
+
+`speed-profile` é código compilado de verdade. Contra o `run-from-apk` que a
+[TASK-0086](TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md) mediu no A12 com o APK
+`debuggable`, a diferença de regime está demonstrada.
+
+### O limite desta confirmação, e ele é real
+
+**São dois aparelhos, não um A/B controlado.** O `speed-profile` veio do g86 com uma build de
+release; o `run-from-apk` veio do A12 com `githubDebug`. As duas pontas diferem em aparelho **e** em
+tipo de build.
+
+E o APK que esta task produz — debug **com** a flag — **não foi instalado em aparelho nenhum**:
+
+- no **A12**, que é onde as medições pendentes precisam ser refeitas, ele instalaria (mesma
+  assinatura de debug), mas o aparelho não estava conectado;
+- no **g86** ele foi recusado com `INSTALL_FAILED_UPDATE_INCOMPATIBLE` — lá há uma build de
+  **produção**, e a assinatura não bate. A tentativa foi feita e falhou sem consequência: uma
+  instalação recusada não toca em dados.
+
+Ou seja: o mecanismo está pronto e provado no artefato; falta o A12 para usá-lo.

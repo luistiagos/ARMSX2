@@ -5,7 +5,7 @@ atualizar as referências remotas. O `upstream/master` verificado estava em `5fd
 
 Havia **29 relatórios**, não 18 como dizia o índice anterior. Eles agora estão separados em:
 
-- [`armsx2-fork/`](armsx2-fork/README.md): **8** bugs que afetam, ou cuja causa continua presente,
+- [`armsx2-fork/`](armsx2-fork/README.md): **10** bugs (8 na auditoria de 2026-09-03, mais 2 abertos em 2026-09-05) que afetam, ou cuja causa continua presente,
   na árvore atual do fork (eram 22; os quatro de rastreabilidade foram fechados em 2026-09-03 pelas
   [TASK-0010](../../task/TASK-0010-corrigir-validador-rastreabilidade.md) e
   [TASK-0011](../../task/TASK-0011-impor-regra-de-commit-mecanicamente.md) e
@@ -39,6 +39,8 @@ neles.
 | [Mali perde device com upscale](armsx2-fork/mali-g52-r38-vulkan-perde-o-device-com-qualquer-upscale_2026-09-02T11-33.md) | driver/hardware | **Sem correção de causa no app/core.** | Não para a causa; só mitigação | — | Não remover o para-quedas de device-lost. Oferecer renderer software/limite por jogo se houver evidência suficiente. |
 | [Savestate `0x9A54` rejeitado](armsx2-fork/savestate-formato-9a54-rejeitado-pelo-fork_2026-08-27T09-10.md) | incompatibilidade fork ↔ version1 | **Implementada**, bloqueada na validação. | Sim, já implementada | **Alta** | TASK-0049 implementou leitor e proteção de consumo integral; falta um `.p2s` real da 1.0.23. |
 | [Veredito do renderer ausente no relato](armsx2-fork/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md) | delta do fork | **Implementada**, falta comprovar num relato real sem crash. | Sim, já implementada | **Baixa** | JNI separado e `graphicsBootSummary` já carregam o veredito; a TASK-0065 ainda está em andamento. |
+| [NFS Underground força No Readbacks](armsx2-fork/nfs-underground-no-readbacks-forcado-pelo-overlay_2026-09-05T20-14.md) | delta do fork | **Hipótese derrubada em aparelho (2026-09-05).** A chave é nossa e está ativa de fábrica nas cópias **NTSC-U** — mas no `moto g86 5G`, com ela ligada, `SLUS-21065`/CRC `F5C7B45F` renderiza **correto** no mesmo Main Menu da captura do cliente. Não é causa suficiente. | Da corrupção: não por aqui | **Baixa** (a chave em si) | O discriminador é o **aparelho**. Caracterizar o G06 (GPU, driver, versão do app) e repetir a mesma medição lá. A assimetria NTSC-U/PAL do overlay continua sem justificativa escrita. |
+| [Ajuste por jogo não chega à camada lida pelo core](armsx2-fork/ajuste-por-jogo-igual-ao-global-nao-vence-o-gamedb_2026-09-05T20-14.md) | delta do fork | **Sem correção, e medido em aparelho (2026-09-05).** Um ajuste por jogo feito pela **biblioteca** não gera `gamesettings/<serial>_<CRC>.ini` nenhum — o valor chega pela camada base, mas o *pin* não, então o GameDB vence toda escolha por jogo. Pelo menu **em jogo** o arquivo é gravado, e aí vale a regra "só o que difere do global". | Sim | **Média** | Generaliza para toda chave disputada pelo banco. Sem aviso ao usuário. Bloqueador de diagnóstico: o core grava esses INIs em `0600` e o pacote não é `debuggable`, então nem `adb` nem `run-as` leem o conteúdo. |
 
 ### Fechado desde a última auditoria
 
