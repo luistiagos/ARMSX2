@@ -83,3 +83,72 @@ adb logcat -d | grep 'ANR in come.nanodata'
 > acrescentou `-Parmsx2.debug.debuggable=false`, que produz um APK de debug **não-`debuggable`** —
 > assinado com a chave de debug, então instala neste aparelho sem desinstalar nada. É o que tira o
 > interpretador do ART do caminho e permite refazer os números sem esse confundidor.
+
+## A causa, achada no traço — 2026-09-06
+
+O `bugreport` daquela sessão tinha sido gerado e não lido. Ele contém
+`FS/data/anr/anr_2026-09-05-01-51-01-731`, o traço deste ANR. **A hipótese acima está errada.**
+
+A thread principal está em `Native`, bloqueada num condvar dentro do nosso próprio core:
+
+```
+"main" prio=5 tid=1 Native
+  native: #03  libemucore_4k.so (std::__ndk1::condition_variable::wait(unique_lock<mutex>&)+24)
+  native: #05  libemucore_4k.so (Java_kr_co_iefriends_pcsx2_NativeApp_renderShadeBoost+308)
+  native: #06  libart.so (art_quick_generic_jni_trampoline+148)
+```
+
+E a pilha Java diz de onde a chamada veio:
+
+```
+at kr.co.iefriends.pcsx2.NativeApp.renderShadeBoost(Native method)
+at com.armsx2.config.Settings.applyTo(Settings.kt:1012)
+at com.armsx2.ui.InGameOverlay.saveSettings$lambda$12(InGameOverlay.kt:181)
+at com.armsx2.config.SettingsApplyQueue.runPending(SettingsApplyQueue.kt:131)
+at com.armsx2.config.SettingsApplyQueue.runner$lambda$0(SettingsApplyQueue.kt:80)
+at android.os.Handler.handleCallback(Handler.java:942)
+at android.os.Looper.loop(Looper.java:313)
+```
+
+### O que isso quer dizer
+
+**Não é o ANGLE amarrando o contexto EGL a uma thread.** É a
+[`SettingsApplyQueue`](../../task/TASK-0084-coalescer-o-apply-de-configuracoes.md) despachando o
+apply coalescido **por `Handler` na thread principal**, e `Settings.applyTo` fazendo uma chamada
+JNI **bloqueante** que espera a thread da CPU do emulador.
+
+E isso é **exatamente o resíduo que a TASK-0084 registrou como não resolvido**:
+
+> *"O apply coalescido ainda custa 61–76 ms de main thread quando dispara — uma vez por gesto em vez
+> de nove vezes por segundo, mas ainda um quadro estourado por gesto. Removê-lo significa tirar
+> `applyTo()`/`commitSettings()` da UI thread, o que está bloqueado: `MemorySettingsInterface` não
+> tem mutex e há escritores diretos na UI fora do `applyTo`."*
+
+O que este traço acrescenta é o **teto**: aqueles 61–76 ms não são um limite. Quando a thread que o
+JNI espera está lenta, a espera vai a **mais de 10 segundos** e vira ANR. O apply chegou ali porque a
+recuperação do renderizador tinha acabado de gravar `renderer` + `useAngleOpenGL`, e o apply
+pendente foi drenado no caminho de pausa.
+
+### O papel do ANGLE, revisto
+
+O controle sem ANGLE continua valendo — **0 ANR** —, mas a leitura muda: o ANGLE não é o mecanismo,
+é o que torna a espera longa o suficiente para estourar. Ele deixa a thread do GS mais lenta neste
+par jogo/aparelho, e a chamada bloqueante que já existia passa do limite.
+
+Ou seja: **o degrau do ANGLE não é o defeito**. O defeito é uma chamada JNI bloqueante na thread
+principal, que qualquer coisa suficientemente lenta transforma em ANR.
+
+### O que isso muda nos próximos passos
+
+Os passos 1 a 3 acima continuam úteis, mas deixam de ser o caminho principal. O caminho principal é
+o que a TASK-0084 já nomeou e deixou bloqueado: **tirar `applyTo`/`commitSettings` da thread
+principal**, o que exige mutex em `MemorySettingsInterface` no lado nativo — contribuição ao
+upstream, não remendo local.
+
+Enquanto isso não acontece, um paliativo de baixo risco seria a fila **não** drenar na thread
+principal quando há VM rodando. Não avaliado aqui.
+
+> **Nota de método.** Este traço estava disponível desde 05/09 e passou despercebido porque o
+> `bugreport` foi disparado e nunca aberto. `Input dispatching timed out` diz que a main não
+> respondeu, nunca por quê; o traço em `/data/anr/` diz. Vale sempre puxá-lo.
+
