@@ -305,4 +305,118 @@ nível esperado, inclusive na parte de admitir o critério que **não** foi medi
 
 ## Resultado
 
-— (a preencher pela sessão que implementar)
+> **Parcial, e o que falta é o que mais importa.** O código está aplicado, compilado e **provado
+> dentro do APK**. Nenhum dos critérios de aparelho (1a–1d, 2a–2d) foi validado: **não havia
+> aparelho conectado** (`adb devices` vazio) em nenhum momento da sessão de 2026-09-08. Um "depois"
+> sem aparelho não é validação, e esta seção não vai fingir que é.
+
+### O que foi commitado
+
+| Commit | Autor | Assunto |
+|---|---|---|
+| `98d6c01402` | jpolo1224 | `TASK-0090: faz o Sustained Performance vencer o modo Nucleos de Desempenho` |
+| `5a6ef7fcf2` | jpolo1224 | `TASK-0090: descarta do page cache cada arquivo extraido pelo Quick Loading` |
+| `03f3e48a1f` | Luis Tiago | `TASK-0090: atualiza a descricao da afinidade em pt-BR` |
+
+Os dois primeiros são `git cherry-pick -x` de `a18f2eb238` e `c2bea2f029`. **Os dois aplicaram
+limpo** (`Auto-merging`, sem conflito), a autoria de `jpolo1224` foi preservada e a linha
+`(cherry picked from commit ...)` ficou no corpo. Só o assunto foi reescrito, para levar o prefixo
+`TASK-0090:` que o validador exige — sem isso `check_traceability.py --commits` reprova, porque um
+cherry-pick **não** é merge e entra no laço de conferência.
+
+As cinco alterações não commitadas que não são desta task (`Settings.kt`, `InGameOverlay.kt`,
+`SettingsViewModel.kt`, `gradle.properties`, `publish-retrosystem-ps2.ps1`) continuam
+**não commitadas e intocadas**. Nenhum `git add -A`, nenhum `git stash`.
+
+### Verificação de símbolo antes de escrever (a regra do CLAUDE.md)
+
+Não era código novo, mas o pre-image de um cherry-pick pode mentir tanto quanto um `grep`:
+
+| Símbolo | Onde foi aberto | O que se confirmou |
+|---|---|---|
+| `prefs` | `MainActivityRuntime.kt:139` | `lateinit var prefs: SharedPreferences`, membro do `companion object` — **em escopo** no ponto de inserção (`start()`, também no companion) |
+| `"ui.sustainedPerf"` | `MainActivityRuntime.kt:2670` | chave exata, default `false`, a mesma que aciona `window.setSustainedPerformanceMode(true)` |
+| `bootCfg.affinityMode` | `Settings.kt:445` | `Int`, default `7` |
+| `NativeApp.setAffinityMode` | `NativeApp.java:764` | `public static native void setAffinityMode(int mode)` — recebe `int`, então o `affinity: Int` calculado serve |
+| `fp` | `common/FileSystem.h:108` | `ManagedCFilePtr = std::unique_ptr<std::FILE, FileDeleter>` → `fp.get()` é `std::FILE*`, e `fileno()`/`std::fflush()` valem |
+| `FileDeleter` (comportamento em destruição) | `common/FileSystem.h:99-105` | só `std::fclose(fp)`. Não há nada entre o `fsync` e o `fp.reset()` que desfaça a ordem exigida |
+| `<unistd.h>` / `<stdio.h>` | `native-lib.cpp:4` e `:6` | já presentes → `fsync` e `fileno` declarados. Só faltava `<fcntl.h>`, que o patch traz |
+| `ConfigStore.migrateAffinityPerfCores` | `ConfigStore.kt:297-305` | migração **única**, atrás de um flag em prefs. **Não interage** com a sobreposição: a sobreposição não grava nada, só troca o valor entregue ao nativo |
+
+Uma consequência dessa última linha, que vale registrar para quem for testar: **a sobreposição não
+muda o que a tela mostra.** Com o Sustained Performance ligado, o seletor continua exibindo
+"Núcleos de Desempenho"; o que muda é o valor empurrado para o nativo. É exatamente por isso que a
+frase nova na descrição não é enfeite — ela é a única pista visível de que a sobreposição existe.
+
+### Compilação e testes (medidos)
+
+| Etapa | Resultado |
+|---|---|
+| `native-lib.cpp.o` (ninja `-j 4`, árvore `.cxx/Debug/2r5u2a6y/arm64-v8a`) | **exit 0, 19,6 s.** 3 warnings — `env_main`, `s_dump_frame_number`, `s_loop_number` — todos pré-existentes e fora do trecho novo |
+| `:app:compileGithubDebugKotlin` (`-Pkotlin.incremental=false`, JDK 21) | **BUILD SUCCESSFUL, 1 min 48 s.** Só avisos de deprecação pré-existentes; os de `MainActivityRuntime.kt` são das linhas 2499/2657/2658, não do trecho novo (763-780) |
+| `:app:testGithubDebugUnitTest` | **BUILD SUCCESSFUL, 1 min 6 s — 42 testes, 0 falhas, 0 erros, 0 ignorados** |
+| `:app:assembleGithubDebug` | **BUILD SUCCESSFUL, 47 s.** APK de 93.677.811 bytes |
+| `check_traceability.py` | `OK -- 94 task(s), 3 feature(s)` |
+| `check_traceability.py --commits upstream/master..HEAD` | `OK -- ... 157 commit(s)` |
+
+**Os 42 testes corrigem o número da própria task**, que citava 37 (TASK-0084). A suíte cresceu; a
+contagem por classe é `RendererRecoveryTest` 13, `RomArchiveExtractorTest` 8, `DownloadFormatTest` 5,
+`RomDownloadFallbackTest` 5, `AngleDriverTest` 5, `DiscordSessionClockTest` 4, `ExampleUnitTest` 1,
+`I18nKeysTest` 1.
+
+`I18nKeysTest` foi aberto antes de mexer no JSON: ele confere **chave usada × chave definida em
+`I18n.kt`**, e não olha os JSONs de tradução. Trocar um *valor* em `pt-BR.json` não o afeta — e o
+cherry-pick também não adiciona nem remove chave, só troca o texto de uma.
+
+### A mudança está mesmo dentro do APK (e não só "compilou")
+
+Esta é a armadilha registrada em `apk-instalado-nao-tem-a-correcao.md`, então foi conferida por
+conteúdo, não por "BUILD SUCCESSFUL":
+
+- **C++:** `posix_fadvise` aparece **uma única vez em toda a árvore de código** (`native-lib.cpp:4608`,
+  a linha nova). Na `libemucore_4k.so` ligada às 18:50:52 — depois do `.o` das 18:46:44 —
+  `llvm-readelf --dyn-syms` mostra `UND FUNC GLOBAL posix_fadvise@LIBC` e `UND ... fsync@LIBC`. O
+  símbolo não tinha de onde vir a não ser do trecho novo.
+- **Kotlin:** a string de log `@@ANDROID_AFFINITY@@ sustained performance on -> affinity forced to
+  Disabled` está em `classes6.dex`; a frase nova em inglês (`Turning on Sustained Performance
+  disables it`) está em `classes11.dex`.
+- **Tradução:** `assets/i18n/pt-BR.json` **dentro do APK** abre com `"Núcleos de Desempenho" é o
+  padrão:` e contém `Desempenho Sustentado`. O JSON continua válido, com as **1553 chaves**
+  originais, UTF-8 sem BOM, LF, e `git diff --numstat` de **1 linha alterada, 1 inserida**.
+
+### O que NÃO foi validado, e por quê
+
+**Nenhum critério de aparelho.** `adb devices` devolveu lista vazia no início e no fim da sessão.
+
+| Critério | Situação |
+|---|---|
+| 1a — `@@ANDROID_AFFINITY@@` aparece com sustained ON + modo 7 | **não medido** — sem aparelho |
+| 1b — a linha **não** aparece com sustained OFF | **não medido** — sem aparelho |
+| 1c — a linha **não** aparece nos modos 1–6 | **não medido** — sem aparelho |
+| 1d — a frase nova na tela, em pt-BR e em inglês | **não medido na tela.** Provado só no artefato: os dois textos estão dentro do APK (dex e asset). Isso não é o mesmo que ver renderizado |
+| 2a — série de `Dirty`/`Writeback` antes × depois | **não medido** — sem aparelho e **sem o par "antes"** (ver abaixo) |
+| 2b — app não é morto (`signal 9` / lmkd) depois da extração | **não medido** — sem aparelho |
+| 2c — extração continua correta (contagem de arquivos, boot pelo ELF) | **não medido** — sem aparelho |
+| 2d — custo em tempo da extração, antes × depois | **não medido** — sem aparelho |
+
+**O APK "antes" também não existe ainda.** A tentativa de produzi-lo — reverter os quatro arquivos
+para `b0fe13f769` com `git checkout <commit> -- <paths>`, compilar, guardar o APK e restaurar — foi
+**bloqueada pelo classificador de permissão** da sessão, e não foi contornada: sobrescrever arquivos
+da árvore de trabalho com cinco alterações alheias em cima é justamente o que aquela barreira
+existe para segurar. Fica registrado como decisão de parar, não como esquecimento.
+
+Duas saídas para a próxima sessão, na ordem de preferência:
+
+1. **Usar como "antes" o APK que já estiver instalado no aparelho**, se ele for anterior a
+   `98d6c01402`. É o que a própria task admite ("ou com os dois commits revertidos localmente") e
+   não mexe na árvore.
+2. Reverter os quatro arquivos localmente, **com autorização explícita do usuário**, medir, e
+   restaurar. Os caminhos são `native-lib.cpp`, `MainActivityRuntime.kt`, `I18n.kt` e `pt-BR.json`.
+
+O APK "depois" está pronto e é o do build acima:
+`platforms/android/app/build/outputs/apk/github/debug/app-github-debug.apk` (93.677.811 bytes).
+Na hora de instalar, vale a regra da própria task: `:app:installGithubDebug`, e conferir o tamanho
+do `base.apk` no aparelho contra esse número antes de acreditar em qualquer medição.
+
+Para o Defeito 2 é preciso, além do aparelho, **um jogo de DVD na casa dos 4 GB** — um CD não
+enche o page cache o bastante para o defeito aparecer.
