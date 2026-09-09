@@ -176,3 +176,9 @@ platforms/android/app/src/main/cpp/3rdparty/discord/include/
 dist/
 r2-config.json
 build.properties
+
+# Medicoes da TASK-0090 no aparelho (docs/task/TASK-0090-validar-no-aparelho.py).
+# Series de /proc/meminfo, capturas de tela e uma COPIA DO base.apk instalado (~90 MB),
+# puxada para decidir se o build instalado serve de "antes". Sao artefatos de medicao:
+# os numeros entram na secao Resultado da task, os arquivos nao entram no repositorio.
+docs/task/_TASK-0090-medicoes/

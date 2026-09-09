@@ -405,18 +405,94 @@ para `b0fe13f769` com `git checkout <commit> -- <paths>`, compilar, guardar o AP
 da árvore de trabalho com cinco alterações alheias em cima é justamente o que aquela barreira
 existe para segurar. Fica registrado como decisão de parar, não como esquecimento.
 
-Duas saídas para a próxima sessão, na ordem de preferência:
+### Decisão do usuário sobre o "antes" do Critério 2a (2026-09-08)
 
-1. **Usar como "antes" o APK que já estiver instalado no aparelho**, se ele for anterior a
-   `98d6c01402`. É o que a própria task admite ("ou com os dois commits revertidos localmente") e
-   não mexe na árvore.
-2. Reverter os quatro arquivos localmente, **com autorização explícita do usuário**, medir, e
-   restaurar. Os caminhos são `native-lib.cpp`, `MainActivityRuntime.kt`, `I18n.kt` e `pt-BR.json`.
+**O "antes" será o APK que já estiver instalado no aparelho.** Reverter os quatro arquivos para
+`b0fe13f769` para produzir um "antes" está **descartado por decisão**, não adiado: a árvore fica
+como está, com as cinco alterações alheias intocadas, e a barreira que bloqueou aquele caminho
+**não deve ser contornada**.
+
+Isso traz uma condição, e ela é o ponto todo: **só vale se o build instalado for anterior aos
+quatro commits desta task.** Isso tem de ser conferido **no momento da medição**, não presumido —
+ninguém sabe hoje o que está instalado naquele aparelho. Se na hora ele for igual ou mais novo, o
+Critério 2a **fica sem par e deve ser marcado como não medido**. Não se inventa um substituto: uma
+série de `Dirty` sem o par "antes" não prova nada, e escrever que provou é pior que não medir.
+
+Três conferências, da mais fraca para a mais forte:
+
+| Sinal | Como | O que diz |
+|---|---|---|
+| `versionCode` e data | `adb shell dumpsys package come.nanodata.armsx2 \| grep versionCode`; `adb shell pm path ...` e `stat` no `base.apk` | circunstancial — os dois lados podem compartilhar o mesmo `versionCode`, porque nada nesta task o incrementa |
+| Tamanho | `stat -c %s` no `base.apk` instalado × 93.677.811 do APK novo | tamanho igual = é o mesmo arquivo, e aí **não** serve de "antes" |
+| **Marcador no dex** | puxar o `base.apk` instalado e procurar `@@ANDROID_AFFINITY@@` nos `classes*.dex` | **decisivo.** A string só existe a partir de `98d6c01402`. Se ela **está** no instalado, aquele build já tem a correção e não é "antes" nenhum |
+
+A terceira é a que resolve, e é por isso que o script abaixo a implementa: ela responde
+"este build tem a correção?" diretamente, em vez de inferir de número de versão ou de data de
+arquivo, que é o tipo de inferência que já custou uma medição inteira neste projeto.
+
+### Script de validação, para a medição ser uma passagem só
+
+[`TASK-0090-validar-no-aparelho.py`](TASK-0090-validar-no-aparelho.py), ao lado deste arquivo.
+Existe para que a próxima sessão **não re-derive como medir** — os oito critérios já estão
+codificados, com os mesmos números da seção "Como validar".
+
+```bash
+python docs/task/TASK-0090-validar-no-aparelho.py preflight   # aparelho, APK, e se o instalado serve de "antes"
+python docs/task/TASK-0090-validar-no-aparelho.py library     # acha o alvo de DVD (~4 GB) no proprio aparelho
+python docs/task/TASK-0090-validar-no-aparelho.py defeito1 --game "/storage/.../Jogo.iso"
+python docs/task/TASK-0090-validar-no-aparelho.py meminfo --label antes
+python docs/task/TASK-0090-validar-no-aparelho.py posmortem
+```
+
+O que ele automatiza de verdade: a conferência de identidade do APK e a decisão sobre o "antes"; a
+listagem da biblioteca com tamanhos, separando DVD de CD (e dizendo com todas as letras quando só
+há CD, caso em que 2a–2d **não devem ser medidos** — um CD não enche o page cache o bastante); as
+três rodadas do Defeito 1, **inclusive o boot**, por `am start -a android.intent.action.VIEW -d
+file://…` na `com.armsx2.BootSplashActivity`, que é exportada e declara esse filtro
+(AndroidManifest.xml:102-108); a leitura do logcat e o veredito de 1a/1b/1c; a amostragem de
+`Dirty`/`Writeback` com série gravada em TSV; e a varredura de `lmkd`/`signal 9`/`died` de 2b mais
+a contagem de arquivos de 2c.
+
+O que ele **deliberadamente não faz**, e o motivo em cada caso:
+
+- **Não escreve em `shared_prefs`.** Trocar `ui.sustainedPerf` e `affinityMode` na marra exigiria
+  force-stop e reescrita de um XML com um JSON escapado dentro — código que eu **não teria como
+  exercitar sem aparelho**, entrando justamente no passo que decide o veredito. Um erro ali não
+  falha alto: mede com a régua torta. Então o script **lê** o pref e **confere** que o estado
+  pedido valeu antes de dar boot; quem troca é o operador, na tela.
+- **Não dispara a extração do Quick Loading.** O fluxo passa por um seletor de arquivo do sistema
+  (SAF) para escolher o ELF — `QuickLoadSetup.run(context, iso, elfUri)`. Não há como conduzir isso
+  por adb sem automação de UI. O script pede que o operador dispare e mede em volta.
+- **Não instala nem desinstala nada.** A ordem antes/depois é decisão de quem mede, e desinstalar
+  perde saves.
+- **Não julga o 1d sozinho.** Ele puxa duas capturas de tela (pt-BR e inglês); quem decide se a
+  frase está lá é quem olha.
+
+Conferido sem aparelho: o script compila, o `--help` responde, `preflight` sem aparelho falha alto
+com mensagem clara e `exit=1`, e a função que decide o "antes" foi exercitada contra o APK novo —
+ela responde corretamente que **esse** APK contém o marcador e portanto não serviria de "antes".
+Os caminhos que exigem adb continuam **não exercitados**, e isso é o que é.
+
+Os artefatos que ele gera (séries TSV, capturas, e a cópia de ~90 MB do `base.apk` instalado) caem
+em `docs/task/_TASK-0090-medicoes/`, que entrou no `.gitignore`: os **números** vão para esta
+seção, os arquivos não vão para o repositório.
 
 O APK "depois" está pronto e é o do build acima:
 `platforms/android/app/build/outputs/apk/github/debug/app-github-debug.apk` (93.677.811 bytes).
 Na hora de instalar, vale a regra da própria task: `:app:installGithubDebug`, e conferir o tamanho
 do `base.apk` no aparelho contra esse número antes de acreditar em qualquer medição.
 
-Para o Defeito 2 é preciso, além do aparelho, **um jogo de DVD na casa dos 4 GB** — um CD não
-enche o page cache o bastante para o defeito aparecer.
+### O jogo do Defeito 2 se escolhe na hora, no próprio aparelho
+
+O usuário não nomeou um título, e não precisa: `library` lê o pref `romsDirs` do aparelho, varre as
+pastas configuradas, e lista cada imagem de disco com o tamanho, separando **DVD** (≥ 3 GB) de
+**CD**. O corte em 3 GB fica longe dos dois lados — um DVD de PS2 passa de 4,7 GB, um CD para em
+700 MB — então não há zona cinzenta para errar.
+
+Duas condições que o script já verifica e que valem estar escritas aqui:
+
+- **Tem de ser `.iso` puro.** `.chd` e `.cso` não servem — é a própria mensagem do app
+  (`games.quickLoad.extractFailed`: *"Quick loading needs a plain .iso"*).
+- **Se só houver CD, 2a–2d não devem ser medidos.** Um CD não enche o page cache o bastante para o
+  defeito aparecer; medir com ele produziria um "passou" que não significa nada. O desfecho certo
+  nesse caso é registrar "sem alvo de DVD no aparelho", não medir com o que tem à mão.
