@@ -2,6 +2,8 @@ package com.armsx2.ui.settingshub
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.armsx2.DiscIdentity
 import com.armsx2.EmuState
 import com.armsx2.GameInfo
 import com.armsx2.config.ConfigStore
@@ -10,6 +12,7 @@ import com.armsx2.config.SettingsScope
 import com.armsx2.navigation.SettingsCategory
 import com.armsx2.runtime.MainActivityRuntime
 import com.armsx2.ui.InGameOverlay
+import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val category: SettingsCategory = SettingsCategory.General,
@@ -25,6 +28,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun load(category: SettingsCategory, game: GameInfo?) {
         val serial = game?.settingsKey
         InGameOverlay.currentSerial.value = serial
+        // The CRC is half the name of gamesettings/<serial>_<CRC>.ini, and that file is the ONLY
+        // thing ComputePerGameOverrides reads — so without it a per-game choice made from the
+        // library never pins against the GameDB (TASK-0089). Resolved here rather than at save
+        // time for two reasons: DiscIdentity reads the disc's boot ELF and documents itself as
+        // "never call from the main thread", and the save path runs its job ON the main thread
+        // (SettingsApplyQueue). The serial guard drops a slow result that lands after the user has
+        // moved to a different game.
+        InGameOverlay.currentCrc.value = null
+        if (game != null && serial != null) {
+            viewModelScope.launch {
+                val resolved = DiscIdentity.resolve(game.uri, serial)
+                if (InGameOverlay.currentSerial.value == serial) InGameOverlay.currentCrc.value = resolved
+            }
+        }
         InGameOverlay.settingsScope.value = if (serial == null) SettingsScope.Global else SettingsScope.Game
         settings.value = if (serial == null) ConfigStore.loadGlobal() else ConfigStore.resolveForGame(serial)
         uiState.value = SettingsUiState(
@@ -93,7 +110,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 // rewrite it by serial. A no-op when the game never wrote one — then the pruned
                 // JSON alone already resolves to global at the next boot.
                 gameSerial != null -> ConfigStore.resolveForGame(gameSerial)
-                    .writeGameSettingsIni(ConfigStore.loadGlobal(), gameSerial)
+                    .writeGameSettingsIni(ConfigStore.loadGlobal(), gameSerial, InGameOverlay.currentCrc.value)
                 // Global scope with a game live: re-apply the reset globals to the base layer.
                 running -> settings.value.applyTo()
             }

@@ -1,6 +1,7 @@
 package com.armsx2.ui
 
 import androidx.compose.runtime.mutableStateOf
+import com.armsx2.DiscIdentity
 import com.armsx2.EmuState
 import com.armsx2.runtime.MainActivityRuntime
 import com.armsx2.config.ConfigStore
@@ -13,6 +14,19 @@ object InGameOverlay {
     val settingsState = mutableStateOf(Settings())
     val settingsScope = mutableStateOf(SettingsScope.Global)
     val currentSerial = mutableStateOf<String?>(null)
+
+    /** CRC of the game currently being configured, used only to name
+     *  `gamesettings/<serial>_<CRC>.ini` — see [Settings.writeGameSettingsIni].
+     *
+     *  Written by BOTH entry points, and it has to be, because the field outlives either one:
+     *   - `SettingsViewModel.load` (library, no VM) resolves it off the main thread, since
+     *     `DiscIdentity` reads the boot ELF and says so in its own docs.
+     *   - [open] (in-game) takes it from the VM's own `getPauseGameSerial()` string.
+     *
+     *  Both CLEAR it first and only then refill, so a CRC can never be read against a different
+     *  game's serial. Null is always safe — it restores the pre-TASK-0089 behaviour of not
+     *  creating the file at all. */
+    val currentCrc = mutableStateOf<String?>(null)
     val hardcoreOn = mutableStateOf(false)
     val frameLimitOn = mutableStateOf(true)
 
@@ -198,12 +212,18 @@ object InGameOverlay {
             // a game with no INI and never initialised on one with an old [DEV9/Eth] block, across six
             // back-to-back boots. Only the category-Reset path rewrote the INI, which is why Reset was
             // the only thing that ever "worked". Uses the by-serial overload since there is no running
-            // game to reach it through; a no-op when the game never wrote an INI.
+            // game to reach it through.
+            //
+            // [currentCrc] is what lets that overload CREATE the file rather than only rewrite one
+            // that happens to exist (TASK-0089). Until it was passed, the by-serial glob found
+            // nothing for a game configured only from the library, writeGameSettingsIni returned
+            // early, and the game never got a layer — so ComputePerGameOverrides pinned nothing and
+            // the GameDB won every per-game choice. Still a no-op when the CRC is unknown.
             if (MainActivityRuntime.eState.value == EmuState.STOPPED) {
                 runCatching {
                     currentSerial.value?.takeIf { it.isNotBlank() }?.let { serial ->
                         ConfigStore.resolveForGame(serial)
-                            .writeGameSettingsIni(ConfigStore.loadGlobal(), serial)
+                            .writeGameSettingsIni(ConfigStore.loadGlobal(), serial, currentCrc.value)
                     }
                 }
             }
@@ -223,10 +243,25 @@ object InGameOverlay {
         // settings silently never applied on any launch without a GameInfo (Boot Disc, Swap Disc,
         // BIOS). A BIOS boot is worse still: CRC 0 yields " (00000000)", which is not blank, so it
         // forced Game scope onto a phantom key. Strip to the serial and drop what's left if empty.
-        val serial = MainActivityRuntime.currentGame.value?.settingsKey
-            ?: runCatching { NativeApp.getPauseGameSerial() }.getOrNull()
-                ?.substringBefore(" (")?.trim()?.takeIf(String::isNotBlank)
+        val pauseSerial = runCatching { NativeApp.getPauseGameSerial() }.getOrNull()
+        val bareFromVm = pauseSerial?.substringBefore(" (")?.trim()?.takeIf(String::isNotBlank)
+        val serial = MainActivityRuntime.currentGame.value?.settingsKey ?: bareFromVm
         currentSerial.value = serial
+        // A CRC must never outlive the game it belongs to. [currentCrc] is object-level state that
+        // the LIBRARY path (SettingsViewModel.load) also writes, and writeGameSettingsIni builds
+        // gamesettings/<serial>_<CRC>.ini out of the pair — so opening the overlay on game B while
+        // game A's CRC was still parked here would seed B_<A's CRC>.ini. The `B_*` glob then FINDS
+        // that file and writes the settings into it, while ComputePerGameOverrides looks for
+        // B_<B's CRC>.ini and never sees them: the exact silent no-op TASK-0089 exists to remove,
+        // reintroduced by a stale field.
+        //
+        // So: cleared unconditionally, then refilled only from a VM that is running THIS serial —
+        // the same guard, for the same reason, that DiscIdentity.resolve applies. "%s (%08X)" is
+        // already uppercase and yields " (00000000)" with no VM, which the pattern rejects.
+        currentCrc.value = pauseSerial
+            ?.takeIf { serial != null && bareFromVm == serial }
+            ?.substringAfter(" (", "")?.substringBefore(')')?.trim()?.uppercase()
+            ?.takeIf { it.matches(DiscIdentity.CRC_PATTERN) && it != "00000000" }
         settingsScope.value = if (serial == null) SettingsScope.Global else SettingsScope.Game
         settingsState.value = ConfigStore.resolveForGame(serial)
         frameLimitOn.value = settingsState.value.frameLimitEnable

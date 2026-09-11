@@ -1385,6 +1385,48 @@ data class Settings(
         )
     }
 
+    /**
+     * Give the by-serial path a file to find.
+     *
+     * `gameIniBeginWriteForSerial` globs `<serial>_*.ini` and returns false when nothing matches
+     * ([native-lib.cpp] `gameIniBeginWriteForSerial`) — it cannot create one, because the name
+     * needs the CRC and with no VM there is nothing to ask for it. So a game whose settings were
+     * only ever touched from the LIBRARY never got a `gamesettings/<serial>_<CRC>.ini` at all, and
+     * `ComputePerGameOverrides` reads only that file: no file, no pin, so every GameDB entry
+     * outranked every per-game choice. Measured on a moto g86 with SLUS-21065 (TASK-0089).
+     *
+     * An empty seed is enough. The glob then finds it, `BeginGameIniExport` loads it (`Load()`
+     * already tolerates a file with nothing in it), and `gameIniCommitWrite` deletes it again when
+     * no key ends up differing from global — so this cannot litter `gamesettings/`.
+     *
+     * The name must be the one the CORE would build, or the seed is worse than useless — it would
+     * sit there forever while the glob keeps missing it. Two halves to match, both verified rather
+     * than assumed:
+     *  - **CRC in UPPERCASE hex.** `VMManager::GetGameSettingsPath` formats `{:08X}` and
+     *    `getPauseGameSerial` uses `%08X`. [DiscIdentity.resolve] already uppercases; the call here
+     *    is belt-and-braces for a CRC arriving from anywhere else.
+     *  - **A serial `Path::SanitizeFileName` would not rewrite.** The glob pattern is built from
+     *    the SANITIZED serial while this side has the raw one, so a serial carrying anything that
+     *    sanitizing replaces would produce two different names. On Android that set is only `/`
+     *    and `*` (common/FileSystem.cpp, `FileSystemCharacterIsSane`), which no real PS2 serial
+     *    has — so the conservative charset below costs nothing and removes the divergence.
+     *
+     * A no-op without a usable CRC or on a serial outside that charset: that keeps today's
+     * behaviour instead of guessing a filename the core would never look for.
+     */
+    private fun seedGameSettingsIni(serial: String, crc: String?) {
+        if (crc == null || !crc.matches(com.armsx2.DiscIdentity.CRC_PATTERN)) return
+        if (!serial.matches(SAFE_SERIAL_FOR_FILENAME)) return
+        val root = MainActivityRuntime.currentInitDataRoot()?.takeIf { it.isNotBlank() } ?: return
+        runCatching {
+            val dir = java.io.File(root, "gamesettings")
+            if (dir.isDirectory || dir.mkdirs()) {
+                val file = java.io.File(dir, "${serial}_${crc.uppercase()}.ini")
+                if (!file.exists()) file.createNewFile()
+            }
+        }
+    }
+
     /** Upstream-style per-game export (mirrors PCSX2's FullscreenUI): write only
      *  the keys that differ from [global] into the running game's
      *  gamesettings/<serial>_<CRC>.ini, so the on-disk layer is sparse and
@@ -1392,9 +1434,14 @@ data class Settings(
      *  override). Reuses applyTo's exact field→key mapping via [emitSink]: the
      *  global pass captures a baseline, the effective pass writes the diff. The
      *  running game already reflects the change live, so the native commit does
-     *  not reload — the INI applies as the game layer on the next boot. No-op
-     *  when no VM is running. */
-    fun writeGameSettingsIni(global: Settings, serial: String? = null) {
+     *  not reload — the INI applies as the game layer on the next boot.
+     *
+     *  With a running VM, [serial] and [crc] are both unnecessary — the native
+     *  side takes them from VMManager. Without one they are the whole story: the
+     *  pair is what lets the file be CREATED rather than only rewritten, which
+     *  before TASK-0089 made this a silent no-op for any game configured only
+     *  from the library. */
+    fun writeGameSettingsIni(global: Settings, serial: String? = null, crc: String? = null) {
         // Baseline: global's persisted keys. applyTo early-returns before the
         // live pokes/commit while emitSink is set, so nothing touches the VM.
         val baseline = HashMap<String, String>()
@@ -1405,8 +1452,10 @@ data class Settings(
             emitSink = null
         }
         // With a running VM the target is the current game (gameIniBeginWrite). With no VM — a
-        // per-game Reset done from the library — pass [serial] to locate the file directly; false
-        // there means no stale override file exists, so there is nothing to rewrite.
+        // per-game edit or Reset done from the library — pass [serial] to locate the file directly.
+        // [crc] lets the file be CREATED in that case; without it the by-serial glob only ever
+        // rewrites one that already exists, and false still means "nothing to rewrite".
+        if (serial != null) seedGameSettingsIni(serial, crc)
         val began = if (serial == null) NativeApp.gameIniBeginWrite()
                     else NativeApp.gameIniBeginWriteForSerial(serial)
         if (!began) return
@@ -1977,6 +2026,14 @@ data class Settings(
     }
 
     companion object {
+        /** Serials [seedGameSettingsIni] may name a file after: exactly the characters
+         *  `Path::SanitizeFileName` leaves alone, so the name this side builds and the
+         *  `<serial>_*.ini` glob the core builds cannot disagree. Deliberately narrower than
+         *  that function's real rule (which on Android only rewrites `/` and `*`) — every PS2
+         *  serial is `AAAA-NNNNN`, so nothing legitimate is excluded and nothing needs to be
+         *  kept in sync with a C++ character table. */
+        private val SAFE_SERIAL_FOR_FILENAME = Regex("[A-Za-z0-9._-]+")
+
         /** When non-null, [put] routes persisted-key emits here instead of the
          *  native base layer. Set transiently by [writeGameSettingsIni] to
          *  capture the key set for the sparse per-game INI export without

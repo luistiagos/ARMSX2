@@ -7,8 +7,11 @@
 - **Reincidência:** não
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** [TASK-0089](../../../task/TASK-0089-ajuste-por-jogo-na-biblioteca-cria-a-camada-de-jogo.md)
-  resolve a metade medida — o ajuste feito na biblioteca passa a criar a camada de jogo. A outra
-  metade (chave cujo valor coincide com o global) continua aberta e precisa de decisao propria.
+  resolve a metade medida — o ajuste feito na biblioteca passa a criar a camada de jogo.
+  **Implementada e commitada em 2026-09-11**, com a ressalva de que os três passos de validação em
+  aparelho ainda não rodaram (não havia aparelho conectado); o registro da task diz o que está e o
+  que não está provado. A outra metade (chave cujo valor coincide com o global) **continua aberta**
+  e precisa de decisao propria — por isso este bug segue em `open/`.
 - **Relacionado:** [NFS Underground 1 e 2 nascem com "No Readbacks" forçado](nfs-underground-no-readbacks-forcado-pelo-overlay_2026-09-05T20-14.md)
   — o primeiro caso concreto encontrado
 
