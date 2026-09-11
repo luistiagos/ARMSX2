@@ -169,12 +169,13 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0086](TASK-0086-eco-da-busca-nao-recompoe-a-biblioteca.md) — o eco da busca deixa de recompor a biblioteca inteira | em andamento | — | digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui | `3c09bf4189` `c3b9d09bf0` `68d282aa45` `03e0ad2dc0` |
 | [TASK-0087](TASK-0087-angle-entra-na-escada-de-recuperacao.md) — o ANGLE entra na escada de "a imagem não apareceu", antes do software | concluída | — | gl-mali-g52-r38-tela-preta-contornada-nao-corrigida | `e33da6a7a5` `f3abb2532a` |
 | [TASK-0088](TASK-0088-medir-sem-o-interpretador-do-art.md) — um build de debug **não-`debuggable`**, para medir sem o interpretador do ART no caminho | em andamento | — | anr-ao-abrir-o-menu-de-pausa-sob-angle, digitar-custa-97-a-450ms-por-tecla-na-thread-da-ui | `93d8ee39e8` `e09362b120` `9037ff667c` |
-| [TASK-0089](TASK-0089-ajuste-por-jogo-na-biblioteca-cria-a-camada-de-jogo.md) — ajuste por jogo feito na biblioteca cria a camada de jogo | concluída | — | ajuste-por-jogo-igual-ao-global-nao-vence-o-gamedb | `23498c4976` |
+| [TASK-0089](TASK-0089-ajuste-por-jogo-na-biblioteca-cria-a-camada-de-jogo.md) — ajuste por jogo feito na biblioteca cria a camada de jogo | concluída | — | ajuste-por-jogo-igual-ao-global-nao-vence-o-gamedb | `23498c4976` `a3e32f2db5` |
 | [TASK-0090](TASK-0090-duas-correcoes-de-campo-do-upstream.md) — **bloco 1**: afinidade não anula mais o Sustained Performance, e a extração para de encher o page cache | aberta | FEAT-0003 | — | `98d6c01402` `5a6ef7fcf2` `03f3e48a1f` `02198734e1` `33544306c2` |
 | [TASK-0091](TASK-0091-adotar-remocao-da-captura-de-video.md) — **bloco 2**: adotar a remoção de captura de vídeo/ffmpeg e apagar o nosso contorno local | aberta | FEAT-0003 | — | — |
 | [TASK-0092](TASK-0092-gamedb-e-precisao-ee-vu.md) — **bloco 3**: GameDB (Jak X, GoW II) e a precisão de EE FPU / divisão da VU | aberta | FEAT-0003 | — | — |
 | [TASK-0093](TASK-0093-trabalho-de-controle-do-armsx3.md) — **bloco 4**: o trabalho de controle do ARMSX3 e o fallback de rumble para pads sem motor | aberta | FEAT-0003 | — | — |
 | [TASK-0094](TASK-0094-avaliar-e-adotar-o-pr-660-gs.md) — **bloco 5**: decidir e executar a adoção do PR #660 (`gs-classic-tiler`) | aberta | FEAT-0003 | — | — |
+| [TASK-0095](TASK-0095-autoflush-do-god-of-war-em-gpu-fraca.md) — medir o que o `autoFlush` custa ao God of War em GPU fraca e, se a troca valer, propô-la ao upstream | aberta | — | god-of-war-lento-no-poco-c75-mali-g52 | — |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
