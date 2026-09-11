@@ -64,5 +64,5 @@ Lista objetiva. A feature só fecha quando todos forem verificáveis.
 |---|---|---|---|
 | [FEAT-0001](FEAT-0001-sync-upstream-oficial.md) | em andamento | 7 de 9 | Trazer as correções, o sistema de perfil de GPU e as melhorias do `ARMSX2/ARMSX2` oficial |
 | [FEAT-0002](FEAT-0002-rastreabilidade-verificavel.md) | planejada | 0 de 2 | Tornar a rastreabilidade verificável por máquina, em vez de declarativa |
-| [FEAT-0003](FEAT-0003-colheita-upstream-setembro-2026.md) | planejada | 0 de 5 | Colher, em cinco blocos serializados, o que o upstream produziu entre 31/08 e 07/09 de 2026 |
+| [FEAT-0003](FEAT-0003-colheita-upstream-setembro-2026.md) | em andamento | 1 de 5 | Colher, em cinco blocos serializados, o que o upstream produziu entre 31/08 e 07/09 de 2026 |
 | [`telemetria.md`](telemetria.md) | concluída | — | Reporte de erros de produção (legado, sem numeração) |

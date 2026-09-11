@@ -1,6 +1,6 @@
 # FEAT-0003: Colher o upstream de setembro de 2026
 
-- **Status:** planejada
+- **Status:** em andamento
 - **Criada em:** 2026-09-08
 - **Concluída em:** —
 
@@ -56,7 +56,7 @@ só começa quando a anterior estiver commitada e validada no aparelho.
 
 | Task | Status | Descrição |
 |---|---|---|
-| [TASK-0090](../task/TASK-0090-duas-correcoes-de-campo-do-upstream.md) | aberta | **Bloco 1** — afinidade não anula mais o Sustained Performance; a extração do Quick Loading para de encher o page cache e ser morta pelo lmkd |
+| [TASK-0090](../task/TASK-0090-duas-correcoes-de-campo-do-upstream.md) | concluída | **Bloco 1** — afinidade não anula mais o Sustained Performance (validado no aparelho); a correção de page cache da extração entrou, mas está **dormente**: o nosso app não tem entrada para o Quick Loading |
 | [TASK-0091](../task/TASK-0091-adotar-remocao-da-captura-de-video.md) | aberta | **Bloco 2** — adotar a remoção de captura de vídeo/ffmpeg do upstream, apagando o nosso contorno local |
 | [TASK-0092](../task/TASK-0092-gamedb-e-precisao-ee-vu.md) | aberta | **Bloco 3** — entradas de GameDB (Jak X, Shaolin Monks, GoW II) e a precisão de EE FPU / divisão da VU |
 | [TASK-0093](../task/TASK-0093-trabalho-de-controle-do-armsx3.md) | aberta | **Bloco 4** — o trabalho de controle vindo do ARMSX3 e o fallback de rumble para pads sem motor |
@@ -102,6 +102,19 @@ motivo de ficar fora é sempre o mesmo: não cabe numa sessão junto com o resto
    `python scripts/check_traceability.py`.
 4. **Teste no aparelho é obrigatório e é ponta a ponta.** "Compila" não é validação. Cada task
    abaixo diz qual é o critério e como medi-lo.
+
+### O que o Bloco 1 revelou, e vale para os blocos seguintes
+
+A TASK-0090 descobriu que o **Quick Loading não tem entrada no nosso app**: o merge da TASK-0067
+manteve o nosso `HomeScreen.kt` inteiro e, com ele, descartou o único chamador de `QuickLoadSetup`.
+Por decisão do usuário (2026-09-11), a TASK-0090 fechou com o Defeito 1 validado e o Defeito 2
+registrado como código dormente; devolver a entrada e medir o page cache ficou com a
+[TASK-0096](../task/TASK-0096-devolver-a-entrada-do-quick-loading.md), **fora** da sequência
+serializada — ela não pertence à colheita de setembro, e sim a uma perda de 01/09.
+
+**Para cada bloco daqui em diante:** antes de dar um commit do upstream por "entregue", achar **o
+chamador dele na nossa árvore**. Um recurso cuja entrada mora num arquivo que mantivemos inteiro no
+merge (o `HomeScreen.kt` é o caso conhecido) compila, entra no binário e não existe para o usuário.
 
 ## Critério de conclusão da feature
 

@@ -1,8 +1,10 @@
 # TASK-0090: trazer as duas correções de campo do upstream — afinidade térmica e page cache da extração
 
-- **Status:** aberta
+- **Status:** concluída
 - **Criada em:** 2026-09-08
-- **Concluída em:** —
+- **Concluída em:** 2026-09-11 — Defeito 1 validado no aparelho; Defeito 2 fechado como código
+  dormente, por decisão do usuário, com a validação transferida para a
+  [TASK-0096](TASK-0096-devolver-a-entrada-do-quick-loading.md)
 - **Feature:** [FEAT-0003](../features/FEAT-0003-colheita-upstream-setembro-2026.md)
 - **Bugs que resolve:** — (nenhum bug nosso escrito; os dois defeitos vêm do relato do upstream e
   foram confirmados por leitura na nossa árvore, ver "O que já foi verificado")
@@ -316,8 +318,12 @@ nível esperado, inclusive na parte de admitir o critério que **não** foi medi
 > vale para o upstream, não para nós. A correção entrou, está no binário e é inofensiva; ela passa a
 > importar no dia em que a entrada voltar.
 >
-> **A task não fecha**: 2a–2d ficam sem medir. O que fazer com isso é decisão — ver
-> "O que decidir agora", no fim desta seção.
+> **Fechada em 2026-09-11 pela saída (3) de "O que decidir agora", por decisão do usuário:** o
+> Defeito 1 está provado; o Defeito 2 fica registrado como **código do upstream carregado e dormente
+> no nosso app**, e 2a–2d passam a ser **não aplicáveis aqui** — não "passaram". A pergunta que
+> sobrou ("o Quick Loading volta ao produto?") e a medição do page cache foram para a
+> [TASK-0096](TASK-0096-devolver-a-entrada-do-quick-loading.md). Ver "Decisão do usuário sobre o
+> fechamento", logo abaixo de "O que decidir agora".
 
 ### Veredito por critério (aparelho, 2026-09-11)
 
@@ -489,6 +495,24 @@ não existe. Três saídas, e a escolha não é desta sessão:
 A (3) é a que eu recomendaria: o que esta task prometia sobre o Defeito 1 está provado, e o
 Defeito 2 virou outra pergunta — "queremos o Quick Loading no nosso app?" — que merece registro
 próprio em vez de ficar pendurada aqui.
+
+### Decisão do usuário sobre o fechamento (2026-09-11)
+
+**Saída (3).** A TASK-0090 fecha; o Defeito 2 vira bug e task próprios:
+
+- bug [quick-loading-sem-entrada-apos-merge-da-task-0067](../bugs/open/armsx2-fork/quick-loading-sem-entrada-apos-merge-da-task-0067_2026-09-11T15-40.md)
+  — o recurso do upstream que o merge da TASK-0067 perdeu sem registrar;
+- [TASK-0096](TASK-0096-devolver-a-entrada-do-quick-loading.md) — devolver a entrada à biblioteca e
+  medir lá o Defeito 2, com o critério que discrimina (acima), e não com o 2a como foi escrito aqui.
+
+**O que "concluída" quer dizer nesta task, para ninguém ler mais do que ela entrega:** os dois
+cherry-picks estão no produto; **só o Defeito 1 foi validado em aparelho**. A correção de page cache
+(`c2bea2f029`) está no binário e é inofensiva, mas **nunca rodou num aparelho nosso**, porque nada a
+alcança. Ela ser correta **para nós** é pergunta da TASK-0096.
+
+Consequência para a FEAT-0003: esta task deixa de travar o Bloco 2. A TASK-0096 **não** entra na
+sequência serializada dos cinco blocos — ela não pertence à colheita de setembro, e sim à perda de
+setembro/01 na TASK-0067.
 
 ### O que foi commitado
 
