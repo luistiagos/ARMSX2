@@ -23,6 +23,17 @@ O que ele NAO faz, de proposito:
   * Nao dispara a extracao do Quick Loading. O fluxo passa por um seletor de arquivo do sistema
     (SAF) para escolher o ELF -- `QuickLoadSetup.run(context, iso, elfUri)`. Nao da para conduzir
     isso por adb sem automacao de UI.
+
+!! MEDIDO EM 2026-09-11: NO NOSSO APP O QUICK LOADING NAO TEM PONTO DE ENTRADA. !!
+   `QuickLoadSetup.run` nao tem chamador em `src/`: o unico ficava no `ui/home/HomeScreen.kt` do
+   upstream, e o merge da TASK-0067 manteve a NOSSA HomeScreen inteira. O menu de toque longo do
+   jogo nao oferece "Set up quick loading". Enquanto isso valer, `meminfo` e `posmortem` nao tem
+   o que medir -- ninguem consegue disparar a extracao. Eles ficam aqui para quando a entrada
+   voltar. Ver a secao Resultado da TASK-0090.
+
+Rodando do Git Bash no Windows: `export MSYS_NO_PATHCONV=1` antes de passar `--game /storage/...`.
+Sem isso o MSYS reescreve todo argumento que comeca com `/` como caminho do Windows antes de ele
+chegar ao python.exe (so escapam os que tem `[` ou `]`, o que torna a falha intermitente).
   * Nao instala nem desinstala nada. A ordem antes/depois e decisao de quem esta medindo.
 
 Fatos do app conferidos na arvore (nao sao chute):
@@ -237,13 +248,18 @@ def cmd_library(args):
         if not p.startswith("/"):
             print("  (ignorando %r: nao e caminho de arquivo -- provavelmente SAF content://)" % p)
             continue
-        saida = adb("shell", "find", p, "-type", "f", r"\(", "-iname", "*.iso", "-o",
-                    "-iname", "*.chd", "-o", "-iname", "*.cso", r"\)",
-                    "-printf", r"%s\t%p\n", check=False, timeout=300)
+        # O `find` do Android e o do toybox, e ele NAO TEM `-printf`: a primeira versao deste
+        # script usava `-printf "%s\t%p\n"`, recebia saida vazia e anunciava "nenhuma imagem de
+        # disco" num aparelho com quatro ISOs de DVD (2026-09-11). `stat -c` o toybox tem. O filtro
+        # de extensao fica no Python, para nao depender de como o shell do aparelho trata `\(`.
+        saida = adb("shell", "find '%s' -type f -exec stat -c '%%s|%%n' {} +" % p,
+                    check=False, timeout=300)
         for linha in saida.splitlines():
-            if "\t" not in linha:
+            if "|" not in linha:
                 continue
-            tam, caminho = linha.split("\t", 1)
+            tam, caminho = linha.split("|", 1)
+            if not caminho.lower().endswith((".iso", ".chd", ".cso")):
+                continue
             try:
                 achados.append((int(tam), caminho.strip()))
             except ValueError:
@@ -254,11 +270,16 @@ def cmd_library(args):
         return 1
 
     achados.sort(reverse=True)
-    print("%-12s %-6s %s" % ("TAMANHO", "TIPO", "CAMINHO"))
+    print("%-13s %-10s %s" % ("TAMANHO", "TIPO", "CAMINHO"))
     for tam, caminho in achados:
         gb = tam / float(1024 ** 3)
-        tipo = "DVD" if tam >= DVD_MIN_BYTES else "CD"
-        print("%9.2f GB %-6s %s" % (gb, tipo, caminho))
+        # So o .iso tem tamanho que diz se e DVD ou CD. Um .chd/.cso de DVD comprime para a faixa
+        # de um CD (Tomb Raider Anniversary: 2,24 GiB em .chd) -- rotular pelo tamanho mentiria.
+        if caminho.lower().endswith(".iso"):
+            tipo = "DVD" if tam >= DVD_MIN_BYTES else "CD"
+        else:
+            tipo = "comprimido"
+        print("%9.2f GiB %-10s %s" % (gb, tipo, caminho))
 
     dvds = [(t, c) for t, c in achados if t >= DVD_MIN_BYTES and c.lower().endswith(".iso")]
     print("")
@@ -267,6 +288,12 @@ def cmd_library(args):
         print(">> Alvo do Defeito 2: %s (%.2f GB)" % (alvo[1], alvo[0] / float(1024 ** 3)))
         print(">> O Quick Loading exige .iso puro -- .chd/.cso nao servem")
         print("   (I18n 'games.quickLoad.extractFailed').")
+        print(">> ATENCAO: tamanho do .iso nao basta. O Criterio 2a so discrimina se o disco tiver")
+        print("   VARIOS arquivos medios: o fsync+DONTNEED age por arquivo. Os quatro DVDs do")
+        print("   SM-A127M em 2026-09-11 tinham um unico arquivo empacotado de 1,1-4 GB (PART1.PAK,")
+        print("   PAC.BIN, DATA.BIN, ROM.) -- durante ele antes e depois rodam o mesmo codigo.")
+        print("   Confira tambem /proc/sys/vm/dirty_bytes: la era 100 MB, o que ja impede o 'antes'")
+        print("   de acumular GB de pagina suja. Veja a secao Resultado da TASK-0090.")
     else:
         print(">> NAO ha .iso de DVD (>= %.1f GB) neste aparelho." % (DVD_MIN_BYTES / float(1024 ** 3)))
         print(">> O Defeito 2 NAO deve ser medido com um CD: nao enche o page cache o bastante")

@@ -89,6 +89,7 @@ Não repita este trabalho — mas **confira que ainda vale**, porque há altera�
 | `perf.affinity.description` no nosso `I18n.kt` | ✅ linha **1556**, string idêntica à do pre-image (o número da linha difere do deles) |
 | `perf.affinity.description` traduzido | ⚠️ Só em `assets/i18n/pt-BR.json`, linha ~1435, **e a tradução de lá é mais antiga que o texto em inglês** — descreve os modos numerados como se fossem o comportamento principal |
 | `extractIsoToHostfs` existe | ✅ `native-lib.cpp:4503` |
+| `extractIsoToHostfs` é **chamado** por algo que o usuário alcança? | ❌ **Não** — conferido só em 2026-09-11. O único chamador é `QuickLoadSetup.run`, que não tem chamador no nosso app (a entrada ficava na `HomeScreen.kt` do upstream, descartada na TASK-0067). Esta linha faltou na verificação original; ver o Resultado |
 | A região do `fp.reset()` é idêntica ao pre-image deles | ✅ conferido em `native-lib.cpp:4570-4600` |
 | Já temos `posix_fadvise`? | ❌ Não aparece em `native-lib.cpp` |
 
@@ -305,10 +306,189 @@ nível esperado, inclusive na parte de admitir o critério que **não** foi medi
 
 ## Resultado
 
-> **Parcial, e o que falta é o que mais importa.** O código está aplicado, compilado e **provado
-> dentro do APK**. Nenhum dos critérios de aparelho (1a–1d, 2a–2d) foi validado: **não havia
-> aparelho conectado** (`adb devices` vazio) em nenhum momento da sessão de 2026-09-08. Um "depois"
-> sem aparelho não é validação, e esta seção não vai fingir que é.
+> **Defeito 1: os quatro critérios passaram no aparelho (2026-09-11). Defeito 2: nenhum dos quatro
+> foi medido, e não por falta de tempo nem de aparelho — no nosso app a extração do Quick Loading
+> não tem ponto de entrada.** `QuickLoadSetup.run` não tem chamador: o único ficava na
+> `HomeScreen.kt` do upstream, e o merge da TASK-0067 manteve a nossa HomeScreen inteira. Ninguém
+> consegue disparar `extractIsoToHostfs` no RetroSystem PS2 hoje, então o defeito que o
+> `c2bea2f029` corrige **não existe para os nossos usuários**, e a premissa da task ("o app é morto
+> pelo sistema depois de uma extração grande do Quick Loading", "sintoma que o usuário sente hoje")
+> vale para o upstream, não para nós. A correção entrou, está no binário e é inofensiva; ela passa a
+> importar no dia em que a entrada voltar.
+>
+> **A task não fecha**: 2a–2d ficam sem medir. O que fazer com isso é decisão — ver
+> "O que decidir agora", no fim desta seção.
+
+### Veredito por critério (aparelho, 2026-09-11)
+
+| Critério | Veredito | Evidência |
+|---|---|---|
+| **1a** — sustained ON + modo 7 → linha aparece | ✅ **passou** | `15:26:53.997 @@ANDROID_AFFINITY@@ sustained performance on -> affinity forced to Disabled`, 60 ms depois do `@@ANDROID_START_VM@@`; e o **nativo tomou o ramo do modo 0** (abaixo) |
+| **1b** — sustained OFF + modo 7 → linha **não** aparece | ✅ **passou** | `@@ANDROID_START_VM@@` às 15:23:39.505, zero `@@ANDROID_AFFINITY@@`; nativo: `Affinity mode: Performance Cores (mask 0xff, 8 processors, mtvu=1)` |
+| **1c** — sustained ON + modo 3 → linha **não** aparece | ✅ **passou** | `@@ANDROID_START_VM@@` às 15:30:24.944, zero `@@ANDROID_AFFINITY@@`; nativo: `Affinity mode 3: EE rank 1 (0x20), VU rank 0, GS rank 2 (0x40), mtvu=1` |
+| **1d** — frase nova na tela, pt-BR e inglês | ✅ **passou** | texto completo renderizado no diálogo "i" do cartão, nos dois idiomas (citado abaixo) |
+| **2a** — série de `Dirty` antes × depois | ⛔ **não medido** | a extração não pode ser disparada no nosso app |
+| **2b** — app não é morto depois da extração | ⛔ **não medido** | idem |
+| **2c** — extração correta, boot pelo ELF | ⛔ **não medido** | idem |
+| **2d** — custo em tempo da extração | ⛔ **não medido** | idem |
+
+### Aparelho e proveniência dos dois APKs
+
+- **Aparelho:** `RX8R90G1D6E`, SM-A127M, Android 13, Helio P35 (2 clusters, 8 × Cortex-A53),
+  `MemTotal` 3.792.268 kB, 14 GB livres.
+- **"Antes" (o instalado, pela decisão de 2026-09-08):** 2.0.4 / versionCode 2004, `base.apk` de
+  94.329.132 bytes. A condição que a decisão impôs foi conferida **no momento da medição** e **vale**:
+  `@@ANDROID_AFFINITY@@` ausente dos `classes*.dex`, e a `libemucore_4k.so` dele **não importa nem
+  `posix_fadvise` nem `fsync`** (`llvm-readelf --dyn-syms`) — as duas metades da task ausentes. Era
+  um "antes" válido. Ficou sem uso porque o Defeito 2 não tem como ser disparado, e o Defeito 1 não
+  precisa de par.
+- **"Depois":** construído do `HEAD` **`8d3ad9a338`** por `:app:installGithubDebug` (1 min 11 s),
+  mais uma única diferença não commitada na entrada do build: `platforms/android/gradle.properties`
+  com `armsx2.versionCode=2005` / `versionName=2.0.5` (o commitado é 2000 / 2.0.0; é trabalho do
+  usuário para a próxima versão e **não** foi tocado). Nenhuma outra alteração de código na árvore.
+  Instalado às 15:22:40. **md5 `31cb514beacc47b771fba32ad8745462` idêntico no aparelho e no
+  `outputs/`**, 93.677.811 bytes, versionCode 2005, e a tela de Configurações mostra
+  "Instalado: 2.0.5". O APK de 08/09 **não** foi usado.
+
+### Defeito 1 — como cada veredito foi lido
+
+O critério escrito na task olha só a linha do Kotlin. Isso prova a **decisão**, não o que chegou ao
+núcleo. Por isso cada rodada leu também o log do `VMManager::SetEmuThreadAffinities`, que imprime
+coisas diferentes por ramo (`pcsx2/VMManager.cpp:4243-4360`):
+
+| Ramo | O que o nativo imprime |
+|---|---|
+| modo 0 (Desativado) | **nada**: `return` na linha 4265-4274, **antes** do `EnsureCPUInfoInitialized()` da linha 4276 — portanto nem `Processor count` |
+| modos 1–6 | `Processor count: …` e `Affinity mode N: EE rank …` |
+| modo 7 | `Processor count: …` e `Affinity mode: Performance Cores (mask …)` |
+
+E um cuidado nas duas rodadas em que o critério é "a linha **não** aparece" (1b, 1c): a ausência só
+vale se o boot chegou ao `start()`. As duas mostram `@@ANDROID_START_VM@@`, impresso no `start()`
+imediatamente antes do código da afinidade. Sem isso, "não apareceu" seria vácuo.
+
+Em **1a** o silêncio do nativo é, então, evidência positiva: as três linhas que qualquer modo
+diferente de 0 imprime (`Processor count`, `Affinity mode…`, `(Oboe) … pinned to perf-cluster`)
+estão ausentes, **numa VM que comprovadamente rodou** — 415 linhas do núcleo e
+`PerfLog: 41.6 fps | EE 69% GS 30% VU 2%` aos 64 s. Em 1b o mesmo jogo imprimiu as três.
+
+Os estados de cada rodada foram postos **pela própria tela de Configurações** (escopo Global),
+tocada por `adb shell input`, e conferidos **no disco** (`run-as … cat shared_prefs/ARMSX2.xml`)
+antes de cada boot: 1b `(ui.sustainedPerf=false, affinityMode=7)`, 1a `(true, 7)`, 1c `(true, 3)`.
+O boot foi por `am start -a android.intent.action.VIEW -d file://…` na `BootSplashActivity`, com
+*The Adventures of Darwin* (`.chd`, 74 MB) para o boot ser curto.
+
+**1d**, texto renderizado no diálogo "i" do cartão "Modo de controle de afinidade":
+
+- pt-BR: *"…Aplica-se na próxima inicialização. Ligar o Desempenho Sustentado o desativa: essa
+  configuração pede um clock estável e mais frio, e segurar o emulador nos núcleos grandes trabalha
+  contra ela."*
+- inglês (idioma trocado para English e depois devolvido a "Idioma do sistema"): *"…Applies on the
+  next boot. Turning on Sustained Performance disables it: that setting asks for a cooler steady
+  clock, and holding the emulator on the big cores works against it."*
+
+Duas observações que o aparelho mostrou e que valem registrar:
+
+- **A sobreposição não muda o que a tela mostra**, como previsto em 2026-09-08: com o Sustained
+  ligado, o seletor continua destacando "Núcleos de Desempenho". A frase da descrição é a única
+  pista visível — e agora ela está lá, nos dois idiomas.
+- **Neste aparelho o modo 7 não confina nada:** os dois clusters do Helio P35 são Cortex-A53, e
+  "Núcleos de Desempenho" resolve para `mask 0xff` — os oito núcleos. Então o efeito térmico que o
+  Defeito 1 descreve **não é observável no SM-A127M**; o que se validou aqui é a lógica da
+  sobreposição, que é o que os critérios pedem. Medir calor exigiria um aparelho com cluster grande
+  de verdade (o relato era um Snapdragon 8 Gen 1).
+
+### Defeito 2 — por que nada foi medido
+
+**A extração não tem ponto de entrada no nosso app.** Como isso foi estabelecido, e não presumido:
+
+1. `QuickLoadSetup.run` — o único chamador de `NativeApp.extractIsoToHostfs` — **não tem chamador
+   nenhum** em `platforms/android/app/src/`, em nenhum source set. As chaves de UI do fluxo
+   (`games.quickLoad.confirmTitle`, `.continue`, `.working`) só aparecem no `I18n.kt`.
+2. `git grep` pelos chamadores em quatro revisões: **`upstream/master` e o nosso merge-base
+   `ce96af5046` chamam** de `ui/home/HomeScreen.kt` (linhas 193, 1143, 1168, 1185, 1240); **o nosso
+   `HEAD` e o `662b114168` não**.
+3. Na nossa linha de primeira-mãe, `HomeScreen.kt` **nunca** teve a chamada. O histórico do
+   upstream entrou pelo merge **`e047ce36fe`** (*TASK-0067: traz o merge com o upstream…*), cujo
+   segundo pai é **`6a86b38ebf`** (*TASK-0067: git merge upstream/master…*). A TASK-0067 registra que
+   **"`HomeScreen.kt` ficou com a NOSSA versão inteira"** e anota a perda das prateleiras por
+   categoria — mas **não** percebeu que a entrada do Quick Loading morava no mesmo arquivo. O
+   `QuickLoadSetup.kt` chegou por auto-merge, como arquivo novo, com o único chamador descartado.
+4. **Conferido na tela**, no build novo: o toque longo em *God of War II* (um `.iso` de 4,27 GB,
+   exatamente onde o upstream oferece a opção) abre uma folha com **Jogar, Configurações, BIOS por
+   jogo, Região de cobertura, Memory Cards, Adicionar à tela inicial, Remover dos reproduzidos
+   recentemente, Ocultar da biblioteca, Deletar jogo** — e nada de "Set up quick loading". O menu
+   lateral também não tem.
+
+É exatamente o caso da regra do CLAUDE.md: *"Ao afirmar que uma função faz parte de um fluxo,
+provar pelo call-site, não pelo nome."* Em 2026-09-08 esta task verificou que `extractIsoToHostfs`
+**existe** (tabela "O que já foi verificado"), não que ela é **chamada**.
+
+**Mesmo com a entrada de volta, o Critério 2a como está escrito não discriminaria neste aparelho.**
+Duas coisas medidas em 2026-09-11 que a próxima tentativa precisa saber:
+
+- **`vm.dirty_bytes = 104857600` (100 MB)**, `dirty_background_bytes` 25 MB,
+  `dirty_expire_centisecs` 200. A Samsung limita a memória suja a 100 MB **absolutos**; o escritor é
+  estrangulado ali. O "antes" não tem como "crescer monotonicamente rumo aos GB", que é o que o
+  critério espera. O defeito relatado (um tablet de 6 GB) acontece com limite por **razão**
+  (`dirty_ratio`), que cresce com a RAM.
+- **Os quatro DVDs do aparelho são "um arquivo só".** Lendo o ISO9660 de cada um setor a setor por
+  `adb exec-out dd` (sem puxar os GB): *God of War 2* tem 15 arquivos e `PART1.PAK` de **4.065 MB**;
+  *3LDK* tem `PAC.BIN` de 1,9 GB; *120 Yen no Haru*, `DATA.BIN` de 1,1 GB; *_summer Double Sharp*,
+  `ROM.` de 2,2 GB. O `fsync`+`DONTNEED` age **por arquivo** — durante o arquivo gigante, antes e
+  depois rodam o mesmo código, e a diferença só aparece **no fim** dele.
+
+Um critério que discriminaria: no fim da extração, `Dirty` perto de zero e `Cached` caindo na
+ordem do tamanho do arquivo (o `DONTNEED` descartando as páginas limpas), contra `Cached` alto e
+`Dirty` no teto no "antes" — medido num aparelho de limite por razão, ou num disco com vários
+arquivos médios. Fica como sugestão para quem escrever a próxima task, não como coisa feita.
+
+### Um ajuste alterado sem querer, e desfeito
+
+**"Verifique no lançamento" (`update.checkOnLaunch`) foi alternado duas vezes por toques meus.** A
+transição do menu lateral para Configurações leva mais de 3 s neste aparelho; a captura de tela
+ainda mostrava o menu, e eu toquei de novo em (220, 877) — que, já na aba App, cai dentro da linha
+desse interruptor (a linha inteira é clicável). Aconteceu nas duas navegações que fiz assim: às
+~15:25 e às ~15:31.
+
+O valor final é `false`. A última cópia independente das preferências — `files/x.xml` e
+`files/ARMSX2.xml.new`, de 2026-09-04, com 81 chaves cada — **não contém chave `update.*`
+nenhuma**, ou seja, o interruptor nunca tinha sido gravado e valia o padrão, `false`. A leitura
+consistente é: `false` → `true` (15:25) → `false` (15:31), de volta ao original. **Mas é inferência**:
+se o usuário o tiver ligado por conta própria entre 04/09 e 11/09, ele está desligado agora e
+precisa ser religado na tela. Não reescrevi o XML para apagar a chave: `false` e "ausente" leem
+igual, e escrever preferências na marra é justamente o que esta task descartou.
+
+Todo o resto voltou ao estado de antes da sessão: `ui.sustainedPerf=false`, `affinityMode=7`,
+`ui.language=system`, e o `config.global` final é **byte a byte igual** ao capturado antes da
+rodada 1c. As outras diferenças no arquivo são carimbos que o próprio app grava
+(`playtime.last.*`, `telemetry_last_exit_ts`).
+
+### Correções no script de validação
+
+O `library` do `TASK-0090-validar-no-aparelho.py` anunciou **"nenhuma imagem de disco"** num
+aparelho com quatro ISOs de DVD: o `find` do Android é o do toybox e **não tem `-printf`**. Passou a
+usar `find … -exec stat -c '%s|%n'`, testado no aparelho. Também deixou de rotular `.chd`/`.cso`
+como "CD" pelo tamanho (um `.chd` de DVD comprime para a faixa de um CD) e passou a avisar que o
+tamanho do `.iso` não basta para o Critério 2a. O cabeçalho do script agora diz que o Quick Loading
+não tem entrada no app e que, no Git Bash, é preciso `MSYS_NO_PATHCONV=1` para passar caminhos
+`/storage/...` — sem isso o MSYS os reescreve como caminho do Windows, e só escapam os que têm `[`
+ou `]`, o que torna a falha intermitente.
+
+### O que decidir agora
+
+A TASK-0090 não tem como fechar com os critérios que tem: 2a–2d dependem de uma entrada de UI que
+não existe. Três saídas, e a escolha não é desta sessão:
+
+1. **Reescopar e fechar**: declarar o Defeito 2 como "código do upstream carregado, dormente no nosso
+   app", marcar 2a–2d como não aplicáveis, e fechar a task com o Defeito 1 validado.
+2. **Task nova para devolver a entrada do Quick Loading** à nossa HomeScreen (é um recurso do
+   upstream que perdemos sem saber, na TASK-0067) e validar o Defeito 2 **lá**, com um critério que
+   discrimine (acima).
+3. As duas: fechar esta pelo (1) e abrir a (2) como bug/task própria.
+
+A (3) é a que eu recomendaria: o que esta task prometia sobre o Defeito 1 está provado, e o
+Defeito 2 virou outra pergunta — "queremos o Quick Loading no nosso app?" — que merece registro
+próprio em vez de ficar pendurada aqui.
 
 ### O que foi commitado
 
@@ -317,6 +497,11 @@ nível esperado, inclusive na parte de admitir o critério que **não** foi medi
 | `98d6c01402` | jpolo1224 | `TASK-0090: faz o Sustained Performance vencer o modo Nucleos de Desempenho` |
 | `5a6ef7fcf2` | jpolo1224 | `TASK-0090: descarta do page cache cada arquivo extraido pelo Quick Loading` |
 | `03f3e48a1f` | Luis Tiago | `TASK-0090: atualiza a descricao da afinidade em pt-BR` |
+| `02198734e1` | Luis Tiago | `TASK-0090: registra o resultado parcial -- codigo provado no APK, aparelho pendente` |
+| `33544306c2` | Luis Tiago | `TASK-0090: registra a decisao do "antes" e deixa a validacao pronta em um comando` |
+
+Os resultados de aparelho de 2026-09-11 e as correções do script entram num commit seguinte, com
+o mesmo prefixo (o índice guarda todos os hashes).
 
 Os dois primeiros são `git cherry-pick -x` de `a18f2eb238` e `c2bea2f029`. **Os dois aplicaram
 limpo** (`Auto-merging`, sem conflito), a autoria de `jpolo1224` foi preservada e a linha
@@ -384,22 +569,12 @@ conteúdo, não por "BUILD SUCCESSFUL":
   padrão:` e contém `Desempenho Sustentado`. O JSON continua válido, com as **1553 chaves**
   originais, UTF-8 sem BOM, LF, e `git diff --numstat` de **1 linha alterada, 1 inserida**.
 
-### O que NÃO foi validado, e por quê
+### Histórico: 2026-09-08, sem aparelho
 
-**Nenhum critério de aparelho.** `adb devices` devolveu lista vazia no início e no fim da sessão.
+Nesta data nenhum critério de aparelho foi medido — `adb devices` ficou vazio a sessão inteira. A
+tabela de vereditos no topo desta seção substitui a que estava aqui.
 
-| Critério | Situação |
-|---|---|
-| 1a — `@@ANDROID_AFFINITY@@` aparece com sustained ON + modo 7 | **não medido** — sem aparelho |
-| 1b — a linha **não** aparece com sustained OFF | **não medido** — sem aparelho |
-| 1c — a linha **não** aparece nos modos 1–6 | **não medido** — sem aparelho |
-| 1d — a frase nova na tela, em pt-BR e em inglês | **não medido na tela.** Provado só no artefato: os dois textos estão dentro do APK (dex e asset). Isso não é o mesmo que ver renderizado |
-| 2a — série de `Dirty`/`Writeback` antes × depois | **não medido** — sem aparelho e **sem o par "antes"** (ver abaixo) |
-| 2b — app não é morto (`signal 9` / lmkd) depois da extração | **não medido** — sem aparelho |
-| 2c — extração continua correta (contagem de arquivos, boot pelo ELF) | **não medido** — sem aparelho |
-| 2d — custo em tempo da extração, antes × depois | **não medido** — sem aparelho |
-
-**O APK "antes" também não existe ainda.** A tentativa de produzi-lo — reverter os quatro arquivos
+**O APK "antes" também não existia.** A tentativa de produzi-lo — reverter os quatro arquivos
 para `b0fe13f769` com `git checkout <commit> -- <paths>`, compilar, guardar o APK e restaurar — foi
 **bloqueada pelo classificador de permissão** da sessão, e não foi contornada: sobrescrever arquivos
 da árvore de trabalho com cinco alterações alheias em cima é justamente o que aquela barreira
