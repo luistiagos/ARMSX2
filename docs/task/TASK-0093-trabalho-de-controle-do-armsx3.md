@@ -1,11 +1,11 @@
 # TASK-0093: trazer o trabalho de controle do ARMSX3 e o fallback de rumble para pads sem motor
 
-- **Status:** aberta
+- **Status:** em andamento
 - **Criada em:** 2026-09-08
 - **Concluída em:** —
 - **Feature:** [FEAT-0003](../features/FEAT-0003-colheita-upstream-setembro-2026.md)
 - **Bugs que resolve:** —
-- **Commit:** — (o vínculo é o prefixo `TASK-0093:` no assunto)
+- **Commit:** `7300a5133d`
 - **Revertida por:** —
 - **Publicado em:** —
 
@@ -314,4 +314,20 @@ nosso `UsbDevices.kt`.
 
 ## Resultado
 
-— (a preencher pela sessão que implementar)
+Implementação aplicada no commit `7300a5133d` (`TASK-0093:`), adotando os commits upstream `57a2f47137` e `a2692242e0` em um commit rastreável desta árvore.
+
+Validação feita nesta máquina:
+
+- `git fetch upstream --prune`: passou.
+- `:app:compileGithubDebugKotlin` com `-Pkotlin.incremental=false`: passou em 1m34s. Avisos: depreciações existentes e `UsbRumble.kt:268` usando `getParcelableExtra` legado.
+- `:app:assembleGithubRelease -Parmsx2.applicationId=come.nanodata.armsx2`: passou em 6m32s; R8 concluiu sem exigir regra nova. As classes `UsbRumble` e `UsbPadTakeover` são alcançadas por referências Java diretas, não por reflexão/JNI por nome, então nenhuma regra nova foi adicionada a `proguard-rules.pro`.
+- `:app:testGithubDebugUnitTest`: passou em 54s.
+- `pt-BR.json`: JSON válido; as 16 chaves novas da aba Pad foram traduzidas.
+
+Validação não feita nesta máquina:
+
+- Instalação do APK debug/release: `adb devices` não listou nenhum aparelho conectado.
+- Critérios 1 a 7 de hardware: pendentes por falta de aparelho/controles na sessão. Não foram testados DualSense/DualShock 4 por USB, Xbox Series X|S/DualSense por Bluetooth, dois controles para fixação de slot, Multitap, nem repetição em APK release.
+- Critério 8 visual no app: a cobertura de chaves foi validada no arquivo, mas a tela pt-BR ainda precisa ser conferida no aparelho.
+
+Sobreposição observada: `UsbRumble.kt` é uma rota nova de rumble USB direto para pads PlayStation. O `UsbDevices.kt` existente não foi alterado nem unificado nesta task, conforme o escopo.
