@@ -5,7 +5,7 @@
 - **Concluída em:** —
 - **Feature:** [FEAT-0003](../features/FEAT-0003-colheita-upstream-setembro-2026.md)
 - **Bugs que resolve:** —
-- **Commit:** `7300a5133d`
+- **Commit:** — (o vínculo é o prefixo `TASK-0093:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
 
@@ -314,7 +314,27 @@ nosso `UsbDevices.kt`.
 
 ## Resultado
 
-Implementação aplicada no commit `7300a5133d` (`TASK-0093:`), adotando os commits upstream `57a2f47137` e `a2692242e0` em um commit rastreável desta árvore.
+Implementação aplicada em **três commits**, adotando os commits upstream `57a2f47137` e
+`a2692242e0` por `git cherry-pick -x`:
+
+| Commit | Autor | O que é |
+|---|---|---|
+| `b1c22e953f` | jpolo1224 | cherry-pick de `57a2f47137` — o fallback de rumble (#646) |
+| `60ea345692` | jpolo1224 | cherry-pick de `a2692242e0` — o trabalho de controle do ARMSX3 |
+| `83ca710013` | Luis Tiago | as 16 traduções pt-BR da aba Pad |
+
+> **Isto substitui um commit único anterior (`7300a5133d`), que juntava os dois commits do upstream
+> e ficava assinado por nós.** Refeito em 2026-09-15 por decisão do usuário: a FEAT-0003 exige
+> `cherry-pick -x` para **preservar a autoria do upstream** e deixar a linha
+> `(cherry picked from commit …)` no corpo, que é o que faz o próximo `git merge upstream/master`
+> reconhecer o que já veio. A árvore resultante é **byte a byte idêntica** à do commit anterior — foi
+> conferido com `git diff` antes de mover a branch —, então nada do que foi validado mudou. O estado
+> anterior está preservado em `backup/task-0093-squash-2026-09-15`.
+
+O ajuste de integração que os dois cherry-picks precisaram: esta árvore semeia os gates nativos em
+`seedNativeGates()`, num worker, para tirar o `System.loadLibrary` da thread da UI (TASK-0079).
+`ControllerMappings.syncRumbleFallback()` entra lá; `UsbRumble.start`, `UsbRumble.loadTakeover` e
+`PadRouter.loadPins` ficam no `onCreate`, porque precisam da Activity.
 
 Validação feita nesta máquina:
 

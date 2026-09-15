@@ -253,7 +253,7 @@ motivo vale mais que um merge feito às pressas.
 
 ### Fase 1 — evidência coletada em 2026-09-15
 
-Pré-condição: a TASK-0093 está commitada (`7300a5133d`, `9c3e1d50e9`), mas ainda não está validada fisicamente porque a sessão ficou sem joystick. Por isso esta sessão não executou merge nem validação de runtime; ficou só na decisão documentada.
+Pré-condição: a TASK-0093 está commitada (`b1c22e953f`, `60ea345692`, `83ca710013`, `b4bf1c4d73` — os hashes mudaram em 2026-09-15, quando os commits foram refeitos como `cherry-pick -x` para preservar a autoria do upstream), mas ainda não está validada fisicamente porque a sessão ficou sem joystick. Por isso esta sessão não executou merge nem validação de runtime; ficou só na decisão documentada.
 
 Comandos e achados:
 
