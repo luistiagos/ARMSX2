@@ -1,6 +1,6 @@
 # TASK-0094: decidir e executar a adoção do PR #660 (`gs-classic-tiler`)
 
-- **Status:** aberta
+- **Status:** em andamento
 - **Criada em:** 2026-09-08
 - **Concluída em:** —
 - **Feature:** [FEAT-0003](../features/FEAT-0003-colheita-upstream-setembro-2026.md)
@@ -251,4 +251,44 @@ motivo vale mais que um merge feito às pressas.
 
 ## Resultado
 
-— (a preencher pela sessão que implementar)
+### Fase 1 — evidência coletada em 2026-09-15
+
+Pré-condição: a TASK-0093 está commitada (`7300a5133d`, `9c3e1d50e9`), mas ainda não está validada fisicamente porque a sessão ficou sem joystick. Por isso esta sessão não executou merge nem validação de runtime; ficou só na decisão documentada.
+
+Comandos e achados:
+
+- `git fetch upstream --prune`: passou.
+- PR #660 (`https://github.com/ARMSX2/ARMSX2/pull/660`): GitHub mostra merge em 2026-09-06, de `gs-classic-tiler` para `master`, com 283 commits no PR. O diff agregado medido em `a100539924^1..a100539924` segue sendo `149 files changed, 21142 insertions(+), 1147 deletions(-)`.
+- Depois de `a100539924`, `git log upstream/master ^a100539924 -- pcsx2/GS/` lista 27 commits ainda tocando GS. Relevantes para risco: `843835aa71` (fast stencil shadow por device), `9cb5079857` (alpha stencil counter), vários ajustes `GS/SW`, `803e4fb19d` (remove hack MediaTek Mali Tekken 5) e commits de recursos/build que também tocam GS/libretro.
+- Issues upstream abertas/atualizadas depois do merge incluem regressões gráficas/perf: #671 (NFS Underground vertical bands/flicker, Android 2.6.9), #672 (Splinter Cell Double Agent vertical lines regression), #675 (Urban Chaos speed drop), #678 (iOS SMT Nocturne graphical error), #680 (Adreno 650), #683/#684 (MGS3), #688 (Bleach performance), #697 (GT3 depth readbacks). Isso não prova causalidade do #660, mas mostra que o bloco ainda está recebendo fallout/triagem.
+- Issues citadas pela task: #658 está aberta (`Textures aren't loaded in one area of Tales of Destiny director's cut`, Android 16, Exynos 2400/Xclipse 940, criada 2026-09-05 e atualizada 2026-09-08); #666 está aberta (`Manhunt (SLUS-20827) closes ARMSX2`, Snapdragon 7s Gen 4/Adreno 810, criada 2026-09-07).
+
+Família (c), os commits Android-relevantes:
+
+- `3facc8904e`: muda `Auto` para Vulkan no Mali medido; toca `GSUtil`, `GSGPUDriverProfile` e testes. Valor alto, risco alto no nosso aparelho de referência porque muda comportamento observável.
+- `662576cfa6`: transforma o stencil kill do Adreno em regra de driver `Turnip < 26.2`; escopo bom e testável.
+- `cf0f5e9c02`: move deny list de fbfetch MediaTek para o banco e isenta o SoC medido; valor direto para Android, mas depende de validação em Mali/MediaTek.
+- `c12083a8ef` + `921069d2c7`: registram o bug de blend constant do Turnip e substituem `ForceBrokenBlendConstant` por override de bug forçado. Valor direto para Adreno/Turnip.
+
+Superfície de conflito medida agora:
+
+| Arquivo | Nosso delta desde merge-base | Delta do #660 | Observação |
+|---|---:|---:|---|
+| `pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp` | +8 / -2 | +566 / -106 | Grande no upstream, pequeno nosso; merge-tree não conflitou neste arquivo. |
+| `tests/ctest/core/gs/gs_gpu_driver_profile_tests.cpp` | +56 / -0 | +549 / -2 | Conflita. Melhor tomar upstream e re-aplicar só o que ainda fizer sentido. |
+| `pcsx2/GS/Renderers/Common/GSGPUDriverProfile.cpp` | +31 / -0 | +195 / -7 | Conflita; é o centro da família (c). |
+| `pcsx2/GS/GSUtil.cpp` | +173 / -5 | +36 / -9 | Conflita; aqui mora risco alto porque nosso delta é maior. |
+| `pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.cpp` | +131 / -25 | +18 / -1 | Delta grande nosso; merge-tree não conflitou, mas precisa revisão manual porque o hunk é de renderer. |
+
+Simulação de merge sem alterar worktree:
+
+- `git merge-tree HEAD a100539924`: 6 conflitos reais: `pcsx2/GS/GSUtil.cpp`, `pcsx2/GS/GSUtil.h`, `pcsx2/GS/Renderers/Common/GSGPUDriverProfile.cpp`, `pcsx2/PerformanceMetrics.cpp`, `platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt`, `tests/ctest/core/gs/gs_gpu_driver_profile_tests.cpp`.
+- `git merge-tree HEAD upstream/master`: 7 conflitos reais; os seis acima, mais `platforms/android/app/src/main/java/com/armsx2/input/ControllerMappings.kt` por causa do trabalho de controle da TASK-0093/upstream.
+
+Recomendação para decisão do usuário:
+
+**Não adotar o merge inteiro do #660 agora.** O bloco é tecnicamente valioso, mas o risco está acima do que dá para aceitar nesta sessão: há 27 commits de GS posteriores ao merge, várias issues gráficas/perf abertas desde 2026-09-06, conflito direto em `GSUtil.cpp`/`GSGPUDriverProfile.cpp`, e a validação exigida pela própria task depende de aparelho/jogos/cenas que não estão prontos agora. Além disso, a TASK-0093 ainda está sem validação física por falta de joystick, então o Bloco 5 não deveria virar execução.
+
+Se o objetivo for capturar valor Android sem carregar todo o risco, minha recomendação secundária é **mudar o escopo para adotar só a família (c)** em uma task menor: banco de driver, regras Turnip/MediaTek/fbfetch e a mudança de Auto para Vulkan. Mesmo assim, isso precisa de validação no aparelho de referência ou, no mínimo, uma rodada explícita no Android disponível antes de concluir.
+
+Decisão pendente do usuário: abandonar a adoção inteira agora, ou autorizar uma task/escopo menor para a família (c). Nenhum merge foi feito nesta sessão.

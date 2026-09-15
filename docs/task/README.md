@@ -174,7 +174,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0091](TASK-0091-adotar-remocao-da-captura-de-video.md) — **bloco 2**: adotar a remoção de captura de vídeo/ffmpeg e apagar o nosso contorno local | concluída | FEAT-0003 | — | `dcf07cc353` `42a898f66b` |
 | [TASK-0092](TASK-0092-gamedb-e-precisao-ee-vu.md) — **bloco 3**: GameDB (Jak X, GoW II) e a precisão de EE FPU / divisão da VU | aberta | FEAT-0003 | — | — |
 | [TASK-0093](TASK-0093-trabalho-de-controle-do-armsx3.md) — **bloco 4**: o trabalho de controle do ARMSX3 e o fallback de rumble para pads sem motor | em andamento | FEAT-0003 | — | `7300a5133d` |
-| [TASK-0094](TASK-0094-avaliar-e-adotar-o-pr-660-gs.md) — **bloco 5**: decidir e executar a adoção do PR #660 (`gs-classic-tiler`) | aberta | FEAT-0003 | — | — |
+| [TASK-0094](TASK-0094-avaliar-e-adotar-o-pr-660-gs.md) — **bloco 5**: decidir e executar a adoção do PR #660 (`gs-classic-tiler`) | em andamento | FEAT-0003 | — | — |
 | [TASK-0095](TASK-0095-autoflush-do-god-of-war-em-gpu-fraca.md) — medir o que o `autoFlush` custa ao God of War em GPU fraca e, se a troca valer, propô-la ao upstream | aberta | — | god-of-war-lento-no-poco-c75-mali-g52 | — |
 | [TASK-0096](TASK-0096-devolver-a-entrada-do-quick-loading.md) — devolver à biblioteca a entrada do Quick Loading que o merge da TASK-0067 perdeu, e medir lá o page cache da extração | aberta | — | quick-loading-sem-entrada-apos-merge-da-task-0067 | — |
 
