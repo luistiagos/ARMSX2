@@ -88,6 +88,17 @@ contorno por jogo descrito no bug.
 - **As recomendações de blending e AA1** do GoW II — são da
   [TASK-0092](TASK-0092-gamedb-e-precisao-ee-vu.md), e vão na direção **oposta** (fidelidade, com
   custo).
+
+  > **Restrição explícita, e ela não é um conflito hoje.** O `a0d31aa9f4` entra como
+  > *recomendação*: o OSD avisa, nada é forçado, e o critério 4b da TASK-0092 existe justamente
+  > para provar que a imagem na configuração padrão não muda. Enquanto for assim, as duas tasks
+  > convivem.
+  >
+  > O conflito nasceria se alguém ligasse **High blending + AA1 por padrão no mobile** — é
+  > exatamente o oposto do que esta task persegue no mesmo jogo, que é tirar carga de GPU em
+  > aparelho fraco. Quem propuser isso tem de ler as duas tasks antes, e trazer número.
+  >
+  > Alinhado com a sessão que conduz a FEAT-0003, em 2026-09-15.
 - **O `DeviceTier`**, que não reconhece o POCO C75 como fraco (item 4 do bug). Defeito real, outra
   task.
 - **Um mecanismo de overlay condicionado à GPU.** Não existe — o overlay entra no APK de todo
