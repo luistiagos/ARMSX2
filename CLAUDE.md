@@ -28,7 +28,13 @@ docs/                            # nosso: processo, tasks, bugs, planos
 scripts/                         # nosso: check_traceability.py, compare_jni_surface.py
 ```
 
-`AGENTS.md` na raiz é deles e descreve o core. Este arquivo governa o que é **nosso**.
+[`AGENTS.md`](AGENTS.md) na raiz é **nosso** e diz **como agentes dividem o trabalho** — sessão
+orquestradora, subsessões desenvolvedoras e uma auditora. (O `AGENTS.md` do PCSX2, que descrevia o
+core, foi apagado pelo upstream em `97d95b0ce5`.) Este arquivo governa o produto e o build.
+
+> **Trabalho longo tem uma sessão mestre que orquestra, subsessões que codificam e uma que audita.
+> A sessão mestre é a única que carrega o contexto inteiro, e é ela quem testa.** O porquê, com os
+> números que motivaram a regra, está no [`AGENTS.md`](AGENTS.md).
 
 ## A regra que sustenta o fork
 
