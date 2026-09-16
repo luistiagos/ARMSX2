@@ -80,7 +80,15 @@ Duas consequências, e as duas doem:
    reprova hash órfão, mas só o que está nos documentos de task.
 5. **Meça o "antes" antes de instalar o "depois".** Instalar primeiro destrói o único par
    disponível, e reconstruir a linha de base custa caro — às vezes é impossível.
-6. **Arquivo alheio não se toca.** `git add <caminho>` explícito, nunca `git add -A`; **nunca**
+6. **Antes de mandar toque para o aparelho, confira quem está em foco.** `adb shell input tap`
+   entrega o evento a **quem estiver em primeiro plano**, não ao app que você acha que está lá. Um
+   laço de toques continuou rodando depois que o emulador saiu da frente e foi parar no aplicativo de
+   Mensagens do usuário, e uma captura registrou dados pessoais. Todo lote confere
+   `dumpsys window | grep mCurrentFocus` antes de cada toque e aborta se não for o pacote esperado;
+   lotes longos às cegas não existem.
+7. **Num emulador lento, toque curto se perde.** A 8–15 % da velocidade um quadro dura ~116 ms e o
+   `input tap` cai entre dois. Use `input swipe x y x y 450`, que segura o botão.
+8. **Arquivo alheio não se toca.** `git add <caminho>` explícito, nunca `git add -A`; **nunca**
    `git stash` puro, porque a pilha é compartilhada entre worktrees.
 
 ## Quando **não** abrir subsessão

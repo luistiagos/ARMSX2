@@ -58,7 +58,7 @@ só começa quando a anterior estiver commitada e validada no aparelho.
 |---|---|---|
 | [TASK-0090](../task/TASK-0090-duas-correcoes-de-campo-do-upstream.md) | concluída | **Bloco 1** — afinidade não anula mais o Sustained Performance (validado no aparelho); a correção de page cache da extração entrou, mas está **dormente**: o nosso app não tem entrada para o Quick Loading |
 | [TASK-0091](../task/TASK-0091-adotar-remocao-da-captura-de-video.md) | concluída | **Bloco 2** — remoção de captura de vídeo/ffmpeg adotada (cherry-pick sem conflito); os 7 critérios validados no aparelho. O delta contra `upstream/master` caiu de 773 para 606 arquivos (−40.118 linhas). O contorno do Android era **do upstream** (`f06e144f57`), não nosso |
-| [TASK-0092](../task/TASK-0092-gamedb-e-precisao-ee-vu.md) | aberta | **Bloco 3** — entradas de GameDB (Jak X, Shaolin Monks, GoW II) e a precisão de EE FPU / divisão da VU |
+| [TASK-0092](../task/TASK-0092-gamedb-e-precisao-ee-vu.md) | em andamento | **Bloco 3** — entradas de GameDB (Jak X, Shaolin Monks, GoW II) e a precisão de EE FPU / divisão da VU |
 | [TASK-0093](../task/TASK-0093-trabalho-de-controle-do-armsx3.md) | em andamento | **Bloco 4** — o trabalho de controle vindo do ARMSX3 e o fallback de rumble para pads sem motor |
 | [TASK-0094](../task/TASK-0094-avaliar-e-adotar-o-pr-660-gs.md) | em andamento | **Bloco 5** — decidir e executar a adoção do PR #660 (`gs-classic-tiler`, 279 commits de GS) |
 

@@ -1,6 +1,6 @@
 # TASK-0092: trazer as entradas de GameDB e a precisão de EE FPU / divisão da VU
 
-- **Status:** aberta
+- **Status:** em andamento
 - **Criada em:** 2026-09-08
 - **Concluída em:** —
 - **Feature:** [FEAT-0003](../features/FEAT-0003-colheita-upstream-setembro-2026.md)
@@ -253,4 +253,153 @@ rodaram — exatamente o que impediu.
 
 ## Resultado
 
-— (a preencher pela sessão que implementar)
+> **Código commitado e três dos seis critérios provados no aparelho. A task NÃO fecha:** o critério
+> 1 tem 3 das 5 repetições pedidas, o 4c não foi medido, e o 6 perdeu o par de comparação e depende
+> de decisão do usuário. O que falta está dito abaixo, com o custo de cada parte.
+
+**Aparelho:** SM-A127M (`RX8R90G1D6E`), Android 13, Helio P35. **Build medido:** o APK instalado em
+2026-09-11 22:23 (versionCode 2005), que é **pós-TASK-0092 e pré-TASK-0093** — provado assim: o
+`assets/resources/GameIndex.yaml` extraído do `base.apk` contém `3091E6FB` (o patch do Jak X), que
+**não existe** na versão anterior à task, e `UsbRumble` está **ausente** dos `classes*.dex`, ou seja,
+o trabalho de controle do Bloco 4 não está nele. É Bloco 3 puro, que é o que se queria medir.
+
+### Veredito por critério
+
+| Critério | Veredito | Evidência |
+|---|---|---|
+| **1** — Jak X salva sem travar | ⚠️ **3 de 5** repetições, **nenhum travamento** | abaixo |
+| **2** — Sly 3 em cores | ✅ **passou** | abaixo |
+| **3** — Shaolin Monks com texto correto | ✅ **passou** | abaixo |
+| **4a** — OSD avisa as recomendações | ❌ **critério inválido para o nosso fork** | abaixo — não é defeito |
+| **4b** — imagem padrão inalterada | ✅ **provado pelo código**, mais forte que screenshot | abaixo |
+| **4c** — High blending + AA1 à mão | ⛔ **não medido** | custo alto, valor baixo depois do 4b |
+| **5** — não regressão | ⚠️ **parcial** | 4 jogos rodados, nenhum crash |
+| **6** — desempenho antes/depois | ⛔ **sem par** | decisão pendente do usuário |
+
+### Critério 1 — Jak X (`SCUS-97429`, CRC `3091E6FB`)
+
+**A pré-condição foi provada antes do teste**, e ela era o risco real da task: o patch é chaveado por
+CRC, e a cópia disponível é a v2.00. O log do boot resolveu a dúvida:
+
+```
+Serial: SCUS-97429
+CRC: 3091E6FB
+Found 1 game patches in GameDB.
+Enabled patch
+```
+
+**A ROM bate com a chave e o patch carregou.** Sem isso, um travamento seria ambíguo entre "a
+correção falhou" e "o patch nem se aplica a esta cópia".
+
+Três salvamentos de perfil observados um a um, cada um terminando com o **retorno ao menu**:
+
+1. perfil novo `Aa` criado e salvo num slot vazio → aviso de salvamento → Continue → menu principal;
+2. sobrescrita do mesmo `Aa` (o slot apareceu na lista, provando que o passe 1 persistiu) → menu;
+3. nova sobrescrita → menu.
+
+**O log de gravação do cartão não vale como prova sozinho**, e isto está registrado de propósito: o
+próprio relatório do upstream diz que a escrita conclui **mesmo quando o jogo trava**. A prova é a
+tela voltar ao menu, e por isso cada passe terminou numa captura.
+
+**O que estes três passes provam, e o que não provam:** provam que **com** o patch o jogo não trava.
+**Não** provam que travaria sem ele neste aparelho — não existe build "antes" para comparar, e a
+causalidade vem da análise do upstream, não desta medição.
+
+**Por que parou em 3:** o roteiro automatizado dessincronizou. Depois do retorno ao menu o jogo
+**reposiciona o cursor em "Adventure"**, não em "Profile", e o passe seguinte entrou no modo aventura
+em vez de salvar. Não foi travamento — foi comportamento do jogo que o roteiro não previa.
+
+**Custo de completar:** o jogo roda a **9–15 % da velocidade** neste aparelho, e a abertura leva ~13
+minutos. Refazer do zero é caro; o caminho barato é um **save state no menu principal**, e então cada
+repetição custa ~3 minutos.
+
+### Critério 2 — Sly 3 (`SCUS-97464`, CRC `8BC95883`)
+
+**A condição do critério foi conferida no GameDB antes:** a entrada força `vu0ClampMode: 3` e
+**deixa a VU1 no padrão** — exatamente o que o commit `ad9f54ae0f` descreve, já que a divisão por
+zero acontece **por vértice na VU1**.
+
+O protagonista aparece **totalmente colorido** em quatro capturas do binocucom (boné azul, máscara,
+pelagem). E os retratos **mudam de pose entre capturas** — cabeça virada, boca aberta —, o que prova
+que são **modelo 3D em tempo real**, não textura estática; é onde o defeito de preto e branco
+apareceria. `PerfLog` confirma a VU ativa (`VU 24–31 %`).
+
+**O que não foi feito:** não cheguei ao modelo no mundo aberto. O diálogo de abertura é longo a 7–8 %
+da velocidade. O veredito se apoia no modelo 3D do retrato, e isso está dito em vez de escondido.
+
+### Critério 3 — Mortal Kombat: Shaolin Monks (`SLUS-21087`, CRC `455DD546`)
+
+**A entrada do GameDB está no estado que o upstream deixou:** `eeClampMode: 3` (clamp completo de EE)
+e **nenhum modo de arredondamento de divisão** — prova de que os três commits que se cancelam
+(`6baf7d138d`, `d40b290604`, `7986c0bb4c`) ficaram corretamente fora, como a task mandava.
+
+A tela de menu do jogo renderiza **correta**: o painel *Character Stats* com as duas colunas
+alinhadas, o mapa dentro da moldura, o cabeçalho *Main / Moves* e a barra *Toggle Map / Exit /
+Navigate*. **Nada de texto esticado nem de painel dimensionado uma potência de dois pequeno demais**
+— que é o sintoma que `efd403fb39` corrige.
+
+### Critério 4 — God of War II (`SCUS-97481`, CRC `2F123FD8`)
+
+As duas entradas de `3302dfed36` **são lidas e aplicadas**:
+
+```
+GameDB: Enabled GS Hardware Fix: recommendedBlendingLevel to [mode=3]
+GameDB: Enabled GS Hardware Fix: recommendedHWAA1 to [mode=1]
+```
+
+**O critério 4a, como foi escrito, não vale para o nosso fork — e isso não é defeito.** Nenhum aviso
+de OSD sobre as recomendações aparece, e **não deve mesmo aparecer**: a
+[TASK-0043](TASK-0043-aviso-anti-revenda-do-upstream.md) removeu esses avisos de propósito. O código
+prova: `GameDatabase.cpp:1094-1117`, os `case RecommendedBlendingLevel`, `RecommendedAccurateAlphaTest`
+e `RecommendedHWAA1` **só chamam `Host::RemoveKeyedOSDMessage(...)`**. O comentário de lá diz o
+porquê — os avisos disparavam numa **instalação limpa**, sem ação do usuário, porque o padrão móvel é
+menor que o recomendado no GameDB, e todo jogo afetado abria com uma tarja explicando uma
+configuração que o usuário não mexeu.
+
+**Eu escrevi o 4a a partir da mensagem do commit deles ("the OSD tells the player") sem conferir o
+nosso delta.** É a regra do `CLAUDE.md` outra vez: provar pelo call-site, não pelo nome.
+
+**O critério 4b fica provado pelo código, o que é mais forte que comparar screenshots:** aqueles
+`case`s **não escrevem em `config`**. Logo a recomendação **não pode** alterar a imagem no padrão —
+não por observação, mas por construção.
+
+**4c não foi medido.** Ligar High blending + AA1 à mão exige achar o AA1 nas Configurações completas,
+na seção recolhida "Blending e Avançado", e **reiniciar o jogo** — duas execuções a 8 % da
+velocidade. Depois do 4b, o valor informativo é baixo: sabe-se que a entrada não força nada.
+
+### Critério 5 — não regressão (parcial)
+
+Quatro jogos booted e rodados nesta sessão — **Jak X**, **Sly 3**, **Shaolin Monks** e **God of War
+II** —, somando mais de uma hora de execução. **Nenhum crash, nenhuma anomalia visual observada.** O
+que a task pedia era "três jogos, 5 minutos cada, com atenção"; o que houve foi observação enquanto
+se navegava para outros critérios. Conta como evidência, não como o protocolo escrito.
+
+### Critério 6 — desempenho: o par não existe mais
+
+O "antes" precisaria de um APK **sem** a TASK-0092, e o que está no aparelho **já a tem**. Construir
+um exigiria uma worktree separada em `ebe4a88253`, e a `CLAUDE.md` avisa que uma worktree nova **não
+vem com as dependências do shaderc** (7 pastas, 264 MB, `gitignore`d). **Não fiz isso por conta
+própria; é decisão do usuário** se o número vale o custo.
+
+### Um incidente de método, e a correção
+
+Durante o critério 2, um lote de toques automatizados continuou enviando eventos **depois que o
+emulador saiu do primeiro plano**, e uma captura registrou a tela do aplicativo de Mensagens do
+usuário. **A captura foi apagada imediatamente e não foi transmitida a lugar nenhum**, e o usuário
+foi avisado para conferir se ficou rascunho no compositor de SMS.
+
+**A causa é o método, não o aparelho:** `adb shell input tap` entrega o evento a quem estiver em
+foco. A correção, aplicada no resto da sessão: **cada lote confere o app em foco antes de cada
+toque** (`dumpsys window | grep mCurrentFocus`) e aborta se não for `come.nanodata.armsx2`. A regra
+entrou no [`AGENTS.md`](../../AGENTS.md).
+
+Um segundo detalhe do mesmo tipo: a 8–15 % da velocidade, **um `input tap` curto se perde entre
+quadros** (o quadro dura ~116 ms). Os toques passaram a ser `input swipe x y x y 450`, que segura o
+botão tempo suficiente.
+
+### O que falta para fechar
+
+1. **Critério 1**: 2 repetições, via save state no menu principal (~3 min cada).
+2. **Critério 4c**: dois boots do God of War II (~20 min), valor baixo.
+3. **Critério 6**: decisão do usuário sobre construir o APK "antes".
+4. **Critério 5**: se o protocolo escrito for exigido à risca, 3 jogos × 5 min com atenção.
