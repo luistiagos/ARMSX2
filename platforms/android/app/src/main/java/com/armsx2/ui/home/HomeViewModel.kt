@@ -199,7 +199,6 @@ class HomeViewModel(application: Application) :
                     MainActivityRuntime.prefs.getString(TabPreference, HomeTab.Catalog.name) ?: HomeTab.Catalog.name,
                 )
             }.getOrDefault(HomeTab.Catalog)
-            pendingInitialScan = cached.key != repository.cacheKey(scanDirs)
             val validCached = cached.games.filter { game ->
                 if (game.uri.scheme == "file" || game.uri.scheme == null) {
                     val path = game.uri.path ?: game.uri.toString()
@@ -208,6 +207,8 @@ class HomeViewModel(application: Application) :
                     true
                 }
             }
+            pendingInitialScan = cached.key != repository.cacheKey(scanDirs) ||
+                (validCached.isEmpty() && scanDirs.isNotEmpty())
             localGames = validCached
             val initialSort = if (currentTab == HomeTab.Saved) HomeSort.RecentlyPlayed else HomeSort.Title
             state.value = buildState(
@@ -226,7 +227,7 @@ class HomeViewModel(application: Application) :
             // Só os jogos locais: uma linha de catálogo não tem arquivo para hashear.
             if (nativeReady) com.armsx2.RaLibrary.onLibraryLoaded(localGames)
             if (nativeReady && pendingInitialScan) refresh()
-        } else if (nativeReady && (pendingInitialScan || dirsChanged || repository.loadCached().key != repository.cacheKey(scanDirs))) {
+        } else if (nativeReady && (pendingInitialScan || dirsChanged || repository.loadCached().let { it.key != repository.cacheKey(scanDirs) || (it.games.isEmpty() && scanDirs.isNotEmpty()) })) {
             refresh()
         }
     }

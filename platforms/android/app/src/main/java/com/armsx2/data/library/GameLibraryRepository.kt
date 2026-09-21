@@ -21,7 +21,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-class GameLibraryRepository(private val context: Context) {
+class GameLibraryRepository(private val context: Context? = null) {
     private val gameExtensions = setOf(
         "iso", "chd", "cso", "zso", "gz", "bin", "mdf", "img", "nrg", "dump", "elf",
     )
@@ -73,6 +73,9 @@ class GameLibraryRepository(private val context: Context) {
     private fun hostfsRoot(): File? =
         runCatching { MainActivityRuntime.hostfsDir() }.getOrNull()
 
+    var lastScanAllRead: Boolean = true
+        private set
+
     suspend fun scan(directories: List<String>): List<GameInfo> = withContext(Dispatchers.IO) {
         val collected = linkedMapOf<String, GameInfo>()
         // ELFs only. hostfs holds a whole extracted disc -- CNICON.BIN, GCRES.BIN, NETBIO00.DAT
@@ -80,30 +83,47 @@ class GameLibraryRepository(private val context: Context) {
         // default filter turned every one of those data files into a library entry. The ELF is
         // the only thing here anyone launches.
         hostfsRoot()?.let { scanRawDirectory(it, collected, 0, accept = setOf("elf")) }
+        var allRead = true
         directories.forEach { rawUri ->
-            // Uma entrada pode ser um caminho POSIX puro em vez de um tree URI do SAF: e o caso da
-            // pasta do proprio app ([MainActivityRuntime.seedOwnRomsFolder]), onde o catalogo grava
-            // as ROMs baixadas. Ela nao sobrevive ao caminho de baixo -- `resolveTreeUriToPosix`
-            // exige um tree document id e devolve null, e `DocumentFile.fromTreeUri` nao tem o que
-            // fazer com ela -- e tambem nao depende de MANAGE_EXTERNAL_STORAGE, porque e a pasta de
-            // arquivos externos do proprio pacote. Sem este ramo um jogo de 1,4 GB terminava de
-            // baixar e a biblioteca continuava dizendo "Total de jogos: 0".
-            val plainDir = rawUri.takeIf { it.startsWith("/") }
-                ?.let(::File)
-                ?.takeIf { it.isDirectory && it.canRead() }
-            if (plainDir != null) {
-                scanRawDirectory(plainDir, collected, 0)
-                return@forEach
-            }
-            val uri = runCatching { rawUri.toUri() }.getOrNull() ?: return@forEach
-            val rawRoot = if (canUseRawStorage()) MainActivityRuntime.resolveTreeUriToPosix(rawUri)?.let(::File) else null
-            if (rawRoot?.isDirectory == true) {
-                scanRawDirectory(rawRoot, collected, 0)
-            } else {
-                DocumentFile.fromTreeUri(context, uri)?.let { scanDocumentTree(it, collected, 0) }
+            if (!scanSingleDirectory(rawUri, collected)) {
+                allRead = false
             }
         }
-        collected.values.sortedBy { it.title.lowercase() }.also { saveCache(directories, it) }
+        lastScanAllRead = allRead
+        val games = collected.values.sortedBy { it.title.lowercase() }
+        if (allRead) {
+            saveCache(directories, games)
+        }
+        games
+    }
+
+    private fun scanSingleDirectory(
+        rawUri: String,
+        output: MutableMap<String, GameInfo>,
+    ): Boolean {
+        val plainDir = when {
+            rawUri.startsWith("content:") -> null
+            rawUri.startsWith("file:") -> runCatching { rawUri.toUri().path?.let(::File) }.getOrNull()
+            else -> File(rawUri)
+        }
+        if (plainDir != null) {
+            if (!plainDir.exists() || !plainDir.isDirectory || !plainDir.canRead()) {
+                return false
+            }
+            return scanRawDirectory(plainDir, output, 0)
+        }
+
+        val uri = runCatching { rawUri.toUri() }.getOrNull() ?: return false
+        val rawRoot = if (canUseRawStorage()) MainActivityRuntime.resolveTreeUriToPosix(rawUri)?.let(::File) else null
+        if (rawRoot?.isDirectory == true && rawRoot.canRead()) {
+            val ok = scanRawDirectory(rawRoot, output, 0)
+            if (ok) return true
+        }
+
+        val ctx = context ?: return false
+        val doc = runCatching { DocumentFile.fromTreeUri(ctx, uri) }.getOrNull() ?: return false
+        if (!doc.exists() || !doc.canRead()) return false
+        return scanDocumentTree(doc, output, 0)
     }
 
     /**
@@ -189,7 +209,7 @@ class GameLibraryRepository(private val context: Context) {
      */
     private fun exportRecentGamesPublic(orderedUris: List<String>, justPlayed: GameInfo? = null) {
         val root = MainActivityRuntime.systemDirPosix()
-            ?: context.getExternalFilesDir(null)?.absolutePath
+            ?: context?.getExternalFilesDir(null)?.absolutePath
             ?: return
         val cached = loadCached().games
         val byUri = (if (justPlayed != null) cached + justPlayed else cached).associateBy { it.uri.toString() }
@@ -213,9 +233,9 @@ class GameLibraryRepository(private val context: Context) {
         directory: DocumentFile,
         output: MutableMap<String, GameInfo>,
         depth: Int,
-    ) {
-        if (depth > MaxScanDepth) return
-        val children = runCatching { directory.listFiles() }.getOrNull() ?: return
+    ): Boolean {
+        if (depth > MaxScanDepth) return true
+        val children = runCatching { directory.listFiles() }.getOrNull() ?: return false
         children.forEach { file ->
             if (file.isDirectory) {
                 scanDocumentTree(file, output, depth + 1)
@@ -227,6 +247,7 @@ class GameLibraryRepository(private val context: Context) {
             val probe = if (extension in probeExtensions) probeDocument(file.uri) else null
             output.putIfAbsent(file.uri.toString(), createGame(file.uri, name, extension, probe))
         }
+        return true
     }
 
     private fun scanRawDirectory(
@@ -234,9 +255,9 @@ class GameLibraryRepository(private val context: Context) {
         output: MutableMap<String, GameInfo>,
         depth: Int,
         accept: Set<String> = gameExtensions,
-    ) {
-        if (depth > MaxScanDepth) return
-        val children = runCatching { directory.listFiles() }.getOrNull() ?: return
+    ): Boolean {
+        if (depth > MaxScanDepth) return true
+        val children = runCatching { directory.listFiles() }.getOrNull() ?: return false
         children.forEach { file ->
             if (file.isDirectory) {
                 scanRawDirectory(file, output, depth + 1, accept)
@@ -248,6 +269,7 @@ class GameLibraryRepository(private val context: Context) {
             val probe = if (extension in probeExtensions) probeRaw(file) else null
             output.putIfAbsent(uri.toString(), createGame(uri, file.name, extension, probe))
         }
+        return true
     }
 
     private fun createGame(uri: Uri, name: String, extension: String, rawProbe: String?): GameInfo {
@@ -300,7 +322,7 @@ class GameLibraryRepository(private val context: Context) {
     }
 
     private fun probeDocument(uri: Uri): String? = runCatching {
-        val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return null
+        val descriptor = context?.contentResolver?.openFileDescriptor(uri, "r") ?: return null
         NativeApp.getGameSerialFromFd(descriptor.detachFd())
     }.getOrNull()
 
