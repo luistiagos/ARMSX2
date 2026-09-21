@@ -9,7 +9,7 @@
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** nenhuma ainda
 - **Relacionado:**
-  [a pasta de ROMs semeada uma vez não acompanha a raiz de dados](biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados_2026-09-21T00-16.md)
+  [a pasta de ROMs semeada uma vez não acompanha a raiz de dados](../../done/biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados_2026-09-21T00-16.md)
   — outro jeito de a varredura olhar para uma pasta que não é a dos jogos
 
 ## Sintoma

@@ -4,7 +4,7 @@
 - **Criada em:** 2026-09-21
 - **Concluída em:** 2026-09-21
 - **Feature:** nenhuma
-- **Bugs que resolve:** [biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados](../bugs/open/armsx2-fork/biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados_2026-09-21T00-16.md)
+- **Bugs que resolve:** [biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados](../bugs/done/biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados_2026-09-21T00-16.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0097:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
