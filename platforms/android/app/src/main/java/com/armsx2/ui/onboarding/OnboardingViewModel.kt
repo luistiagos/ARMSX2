@@ -261,8 +261,8 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
     fun canContinue(): Boolean = when (state.value.page) {
         0, 1 -> true
         2 -> state.value.biosInfo != null
-        3 -> state.value.gameFolders.isNotEmpty()
-        else -> state.value.biosInfo != null && state.value.gameFolders.isNotEmpty()
+        3 -> true
+        else -> state.value.biosInfo != null
     }
 
     fun finish() {

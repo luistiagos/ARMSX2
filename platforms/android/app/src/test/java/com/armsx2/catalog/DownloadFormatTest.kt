@@ -98,4 +98,28 @@ class DownloadFormatTest {
         assertFalse(entries[1].isDownloaded)
         assertFalse(entries[2].isDownloaded)
     }
+
+    @Test
+    fun `markDownloaded com multiplos diretorios reconhece jogos em pastas diferentes`() {
+        // Cenário da TASK-0097: o usuário baixou um jogo no armazenamento interno e,
+        // depois de mudar a raiz para o cartão SD, baixou outro jogo lá. Ambos devem
+        // ser reconhecidos como baixados pelo catálogo.
+        val internalRoms = temp.newFolder("internal_roms")
+        val sdRoms = temp.newFolder("sd_roms")
+
+        java.io.File(internalRoms, "God of War (USA).chd").writeBytes(ByteArray(1024))
+        java.io.File(sdRoms, "Gran Turismo 4 (USA).chd").writeBytes(ByteArray(2048))
+
+        val entries = listOf(
+            CatalogEntry("God of War (USA).chd", "", "", ""),
+            CatalogEntry("Gran Turismo 4 (USA).chd", "", "", ""),
+            CatalogEntry("Shadow of the Colossus (USA).chd", "", "", ""),
+        )
+        CatalogParser.markDownloaded(entries, listOf(internalRoms, sdRoms))
+
+        assertTrue(entries[0].isDownloaded)
+        assertTrue(entries[1].isDownloaded)
+        assertFalse(entries[2].isDownloaded)
+    }
 }
+

@@ -182,7 +182,10 @@ class HomeViewModel(application: Application) :
     val liveQuery = androidx.compose.runtime.mutableStateOf("")
 
     fun load(romDirectories: List<String>, nativeReady: Boolean) {
+        val dirsChanged = directories != romDirectories
         directories = romDirectories
+        val scanDirs = effectiveDirectories()
+        com.armsx2.catalog.DownloadQueueManager.get().setRomsDir(romsDir())
         if (!loaded) {
             loaded = true
             val cached = repository.loadCached()
@@ -196,7 +199,7 @@ class HomeViewModel(application: Application) :
                     MainActivityRuntime.prefs.getString(TabPreference, HomeTab.Catalog.name) ?: HomeTab.Catalog.name,
                 )
             }.getOrDefault(HomeTab.Catalog)
-            pendingInitialScan = romDirectories.isNotEmpty() && cached.key != repository.cacheKey(romDirectories)
+            pendingInitialScan = cached.key != repository.cacheKey(scanDirs)
             val validCached = cached.games.filter { game ->
                 if (game.uri.scheme == "file" || game.uri.scheme == null) {
                     val path = game.uri.path ?: game.uri.toString()
@@ -223,13 +226,14 @@ class HomeViewModel(application: Application) :
             // Só os jogos locais: uma linha de catálogo não tem arquivo para hashear.
             if (nativeReady) com.armsx2.RaLibrary.onLibraryLoaded(localGames)
             if (nativeReady && pendingInitialScan) refresh()
-        } else if (nativeReady && pendingInitialScan) {
+        } else if (nativeReady && (pendingInitialScan || dirsChanged || repository.loadCached().key != repository.cacheKey(scanDirs))) {
             refresh()
         }
     }
 
     fun refresh() {
-        if (directories.isEmpty() || scanJob?.isActive == true) return
+        val scanDirs = effectiveDirectories()
+        if (scanDirs.isEmpty() || scanJob?.isActive == true) return
         scanJob = scope.launch {
             val initialScan = pendingInitialScan && state.value.allGames.isEmpty()
             state.value = state.value.copy(
@@ -237,13 +241,14 @@ class HomeViewModel(application: Application) :
                 initialized = if (initialScan) false else state.value.initialized,
                 error = null,
             )
-            val result = runCatching { repository.scan(directories) }
+            val result = runCatching { repository.scan(scanDirs) }
             result.onSuccess { games ->
                 pendingInitialScan = false
                 localGames = games
+                val appDirs = allAppRomsDirs()
                 com.armsx2.catalog.CatalogParser.markDownloaded(
                     com.armsx2.catalog.CatalogLibrary.entries,
-                    romsDir(),
+                    appDirs,
                 )
                 state.value = buildState(
                     state.value.copy(allGames = mergeCatalog(games), scanning = false, initialized = true),
@@ -473,13 +478,41 @@ class HomeViewModel(application: Application) :
      * Onde as ROMs baixadas são gravadas — e, por consequência, onde a biblioteca as encontra.
      *
      * `roms` dentro da raiz de dados do app: é onde o app anterior as punha, é o caminho que o core
-     * alcança sem permissão nenhuma, e é a pasta que `seedOwnRomsFolder` semeia em `romsDirs`.
+     * alcança sem permissão nenhuma, e é derivada dinamicamente de `assetCopyRoot` (TASK-0097).
      * Deliberadamente NÃO é a pasta de ROMs que o usuário escolheu no assistente — aquela pode
      * estar num cartão SD via SAF, onde um download de 10 GB com retomada não tem como escrever de
      * forma confiável.
      */
     private fun romsDir(): java.io.File =
         java.io.File(MainActivityRuntime.assetCopyRoot(getApplication()), "roms").apply { mkdirs() }
+
+    /**
+     * Todos os diretórios de ROM privados do app conhecidos (armazenamento ativo, volumes de arquivos
+     * do pacote em `getExternalFilesDirs` e pasta customizada, se houver).
+     *
+     * Permite que ao trocar de armazenamento (interno <-> cartão SD), jogos baixados anteriormente
+     * continuem sendo encontrados e jogáveis sem exigir migração de arquivos lenta em segundo plano.
+     */
+    private fun allAppRomsDirs(): List<java.io.File> {
+        val current = romsDir()
+        val allExternal = runCatching {
+            getApplication<Application>().getExternalFilesDirs(null).mapNotNull { externalDir ->
+                externalDir?.let { java.io.File(it, "roms") }
+            }
+        }.getOrDefault(emptyList())
+        val custom = MainActivityRuntime.systemDirPosix()?.let { java.io.File(it, "roms") }
+        return (listOf(current) + allExternal + listOfNotNull(custom))
+            .filter { it.exists() && it.isDirectory }
+            .distinctBy { it.canonicalPath }
+    }
+
+    /**
+     * A lista final de pastas a varrer: todas as pastas privadas do app + pastas externas do usuário.
+     */
+    private fun effectiveDirectories(): List<String> {
+        val appPaths = allAppRomsDirs().map { it.absolutePath }
+        return (appPaths + directories).distinct()
+    }
 
     private fun loadCatalog() {
         // Assinar a fila NÃO pode ficar atrás do atalho de cache abaixo.
@@ -496,13 +529,13 @@ class HomeViewModel(application: Application) :
 
         if (com.armsx2.catalog.CatalogLibrary.entries.isNotEmpty()) return
         scope.launch {
-            val dir = romsDir()
+            val appDirs = allAppRomsDirs()
             // O parse lê um asset de 926 KB e monta 12.628 objetos: fora da thread principal, senão
             // a biblioteca abre travada.
             val entries = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 com.armsx2.catalog.CatalogSerialIndex.ensureLoaded(getApplication())
                 com.armsx2.catalog.CatalogParser.parse(getApplication())
-                    .also { com.armsx2.catalog.CatalogParser.markDownloaded(it, dir) }
+                    .also { com.armsx2.catalog.CatalogParser.markDownloaded(it, appDirs) }
             }
             com.armsx2.catalog.CatalogLibrary.install(entries)
             state.value = buildState(state.value.copy(allGames = mergeCatalog(localGames), initialized = true))

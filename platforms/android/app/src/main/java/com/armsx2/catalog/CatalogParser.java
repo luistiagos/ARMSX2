@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -182,16 +184,20 @@ public final class CatalogParser {
      * Uma leitura de diretório em vez de um {@code exists()} por entrada: são 12.628 linhas no
      * manifesto, e a varredura roda a cada abertura da biblioteca.
      */
-    public static void markDownloaded(List<CatalogEntry> entries, File romsDir) {
+    public static void markDownloaded(List<CatalogEntry> entries, Collection<File> romsDirs) {
         Map<String, Long> present = new HashMap<>();
-        File[] files = (romsDir == null) ? null : romsDir.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                String name = f.getName();
-                // Um download em curso não conta como baixado — nem ele nem a anotação de
-                // origem que anda ao lado dele.
-                if (name.endsWith(".part") || name.endsWith(".part.src")) continue;
-                present.put(stripExtension(name).toLowerCase(), f.length());
+        if (romsDirs != null) {
+            for (File romsDir : romsDirs) {
+                File[] files = (romsDir == null) ? null : romsDir.listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        String name = f.getName();
+                        // Um download em curso não conta como baixado — nem ele nem a anotação de
+                        // origem que anda ao lado dele.
+                        if (name.endsWith(".part") || name.endsWith(".part.src")) continue;
+                        present.put(stripExtension(name).toLowerCase(), f.length());
+                    }
+                }
             }
         }
         for (CatalogEntry entry : entries) {
@@ -201,6 +207,10 @@ public final class CatalogParser {
                 entry.queueState = null;
             }
         }
+    }
+
+    public static void markDownloaded(List<CatalogEntry> entries, File romsDir) {
+        markDownloaded(entries, romsDir == null ? Collections.emptyList() : Collections.singletonList(romsDir));
     }
 
     private static String stripExtension(String name) {

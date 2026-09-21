@@ -8,7 +8,7 @@
 - **Classe:** fail silencioso (duas partes do app discordam sobre onde ficam os jogos)
 - **Reincidência:** não
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** nenhuma ainda
+- **Tasks que o resolvem:** [TASK-0097](../../../task/TASK-0097-pasta-de-roms-do-app-acompanha-raiz-de-dados.md)
 - **Relacionado:**
   [a pasta de download da 1.0.x não é adotada](catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork_2026-09-21T00-16.md)
   — mesma raiz: `romsDirs` é uma foto de um caminho, não uma regra

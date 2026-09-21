@@ -1776,7 +1776,7 @@ open class MainActivityRuntime : ComponentActivity() {
             // A pasta do PROPRIO app e uma excecao legitima a regra acima. O raciocinio
             // "/storage so e de fato legivel com all-files" vale para caminho arbitrario; o
             // diretorio de arquivos externos do pacote e legivel sem permissao nenhuma, sempre. E
-            // dele que se trata: e a pasta semeada por [seedOwnRomsFolder], onde o catalogo grava.
+            // dele que se trata: e a pasta onde o catalogo grava (assetCopyRoot/roms).
             // Sem esta excecao o app abria acusando "nao consegui abrir sua pasta de jogos salvos"
             // logo de cara -- sobre uma pasta que ele acabara de criar e estava lendo.
             val ownRoot = runCatching { File(assetCopyRoot(context)).canonicalPath }.getOrNull()
@@ -1802,6 +1802,52 @@ open class MainActivityRuntime : ComponentActivity() {
                     else -> posixReadable(raw)
                 }
             }
+        }
+
+        /**
+         * Lógica pura de verificação de caminho de pasta privada do app.
+         * Separada de [isAppPrivateRomsDir] para poder ser testada sem Android Context.
+         */
+        fun isAppPrivateRomsPath(
+            path: String?,
+            packageName: String,
+            currentAssetCopyRoot: String? = null,
+            externalFilesDirs: List<String> = emptyList(),
+            internalDataDir: String? = null,
+        ): Boolean {
+            if (path.isNullOrBlank()) return false
+            val canonical = runCatching { File(path).canonicalPath }.getOrNull() ?: return false
+            val currentAppRoms = currentAssetCopyRoot?.let { runCatching { File(it, "roms").canonicalPath }.getOrNull() }
+            if (currentAppRoms != null && canonical == currentAppRoms) return true
+            for (dir in externalFilesDirs) {
+                val p = runCatching { File(dir, "roms").canonicalPath }.getOrNull()
+                if (p != null && canonical == p) return true
+            }
+            val internalRoms = internalDataDir?.let { runCatching { File(it, "roms").canonicalPath }.getOrNull() }
+            if (internalRoms != null && canonical == internalRoms) return true
+            val sep = File.separator
+            if (canonical.endsWith("${sep}Android${sep}data${sep}$packageName${sep}files${sep}roms") ||
+                canonical.endsWith("${sep}data${sep}$packageName${sep}files${sep}roms")) {
+                return true
+            }
+            return false
+        }
+
+        /**
+         * Identifica se [path] corresponde à pasta privada de ROMs do próprio app
+         * (seja sob o assetCopyRoot atual, sob qualquer volume retornado por
+         * getExternalFilesDirs(), sob dataDir ou pelo padrão /Android/data/<pkg>/files/roms).
+         * Usado para evitar que a pasta própria do app — que é implícita e derivada —
+         * seja guardada em `romsDirs` junto com as pastas escolhidas pelo usuário.
+         */
+        fun isAppPrivateRomsDir(context: Context, path: String?): Boolean {
+            val externalDirs = runCatching { context.getExternalFilesDirs(null) }
+                .getOrNull()
+                ?.mapNotNull { it?.absolutePath }
+                .orEmpty()
+            val currentAssetRoot = runCatching { assetCopyRoot(context) }.getOrNull()
+            val internalDir = runCatching { context.dataDir.absolutePath }.getOrNull()
+            return isAppPrivateRomsPath(path, context.packageName, currentAssetRoot, externalDirs, internalDir)
         }
 
         /** Resolvido uma vez por escolha de pasta, e nunca mais. Chave = `systemDir.value`, para a
@@ -2615,10 +2661,10 @@ open class MainActivityRuntime : ComponentActivity() {
         biosDir.value = prefs.getString("biosDir", null)
         // Load roms folders. New format: JSON array under "romsDirs" pref.
         // Legacy format: single string under "roms" pref (pre-multi-dir).
-        // Migration path: read legacy if present, hoist into the list, keep
-        // both keys in sync until the user re-confirms in setup. Once the
-        // user adds/removes via the new picker the legacy key is dropped.
-        romsDirs.value = run {
+        // A pasta de ROMs do app agora é implícita e derivada da raiz de dados (TASK-0097).
+        // Higieniza qualquer pasta privada do próprio app que tenha sido pré-semeada em romsDirs,
+        // garantindo que romsDirs guarde apenas as pastas adicionadas pelo usuário.
+        val loadedDirs = run {
             val newJson = prefs.getString("romsDirs", null)
             if (newJson != null) {
                 runCatching {
@@ -2630,7 +2676,11 @@ open class MainActivityRuntime : ComponentActivity() {
                 if (legacy != null) listOf(legacy) else emptyList()
             }
         }
-        seedOwnRomsFolder()
+        val cleanedDirs = loadedDirs.filterNot { isAppPrivateRomsDir(this, it) }
+        romsDirs.value = cleanedDirs
+        if (cleanedDirs.size != loadedDirs.size) {
+            setRomsDirs(cleanedDirs)
+        }
         // Setup recovery. Auto Backup can restore our prefs (incl. setupComplete + the
         // ROMs URIs) on reinstall, but SAF/all-files PERMISSIONS are never backed up — so
         // a restored setup can point at a folder we can no longer read, which would strand
@@ -2644,7 +2694,7 @@ open class MainActivityRuntime : ComponentActivity() {
         // O aviso nao se perde: a biblioteca vazia ja oferece a acao que abre a configuracao
         // (HomeScreen, ramo `noFolders`), que e o mesmo destino por um caminho que o usuario
         // escolhe. So a marca de diagnostico continua sendo levantada.
-        if (!romsAccessible(this, romsDirs.value)) {
+        if (romsDirs.value.isNotEmpty() && !romsAccessible(this, romsDirs.value)) {
             setupRecoveryNeeded.value = true
         }
         // Renderer + upscale now live in the Settings tier (global ∘ per-game);
@@ -3267,12 +3317,6 @@ open class MainActivityRuntime : ComponentActivity() {
         prefs.edit { putString("systemDir", legacy) }
     }
 
-    private fun seedOwnRomsFolder() {
-        if (romsDirs.value.isNotEmpty()) return
-        val own = java.io.File(assetCopyRoot(this), "roms")
-        runCatching { own.mkdirs() }
-        setRomsDirs(listOf(own.absolutePath))
-    }
 
     private fun effectiveKeyCode(event: KeyEvent): Int {
         if (event.keyCode == KeyEvent.KEYCODE_UNKNOWN && event.scanCode != 0 &&
