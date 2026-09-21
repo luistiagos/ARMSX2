@@ -177,7 +177,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0094](TASK-0094-avaliar-e-adotar-o-pr-660-gs.md) — **bloco 5**: decidir e executar a adoção do PR #660 (`gs-classic-tiler`) | em andamento | FEAT-0003 | — | `29420649d1` |
 | [TASK-0095](TASK-0095-autoflush-do-god-of-war-em-gpu-fraca.md) — medir o que o `autoFlush` custa ao God of War em GPU fraca e, se a troca valer, propô-la ao upstream | aberta | — | god-of-war-lento-no-poco-c75-mali-g52 | — |
 | [TASK-0096](TASK-0096-devolver-a-entrada-do-quick-loading.md) — devolver à biblioteca a entrada do Quick Loading que o merge da TASK-0067 perdeu, e medir lá o page cache da extração | aberta | — | quick-loading-sem-entrada-apos-merge-da-task-0067 | — |
-| [TASK-0097](TASK-0097-pasta-de-roms-do-app-acompanha-raiz-de-dados.md) — a pasta de ROMs do app vira implícita e acompanha a raiz de dados | concluída | — | biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados | — |
+| [TASK-0097](TASK-0097-pasta-de-roms-do-app-acompanha-raiz-de-dados.md) — a pasta de ROMs do app vira implícita e acompanha a raiz de dados | concluída | — | biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados | `e9880b1371` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
