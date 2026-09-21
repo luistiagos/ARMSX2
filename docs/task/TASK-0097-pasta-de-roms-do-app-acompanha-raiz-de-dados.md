@@ -62,7 +62,9 @@ Separar a pasta própria do app das pastas escolhidas pelo usuário:
    - Bateria de testes unitários do Android (`:app:testGithubDebugUnitTest`).
    - Rastreabilidade via `python scripts/check_traceability.py`.
 
-2. **No aparelho (com cartão SD):**
-   - Baixar jogo no armazenamento interno -> conferir em Salvos.
-   - Configurações -> Armazenamento -> Cartão SD.
-   - Baixar outro jogo -> ambos os jogos devem aparecer em Salvos e com marca de baixado no catálogo.
+2. **No aparelho (Moto G86 5G, Android 16, SDK 36):**
+   - **Boot limpo e SharedPreferences:** Instalação do APK com pacote de teste isolado `come.nanodata.armsx2.task0097`. `shared_prefs/ARMSX2.xml` verificado: `romsDirs` não foi criado nem semeado com caminho absoluto (está vazio).
+   - **Descoberta implícita:** Arquivo de teste colocado na pasta do app (`/sdcard/Android/data/come.nanodata.armsx2.task0097/files/roms/Shadow of the Colossus (USA).chd`). Na aba "Salvos", o jogo foi reconhecido e exibido imediatamente ("Total de jogos: 1") sem que nenhuma pasta estivesse cadastrada em `romsDirs`.
+   - **Troca de armazenamento (Multi-Volume):** Configurado `systemDir = /sdcard/ARMSX2_Custom` e colocado segundo jogo (`Grand Theft Auto - San Andreas (USA).iso`). Ao reabrir, o app varreu tanto a nova pasta ativa quanto o volume anterior do app: ambos os jogos foram exibidos em "Salvos" ("Total de jogos: 2").
+   - **Higienização de instalações legadas:** Injetado `romsDirs` contaminado com a pasta privada do app mais uma pasta de usuário (`/sdcard/UserCustomGames`). Ao reiniciar o app, `MainActivityRuntime.onCreate` expurgou automaticamente a pasta privada do app, persistindo apenas `["/sdcard/UserCustomGames"]`.
+
