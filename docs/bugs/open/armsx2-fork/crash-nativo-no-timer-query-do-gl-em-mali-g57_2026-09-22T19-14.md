@@ -14,7 +14,9 @@
 - **Reincidência:** 13 crashes em ~21 h no mesmo aparelho. É a assinatura nativa **mais frequente**
   dos últimos 77 eventos de `armsx2/native`.
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** nenhuma ainda
+- **Tasks que o resolvem:** [TASK-0102](../../../task/TASK-0102-timer-query-do-gl-so-quando-o-osd-de-gpu-pede.md)
+  — cobre **só o item 1** da correção abaixo (a porta que tira o caminho do aparelho do cliente).
+  Os itens 2 e 3 seguem **sem task**.
 - **Relacionado:**
   [gpu-timing do OpenGL no Android nunca produz leitura](../../done/gpu-timing-do-opengl-no-android-nunca-produz-leitura_2026-09-01T10-50.md)
   — é o bug que **introduziu** este caminho;
@@ -205,6 +207,9 @@ Em ordem de custo, e as duas primeiras são independentes:
 1. **Não armar o timer query quando o OSD de GPU está desligado** — devolver a porta que o upstream
    tinha em `5793dbc1ef`, mas **só no `__ANDROID__`**, para não reabrir o `624717dfad` no desktop.
    Remove o caminho inteiro do aparelho do cliente, sem perda funcional para quem joga.
+   → **[TASK-0102](../../../task/TASK-0102-timer-query-do-gl-so-quando-o-osd-de-gpu-pede.md)**,
+   aberta em 2026-09-22. O custo aceito está lá: com o OSD desligado, o `PerfLog` no GL do Android
+   deixa de trazer o campo `GPU` — mas agora com interruptor.
 2. **Conferir `glGetError` em *todo* `glBeginQueryEXT`, não só no primeiro** (`GSDeviceOGL.cpp:1749`).
    Um begin recusado não pode consumir o slot — que é exatamente o que a TASK-0085 já decidiu, e ela
    só aplicou a decisão ao primeiro.
