@@ -5,10 +5,12 @@
   (TASK-0067), que manteve o nosso `HomeScreen.kt` inteiro
 - **Errors (serviço):** nenhum — não é crash, é ausência; não gera telemetria
 - **Classe:** fail (recurso inalcançável)
+- **Complexidade:** baixa (exposição de ação/item de menu na interface Compose)
 - **Reincidência:** não
+
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0096](../../../task/TASK-0096-devolver-a-entrada-do-quick-loading.md)
-- **Relacionado:** [TASK-0090](../../../task/TASK-0090-duas-correcoes-de-campo-do-upstream.md) —
+- **Tasks que o resolvem:** [TASK-0096](../../task/TASK-0096-devolver-a-entrada-do-quick-loading.md)
+- **Relacionado:** [TASK-0090](../../task/TASK-0090-duas-correcoes-de-campo-do-upstream.md) —
   onde o defeito apareceu, porque a correção `c2bea2f029` dela não tem como ser exercitada
 
 ## Sintoma

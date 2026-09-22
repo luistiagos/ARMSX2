@@ -1,14 +1,21 @@
 # Bugs aplicáveis ao ARMSX2-fork
 
-Esta pasta contém **13 relatórios** cuja causa afeta ou continua presente na árvore atual.
+Esta pasta contém os relatórios cuja causa afeta ou continua presente na árvore atual.
 
 O status, a viabilidade de correção, a severidade e a evidência de cada item estão no
 [`README` da triagem](../README.md#armsx2-fork-atual).
 
-Os dois relatórios que tinham nascido na linha antiga e ficavam aqui por causa confirmada no código
-atual — carga de `NativeApp` antes do worker e `getExternalFilesDir()` no caminho da UI — foram
-corrigidos e validados em aparelho na
-[TASK-0079](../../../task/TASK-0079-boot-nao-toca-o-nativo-nem-o-disco-na-ui.md).
+O relatório do **Quick Loading sem entrada após merge** saiu daqui em 2026-09-22: a
+[TASK-0096](../../../task/TASK-0096-devolver-a-entrada-do-quick-loading.md) devolveu a `HomeScreen.kt`
+as ações de menu para discos e ELFs instalados, adicionou as 14 chaves em `pt-BR.json` e validou no `SM-A127M`
+a entrada `⚡`, o cálculo de espaço (4,3 GB) e o seletor SAF. Fechado em
+[`done/`](../../done/quick-loading-sem-entrada-apos-merge-da-task-0067_2026-09-11T15-40.md).
+
+O relatório do **veredito do renderer automático ausente no relato** saiu daqui em 2026-09-22: a
+[TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md) expôs a JNI nativa
+`getAutoRendererVerdict()`, populou `sGraphicsBootSummary` centralmente para todo relato não-crash e
+alimentou a recuperação de renderizador no menu de pausa da emulação. Validado no `SM-A127M`. Fechado em
+[`done/`](../../done/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md).
 
 Os relatórios de **downloads apenas em `Android/data`** e **pasta de download da 1.0.x não adotada**
 saíram daqui em 2026-09-22: a [TASK-0099](../../../task/TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md)

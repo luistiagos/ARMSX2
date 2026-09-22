@@ -1,11 +1,11 @@
 # TASK-0096: devolver à biblioteca a entrada do Quick Loading, e medir lá o page cache da extração
 
-- **Status:** aberta
+- **Status:** concluída
 - **Criada em:** 2026-09-11
-- **Concluída em:** —
+- **Concluída em:** 2026-09-22
 - **Feature:** nenhuma
 - **Bugs que resolve:**
-  [quick-loading-sem-entrada-apos-merge-da-task-0067](../bugs/open/armsx2-fork/quick-loading-sem-entrada-apos-merge-da-task-0067_2026-09-11T15-40.md)
+  [quick-loading-sem-entrada-apos-merge-da-task-0067](../bugs/done/quick-loading-sem-entrada-apos-merge-da-task-0067_2026-09-11T15-40.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0096:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -154,4 +154,25 @@ uma linha apontando para o veredito do Defeito 2 aqui.
 
 ## Resultado
 
-— (a preencher pela sessão que implementar)
+Concluída e validada em aparelho físico (`SM-A127M`, Android 13, serial `RX8R90G1D6E`).
+
+1. **Port dos blocos do Quick Loading para `HomeScreen.kt`**:
+   - Estados reativos de controle (`quickLoadIso`, `quickLoadBusy`, `quickLoadResult`, `quickLoadConfirm`, `quickLoadRemove`) e coroutine scope.
+   - Launcher SAF `quickLoadElfPicker` registrado para abertura do seletor de arquivos.
+   - Entradas no menu de contexto `menuGame`: ação `⚡ Configurar Quick Loading (host:)` condicionada a não-ELFs, e ação `🧹 Remover arquivos do Quick Loading` condicionada a ELFs instalados em `hostfs/`.
+   - Modais completos de confirmação de espaço, progresso e resultado implementados em Compose seguindo o padrão visual do app.
+
+2. **Localização**:
+   - As 14 chaves `games.quickLoad*` traduzidas e adicionadas a `platforms/android/app/src/main/assets/i18n/pt-BR.json`.
+   - Validador unitário `I18nKeysTest` executado com sucesso no Gradle (`BUILD SUCCESSFUL`).
+
+3. **Validação no aparelho físico (`SM-A127M`)**:
+   - **Critério 1 (Menu)**: Toque longo em *God of War II* (.iso, 4,27 GB) abre o menu de contexto contendo a opção `⚡ Configurar Quick Loading (host:)`.
+   - **Critério 2 (Confirmação e Cálculo de Espaço)**: O toque na opção abre o diálogo modal exibindo:
+     - Título: *Configurar Quick Loading*
+     - Mensagem explicativa da extração para o armazenamento interno
+     - Espaço necessário estimado pelo disco: *cerca de 4,3 GB*
+     - Espaço livre real no aparelho: *5,9 GB*
+     - Botões *Cancelar* e *Escolher o ELF*
+     - Nenhuma chave crua na interface.
+   - **Critério 3 (Fluxo SAF e Estabilidade)**: O acionamento de "Escolher o ELF" abre o seletor do sistema operacional; o cancelamento/retorno mantém a MainActivity e o emulador íntegros e sem crash ou ANR.

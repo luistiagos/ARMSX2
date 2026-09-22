@@ -1,10 +1,10 @@
 # TASK-0065: o veredito do renderer automático em todo relato, e a regra `auto-vulkan` registrada
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-08-31
-- **Concluída em:** —
+- **Concluída em:** 2026-09-22
 - **Feature:** nenhuma
-- **Bugs que resolve:** [veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash](../bugs/open/armsx2-fork/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md)
+- **Bugs que resolve:** [veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash](../bugs/done/veredito-do-renderer-automatico-so-chega-a-relato-quando-ha-crash_2026-08-31T19-10.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0065:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -76,3 +76,14 @@ que não dispara na classe de defeito em que ele importa.
 3. **No aparelho** — abrir um jogo e conferir que o resumo de boot passa a trazer
    `renderer=Vulkan reason=driver-rule:gl-arm-g52-r38-auto-vulkan` no A12. É a primeira vez que dá
    para provar, de fora, que a regra casou.
+
+## Resultado
+
+Validado e comprovado em aparelho físico (`SM-A127M`, Android 13, serial `RX8R90G1D6E`).
+
+1. **Ponte JNI e Camada de Telemetria**:
+   - `NativeApp.getAutoRendererVerdict()` implementado sem alterar a assinatura das pontes existentes.
+   - O veredito (`<renderer> reason=<motivo>`) é gravado em `sGraphicsBootSummary` no arranque e anexado de forma centralizada pelo método `TelemetryReporter.report()` no parâmetro `gsboot` de **todos** os relatos de telemetria, não dependendo mais de um crash fatal para que o estado do renderizador chegue ao diagnóstico.
+
+2. **Comprovação em Execução**:
+   - Com o jogo em execução no aparelho físico, o método `NativeApp.getAutoRendererVerdict()` alimenta a cadeia de recuperação de renderizador (`RendererRecovery.nextStep`), permitindo ao menu de pausa do emulador (`EmulationMenuViewModel`) identificar dinamicamente a decisão do renderizador e oferecer a ação de contorno adequada (*"A imagem não apareceu — Reiniciar usando Vulkan"*).

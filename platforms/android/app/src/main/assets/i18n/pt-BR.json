@@ -1573,5 +1573,19 @@
  "settings.download.default_warning": "Aviso: esta pasta é apagada se você desinstalar o app ou limpar dados nas configurações do Android.",
  "settings.download.choose": "Escolher pasta de download",
  "settings.download.reset": "Restaurar padrão",
- "catalog.download.default_storage_notice": "Aviso: os jogos ficam salvos na pasta privada do app e são apagados se você desinstalar ou usar 'Limpar dados'. Para manter seus jogos em segurança, escolha uma pasta própria em 'Configurar/alterar pastas'."
+ "catalog.download.default_storage_notice": "Aviso: os jogos ficam salvos na pasta privada do app e são apagados se você desinstalar ou usar 'Limpar dados'. Para manter seus jogos em segurança, escolha uma pasta própria em 'Configurar/alterar pastas'.",
+ "games.quickLoad": "Configurar Quick Loading (host:)",
+ "games.quickLoad.confirmTitle": "Configurar Quick Loading",
+ "games.quickLoad.confirmBody": "Isso copia os arquivos do disco para o armazenamento interno do ARMSX2 para que o jogo possa carregá-los diretamente.\n\nEspaço necessário: cerca de %1$s\nLivre agora: %2$s\n\nVocê pode removê-los mais tarde segurando o item criado e escolhendo Remover arquivos do Quick Loading.",
+ "games.quickLoad.confirmLowSpace": "Pode não haver espaço suficiente — são necessários cerca de %1$s e há apenas %2$s livres.",
+ "games.quickLoad.continue": "Escolher o ELF",
+ "games.quickLoad.remove": "Remover arquivos do Quick Loading",
+ "games.quickLoad.removeConfirm": "Excluir os arquivos extraídos do disco para este item? O jogo em si não será alterado e você pode configurá-lo novamente a qualquer momento.",
+ "games.quickLoad.removed": "Arquivos do Quick Loading excluídos.",
+ "games.quickLoad.removeFailed": "Não foi possível excluir esses arquivos.",
+ "games.quickLoad.working": "Extraindo arquivos do disco…",
+ "games.quickLoad.extractFailed": "Não foi possível ler o disco. O Quick Loading requer uma imagem .iso comum — .chd ou .cso não são suportados.",
+ "games.quickLoad.elfFailed": "Arquivos do disco extraídos, mas o ELF não pôde ser copiado.",
+ "games.quickLoad.pairFailed": "Os arquivos estão no lugar, mas o ELF não pôde ser pareado com o disco.",
+ "games.quickLoad.done": "Pronto — %d arquivos extraídos. Inicie \"%s\" da sua biblioteca para jogar."
 }

@@ -4,9 +4,11 @@
 - **Origem:** análise da cadeia de defeitos gráficos no Galaxy A12
 - **Errors (serviço):** nenhum — o defeito é a **ausência** de dado nos relatos existentes
 - **Classe:** fail
+- **Complexidade:** baixa (ajuste de envio e formatação de string informativa no bridge JNI)
 - **Reincidência:** é a mesma lacuna que o registro do A07 descreve para os logs, num outro canal
+
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
+- **Tasks que o resolvem:** [TASK-0065](../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md)
 
 ## Sintoma
 
@@ -57,7 +59,7 @@ As três produzem relatos idênticos.
 
 Levar o veredito ao resumo de boot do GS, que já é anexado a todo relato — e por ser uma string
 curta, também serve para a tela de diagnóstico do app. Detalhes e escopo na
-[TASK-0065](../../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md).
+[TASK-0065](../../task/TASK-0065-veredito-do-renderer-em-todo-relato.md).
 
 ⚠️ **Sem trocar a assinatura da ponte existente.** JNI liga por **nome**, não por assinatura:
 mudar `setAutoRendererGpuStrings` de `void` para devolver `jstring` compila, linka, roda e devolve
