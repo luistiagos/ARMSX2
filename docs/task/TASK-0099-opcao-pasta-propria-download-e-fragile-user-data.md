@@ -1,6 +1,6 @@
 # TASK-0099: pasta de download própria no catálogo, adoção legada e fragile user data
 
-- **Status:** em andamento
+- **Status:** concluída
 - **Criada em:** 2026-09-21
 - **Concluída em:** 2026-09-21
 - **Feature:** nenhuma

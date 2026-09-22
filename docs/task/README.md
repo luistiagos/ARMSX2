@@ -178,8 +178,8 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0095](TASK-0095-autoflush-do-god-of-war-em-gpu-fraca.md) — medir o que o `autoFlush` custa ao God of War em GPU fraca e, se a troca valer, propô-la ao upstream | aberta | — | god-of-war-lento-no-poco-c75-mali-g52 | — |
 | [TASK-0096](TASK-0096-devolver-a-entrada-do-quick-loading.md) — devolver à biblioteca a entrada do Quick Loading que o merge da TASK-0067 perdeu, e medir lá o page cache da extração | aberta | — | quick-loading-sem-entrada-apos-merge-da-task-0067 | — |
 | [TASK-0097](TASK-0097-pasta-de-roms-do-app-acompanha-raiz-de-dados.md) — a pasta de ROMs do app vira implícita e acompanha a raiz de dados | concluída | — | biblioteca-pasta-de-roms-semeada-uma-vez-nao-acompanha-a-raiz-de-dados | `e9880b1371` `1b6ff8255d` |
-| [TASK-0098](TASK-0098-varredura-falha-preserva-cache-e-revarre.md) — varredura que falha preserva o cache e biblioteca vazia revarre automaticamente | concluída | — | biblioteca-varredura-que-nao-le-a-pasta-grava-cache-vazio-e-nao-revarre | `f693d5a5d4` `cb723d1f22` |
-| [TASK-0099](TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md) — pasta de download própria no catálogo, adoção legada e fragile user data | em andamento | — | catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria, catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork | — |
+| [TASK-0098](TASK-0098-varredura-falha-preserva-cache-e-revarre.md) — varredura que falha preserva o cache e biblioteca vazia revarre automaticamente | concluída | — | biblioteca-varredura-que-nao-le-a-pasta-grava-cache-vazio-e-nao-revarre | `f693d5a5d4` `2c97ad105a` |
+| [TASK-0099](TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md) — pasta de download própria no catálogo, adoção legada e fragile user data | concluída | — | catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria, catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork | `0fbb097cdc` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
