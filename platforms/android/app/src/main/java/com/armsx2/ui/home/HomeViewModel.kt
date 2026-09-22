@@ -485,24 +485,26 @@ class HomeViewModel(application: Application) :
      * forma confiável.
      */
     private fun romsDir(): java.io.File =
-        java.io.File(MainActivityRuntime.assetCopyRoot(getApplication()), "roms").apply { mkdirs() }
+        MainActivityRuntime.downloadDirFile(getApplication())
 
     /**
-     * Todos os diretórios de ROM privados do app conhecidos (armazenamento ativo, volumes de arquivos
-     * do pacote em `getExternalFilesDirs` e pasta customizada, se houver).
+     * Todos os diretórios de ROM conhecidos do app (pasta de download ativa, pasta padrão em assetCopyRoot,
+     * volumes de arquivos do pacote em `getExternalFilesDirs` e pasta customizada de dados/download, se houver).
      *
-     * Permite que ao trocar de armazenamento (interno <-> cartão SD), jogos baixados anteriormente
-     * continuem sendo encontrados e jogáveis sem exigir migração de arquivos lenta em segundo plano.
+     * Permite que ao trocar de armazenamento ou definir uma pasta própria de download, jogos baixados
+     * anteriormente continuem sendo encontrados e jogáveis sem exigir migração de arquivos lenta em segundo plano.
      */
     private fun allAppRomsDirs(): List<java.io.File> {
         val current = romsDir()
+        val defaultRoms = java.io.File(MainActivityRuntime.assetCopyRoot(getApplication()), "roms")
         val allExternal = runCatching {
             getApplication<Application>().getExternalFilesDirs(null).mapNotNull { externalDir ->
                 externalDir?.let { java.io.File(it, "roms") }
             }
         }.getOrDefault(emptyList())
         val custom = MainActivityRuntime.systemDirPosix()?.let { java.io.File(it, "roms") }
-        return (listOf(current) + allExternal + listOfNotNull(custom))
+        val customDownload = MainActivityRuntime.customDownloadDirPosix()?.let { java.io.File(it) }
+        return (listOf(current, defaultRoms) + allExternal + listOfNotNull(custom, customDownload))
             .filter { it.exists() && it.isDirectory }
             .distinctBy { it.canonicalPath }
     }

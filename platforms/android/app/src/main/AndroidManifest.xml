@@ -65,6 +65,7 @@
     <application
         android:name=".Pasx2Application"
         android:allowBackup="true"
+        android:hasFragileUserData="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:largeHeap="true"

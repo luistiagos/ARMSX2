@@ -1917,6 +1917,14 @@ private val BASE_EN: Map<String, String> = mapOf(
     "touch.stateAction.load" to "LOAD",
     "touch.stateAction.save" to "SAVE",
     "touch.stateAction.screenshot" to "SHOT",
+    "settings.download.directory" to "Download directory",
+    "settings.download.directory.summary" to "Folder where downloaded ROMs are saved.",
+    "settings.download.custom_label" to "Custom folder (safe from app data clear and uninstallation)",
+    "settings.download.default_label" to "Default app folder",
+    "settings.download.default_warning" to "Warning: this folder is deleted if you uninstall the app or clear app data in Android settings.",
+    "settings.download.choose" to "Choose download folder",
+    "settings.download.reset" to "Restore default",
+    "catalog.download.default_storage_notice" to "Notice: games are saved in the app's private folder and will be deleted if you uninstall or clear app data. To keep them safe, set a custom folder in 'Configure folders'.",
 )
 
 /**

@@ -1565,7 +1565,13 @@
  "skins.browse.installFailed": "O download falhou ou o pacote não tinha imagens de botão utilizáveis.",
  "touch.editor.fullHalfSticksOff": "Meia tela grudada",
  "touch.editor.fullHalfSticksOn": "Meia tela permanece ligada",
- "touch.editor.gridOff": "Grade desligada",
- "touch.editor.gridOn": "Grade ativada",
- "touch.stateAction.screenshot": "CAPTURA"
+ "touch.stateAction.screenshot": "CAPTURA",
+ "settings.download.directory": "Diretório de Download",
+ "settings.download.directory.summary": "Pasta onde os ROMs baixados são salvos.",
+ "settings.download.custom_label": "Pasta própria (sobrevive a limpar dados e desinstalação)",
+ "settings.download.default_label": "Pasta padrão do aplicativo",
+ "settings.download.default_warning": "Aviso: esta pasta é apagada se você desinstalar o app ou limpar dados nas configurações do Android.",
+ "settings.download.choose": "Escolher pasta de download",
+ "settings.download.reset": "Restaurar padrão",
+ "catalog.download.default_storage_notice": "Aviso: os jogos ficam salvos na pasta privada do app e são apagados se você desinstalar ou usar 'Limpar dados'. Para manter seus jogos em segurança, escolha uma pasta própria em 'Configurar/alterar pastas'."
 }

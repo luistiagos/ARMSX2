@@ -154,6 +154,7 @@ fun HomeScreen(
     val state = viewModel.state.value
     val directories = MainActivityRuntime.romsDirs.value
     val systemDir = MainActivityRuntime.systemDir.value
+    val downloadDir = MainActivityRuntime.downloadDir.value
     val nativeReady = MainActivityRuntime.nativeReady.value
     val context = LocalContext.current
     val coverVersion = CustomCovers.version.value
@@ -192,7 +193,7 @@ fun HomeScreen(
             LibraryKeyboard.open(viewModel.liveQuery.value, viewModel::setQuery, searchPlaceholder)
         }
     }
-    LaunchedEffect(directories, systemDir, nativeReady) { viewModel.load(directories, nativeReady) }
+    LaunchedEffect(directories, systemDir, downloadDir, nativeReady) { viewModel.load(directories, nativeReady) }
     DisposableEffect(viewModel, onOpenMenu) {
         HomeInputController.bind(viewModel, onOpenMenu, onOpenGameMenu = { menuGame = it })
         onDispose { HomeInputController.unbind(viewModel) }

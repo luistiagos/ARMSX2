@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -21,19 +22,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.armsx2.i18n.str
+import com.armsx2.runtime.MainActivityRuntime
 import com.armsx2.ui.common.ArmsBackdrop
 import com.armsx2.ui.common.ArmsTopBar
 import com.armsx2.ui.common.RoundAction
 import com.armsx2.ui.onboarding.OnboardingViewModel
 import com.armsx2.ui.settings.controllerFocusable
+import java.io.File
 
 /**
  * Gerir as pastas de ROM — como tela, não como assistente.
@@ -56,9 +61,55 @@ import com.armsx2.ui.settings.controllerFocusable
 fun RomFoldersScreen(onBack: () -> Unit, viewModel: OnboardingViewModel = viewModel()) {
     val state = viewModel.state.value
     LaunchedEffect(Unit) { viewModel.load() }
+    val context = LocalContext.current
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let(viewModel::addGameFolder)
+    }
+
+    val downloadFolderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let { u ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    u,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            val posix = MainActivityRuntime.resolveTreeUriToPosix(u.toString())
+            if (posix != null && MainActivityRuntime.validateSystemDirWritable(posix)) {
+                MainActivityRuntime.setDownloadDir(posix)
+            } else if (posix != null) {
+                android.widget.Toast.makeText(context, "Cannot write to folder: $posix", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val allFilesLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+            android.os.Environment.isExternalStorageManager()
+        ) {
+            downloadFolderPicker.launch(null)
+        }
+    }
+
+    val onPickDownloadFolder: () -> Unit = {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+            !android.os.Environment.isExternalStorageManager()
+        ) {
+            val manageIntent = android.content.Intent(
+                android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                android.net.Uri.parse("package:${context.packageName}"),
+            )
+            runCatching { allFilesLauncher.launch(manageIntent) }.onFailure {
+                runCatching {
+                    allFilesLauncher.launch(
+                        android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+                    )
+                }
+            }
+        } else {
+            downloadFolderPicker.launch(null)
+        }
     }
 
     ArmsBackdrop {
@@ -131,6 +182,96 @@ fun RomFoldersScreen(onBack: () -> Unit, viewModel: OnboardingViewModel = viewMo
                     if (state.gameFolders.isEmpty()) str("setup.button.pickRomsFolder")
                     else str("setup.button.addAnotherFolder"),
                 )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Text(
+                str("settings.download.directory"),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+
+            Text(
+                str("settings.download.directory.summary"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+
+            val currentCustomDownload = MainActivityRuntime.downloadDir.value
+            val isCustom = !currentCustomDownload.isNullOrBlank()
+            val defaultPath = remember(MainActivityRuntime.systemDir.value) {
+                File(MainActivityRuntime.assetCopyRoot(context), "roms").absolutePath
+            }
+            val displayPath = currentCustomDownload ?: defaultPath
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (isCustom) "📥" else "📦", fontSize = 20.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (isCustom) str("settings.download.custom_label") else str("settings.download.default_label"),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (isCustom) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                displayPath,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (!isCustom) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            str("settings.download.default_warning"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = onPickDownloadFolder,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .controllerFocusable(
+                                    "rom-folders.pick-download-dir",
+                                    RoundedCornerShape(12.dp),
+                                    onConfirm = onPickDownloadFolder,
+                                ),
+                        ) {
+                            Text(str("settings.download.choose"))
+                        }
+                        if (isCustom) {
+                            TextButton(
+                                onClick = { MainActivityRuntime.setDownloadDir(null) },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.controllerFocusable(
+                                    "rom-folders.reset-download-dir",
+                                    RoundedCornerShape(12.dp),
+                                    onConfirm = { MainActivityRuntime.setDownloadDir(null) },
+                                ),
+                            ) {
+                                Text(str("settings.download.reset"), color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

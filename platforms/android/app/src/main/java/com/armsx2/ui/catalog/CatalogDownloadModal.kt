@@ -4,10 +4,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -19,9 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.armsx2.catalog.CatalogEntry
 import com.armsx2.catalog.DownloadQueueManager
 import com.armsx2.i18n.str
+import com.armsx2.runtime.MainActivityRuntime
 import com.armsx2.ui.common.PadModal
 import com.armsx2.ui.settings.controllerFocusable
 
@@ -99,6 +103,30 @@ fun CatalogDownloadModal(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (queueState != DownloadQueueManager.State.PAUSED &&
+                    queueState != DownloadQueueManager.State.QUEUED &&
+                    queueState != DownloadQueueManager.State.DOWNLOADING &&
+                    queueState != DownloadQueueManager.State.EXTRACTING &&
+                    !MainActivityRuntime.hasCustomDownloadDir()
+                ) {
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("⚠️", fontSize = 16.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                str("catalog.download.default_storage_notice"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.height(18.dp))
                 // Em coluna e não em linha: "Cancelar download" não cabe ao lado de mais dois
                 // rótulos num aparelho de 384dp, e empilhado cada escolha vira um alvo largo —

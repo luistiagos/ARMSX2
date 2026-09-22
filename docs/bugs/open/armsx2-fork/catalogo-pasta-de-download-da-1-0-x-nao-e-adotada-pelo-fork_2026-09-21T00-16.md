@@ -10,7 +10,7 @@
 - **Reincidência:** é a mesma classe da TASK-0030 — "as duas linhas guardam a mesma decisão em
   lugares que não se enxergam" — numa chave que aquela task não listou
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** nenhuma ainda
+- **Tasks que o resolvem:** [TASK-0099](../../../task/TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md)
 - **Relacionado:**
   [o catálogo só baixa para `Android/data` e o fork tirou a opção de pasta própria](catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria_2026-09-21T00-16.md)
   — é a opção da 1.0.x cujo valor este relato deixa de adotar

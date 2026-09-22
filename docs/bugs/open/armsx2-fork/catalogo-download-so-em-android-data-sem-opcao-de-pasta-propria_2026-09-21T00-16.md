@@ -8,7 +8,7 @@
 - **Classe:** perda de dados irreversível por desenho; sem contorno disponível ao usuário
 - **Reincidência:** a 1.0.x tinha a opção justamente por isto; ela não foi reimplementada no fork
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** nenhuma ainda
+- **Tasks que o resolvem:** [TASK-0099](../../../task/TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md)
 - **Relacionado:**
   [a pasta de download da 1.0.x não é adotada](catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork_2026-09-21T00-16.md)
   — o valor que a opção antiga gravava, e que o fork ignora

@@ -210,6 +210,39 @@ open class MainActivityRuntime : ComponentActivity() {
             }
         }
 
+        /**
+         * Diretório customizado de download de ROMs configurado pelo usuário.
+         * Nulo = padrão (pasta de dados do app: assetCopyRoot/roms).
+         */
+        val downloadDir = mutableStateOf<String?>(null)
+
+        fun setDownloadDir(path: String?) {
+            val clean = path?.takeIf { it.isNotBlank() }
+            downloadDir.value = clean
+            prefs.edit {
+                if (clean == null) {
+                    remove("downloadDir")
+                } else {
+                    putString("downloadDir", clean)
+                }
+            }
+        }
+
+        fun hasCustomDownloadDir(): Boolean =
+            !downloadDir.value.isNullOrBlank()
+
+        fun customDownloadDirPosix(): String? =
+            downloadDir.value?.takeIf { it.isNotBlank() && validateSystemDirWritable(it) }
+
+        fun downloadDirFile(context: Context): File {
+            val custom = customDownloadDirPosix()
+            if (custom != null) {
+                val f = File(custom)
+                if (f.exists() || f.mkdirs()) return f
+            }
+            return File(assetCopyRoot(context), "roms").apply { mkdirs() }
+        }
+
         // Default backend is "auto" — emucore's GSUtil::GetPreferredRenderer
         // picks at runtime per device. The setup wizard no longer asks; the
         // in-game overlay's Renderer tab is where users override (OpenGL /
@@ -382,8 +415,12 @@ open class MainActivityRuntime : ComponentActivity() {
                 if (!dir.exists() && !dir.mkdirs()) return false
                 if (!dir.isDirectory) return false
                 val probe = File(dir, ".armsx2-write-probe")
-                val ok = probe.createNewFile()
-                if (ok) probe.delete()
+                if (probe.exists()) probe.delete()
+                val ok = runCatching {
+                    java.io.FileOutputStream(probe).use { it.write(1) }
+                    true
+                }.getOrDefault(false)
+                if (probe.exists()) probe.delete()
                 ok
             } catch (_: Exception) {
                 false
@@ -2656,6 +2693,7 @@ open class MainActivityRuntime : ComponentActivity() {
         setupComplete.value = true
         prefs.edit { putBoolean("setupComplete", true) }
         systemDir.value = prefs.getString("systemDir", null)
+        downloadDir.value = prefs.getString("downloadDir", null)
         adoptLegacyDataRoot()
         bios.value = prefs.getString("bios", null)
         biosDir.value = prefs.getString("biosDir", null)
@@ -3302,19 +3340,38 @@ open class MainActivityRuntime : ComponentActivity() {
         // nao o `ARMSX2` deste fork.
         val LEGACY_PREFS = "armsx2"
         val LEGACY_DATA_ROOT_KEY = "data_dir_path"
-        if (!systemDir.value.isNullOrBlank()) return
-        val legacy = applicationContext
-            .getSharedPreferences(LEGACY_PREFS, MODE_PRIVATE)
-            .getString(LEGACY_DATA_ROOT_KEY, null)
-            ?.takeIf { it.isNotBlank() }
-            ?: return
-        if (!validateSystemDirWritable(legacy)) {
-            android.util.Log.w("ARMSX2", "pasta de dados da versao anterior nao e gravavel, ignorando: $legacy")
-            return
+        val LEGACY_DOWNLOAD_DIR_KEY = "download_dir_path"
+        val legacyPrefs = applicationContext.getSharedPreferences(LEGACY_PREFS, MODE_PRIVATE)
+
+        if (systemDir.value.isNullOrBlank()) {
+            val legacyData = legacyPrefs
+                .getString(LEGACY_DATA_ROOT_KEY, null)
+                ?.takeIf { it.isNotBlank() }
+            if (legacyData != null) {
+                if (validateSystemDirWritable(legacyData)) {
+                    android.util.Log.i("ARMSX2", "adotando a pasta de dados da versao anterior: $legacyData")
+                    systemDir.value = legacyData
+                    prefs.edit { putString("systemDir", legacyData) }
+                } else {
+                    android.util.Log.w("ARMSX2", "pasta de dados da versao anterior nao e gravavel, ignorando: $legacyData")
+                }
+            }
         }
-        android.util.Log.i("ARMSX2", "adotando a pasta de dados da versao anterior: $legacy")
-        systemDir.value = legacy
-        prefs.edit { putString("systemDir", legacy) }
+
+        if (downloadDir.value.isNullOrBlank()) {
+            val legacyDownload = legacyPrefs
+                .getString(LEGACY_DOWNLOAD_DIR_KEY, null)
+                ?.takeIf { it.isNotBlank() }
+            if (legacyDownload != null) {
+                if (validateSystemDirWritable(legacyDownload)) {
+                    android.util.Log.i("ARMSX2", "adotando a pasta de download da versao anterior: $legacyDownload")
+                    downloadDir.value = legacyDownload
+                    prefs.edit { putString("downloadDir", legacyDownload) }
+                } else {
+                    android.util.Log.w("ARMSX2", "pasta de download da versao anterior nao e gravavel, ignorando: $legacyDownload")
+                }
+            }
+        }
     }
 
 
