@@ -182,7 +182,7 @@ Os hashes desta tabela são resolvidos do git pelo assunto do commit
 | [TASK-0099](TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md) — pasta de download própria no catálogo, adoção legada e fragile user data | concluída | — | catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria, catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork | `0fbb097cdc` `cfc8524fa2` `421c0b2799` |
 | [TASK-0100](TASK-0100-assistente-da-rota-nativa-do-game-booster.md) — guiar o leigo pela chave nativa da Samsung quando o aparelho a tem | aberta | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
 | [TASK-0101](TASK-0101-rota-longa-para-de-mandar-a-app-pago.md) — a rota longa para de mandar o usuário a um app pago | aberta | — | gos-samsung-limita-clock-a-metade-em-jogo | — |
-| [TASK-0102](TASK-0102-timer-query-do-gl-so-quando-o-osd-de-gpu-pede.md) — no Android, o timer query do GL só é armado quando o OSD de GPU pede | aberta | — | crash-nativo-no-timer-query-do-gl-em-mali-g57 | — |
+| [TASK-0102](TASK-0102-timer-query-do-gl-so-quando-o-osd-de-gpu-pede.md) — no Android, o timer query do GL só é armado quando o OSD de GPU pede | concluída | — | crash-nativo-no-timer-query-do-gl-em-mali-g57 | `3d7f3d1a9a` |
 
 > **O índice não pode mais ficar atrasado em silêncio.** Ele já esteve — 22 linhas de fora, das
 > TASK-0018 a TASK-0037 e a TASK-0039 —, porque o `--fix` só sabia substituir uma linha existente e
