@@ -52,10 +52,15 @@ def start_app():
     time.sleep(5)
 
 def le_prefs_xml(path_rel=PREFS_REL):
-    return adb("shell", "run-as", PKG, "cat", path_rel)
+    out = adb("shell", "run-as", PKG, "cat", path_rel)
+    if "<map" in out:
+        out = out[out.find("<map") : out.rfind("</map>") + 6]
+    return out
 
 def grava_prefs_xml(xml_content, path_rel=PREFS_REL):
     stop_app()
+    if "<map" in xml_content:
+        xml_content = xml_content[xml_content.find("<map") : xml_content.rfind("</map>") + 6]
     tmp_path = "/data/local/tmp/prefs_tmp.xml"
     with io.open("temp_prefs.xml", "w", encoding="utf-8") as f:
         f.write(xml_content)
@@ -66,9 +71,12 @@ def grava_prefs_xml(xml_content, path_rel=PREFS_REL):
         os.remove("temp_prefs.xml")
 
 def parse_prefs(xml_str):
+    if "<map" in xml_str:
+        xml_str = xml_str[xml_str.find("<map") : xml_str.rfind("</map>") + 6]
     try:
         root = ET.fromstring(xml_str)
-    except Exception:
+    except Exception as e:
+        print("Erro parse_prefs:", e)
         return {}
     d = {}
     for e in root:
@@ -82,6 +90,8 @@ def parse_prefs(xml_str):
     return d
 
 def update_pref_xml(xml_str, updates, removes=None):
+    if "<map" in xml_str:
+        xml_str = xml_str[xml_str.find("<map") : xml_str.rfind("</map>") + 6]
     try:
         root = ET.fromstring(xml_str)
     except Exception:
@@ -102,9 +112,43 @@ def update_pref_xml(xml_str, updates, removes=None):
             elem.text = str(val)
     return ET.tostring(root, encoding="utf-8").decode("utf-8")
 
+def espera_cache_conter(termo, timeout_s=25):
+    inicio = time.time()
+    while time.time() - inicio < timeout_s:
+        xml = le_prefs_xml(PREFS_REL)
+        prefs = parse_prefs(xml)
+        cache = prefs.get("gamesCache", "[]")
+        if termo in cache:
+            return True, cache
+        time.sleep(2)
+    return False, cache
+
+def espera_probe_sumir(probe_path, timeout_s=20):
+    inicio = time.time()
+    while time.time() - inicio < timeout_s:
+        exists = adb("shell", "[ -f \"%s\" ] && echo yes || echo no" % probe_path).strip() == "yes"
+        if not exists:
+            return True
+        time.sleep(1)
+    return False
+
+def espera_pref_valor(key, timeout_s=20):
+    inicio = time.time()
+    while time.time() - inicio < timeout_s:
+        xml = le_prefs_xml(PREFS_REL)
+        prefs = parse_prefs(xml)
+        val = prefs.get(key)
+        if val is not None:
+            return val
+        time.sleep(1)
+    return None
+
 def main():
     dev = exige_aparelho()
     print("Aparelho conectado: %s (modelo: %s)" % (dev, adb("shell", "getprop", "ro.product.model").strip()))
+
+    # Garante permissao de armazenamento (flavor github sideload)
+    adb("shell", "cmd", "appops", "set", PKG, "MANAGE_EXTERNAL_STORAGE", "allow")
 
     original_xml = le_prefs_xml(PREFS_REL)
     original_prefs = parse_prefs(original_xml)
@@ -120,19 +164,19 @@ def main():
 
     test1_xml = update_pref_xml(original_xml, {
         "downloadDir": custom_dir
-    })
+    }, removes=["gamesCacheKey", "gamesCacheDir", "gamesCache"])
     grava_prefs_xml(test1_xml)
 
     print("Iniciando app com downloadDir customizado...")
     start_app()
 
-    # Verifica se o jogo no custom_dir foi adicionado ao cache de jogos
-    current_xml = le_prefs_xml(PREFS_REL)
-    current_prefs = parse_prefs(current_xml)
-    current_cache = current_prefs.get("gamesCache", "[]")
-    print("Jogos no cache apos varredura com downloadDir customizado: %s" % ("TestGame_Task0099" in current_cache))
-    if "TestGame_Task0099" not in current_cache:
+    # Aguarda o scan assíncrono indexar o jogo
+    print("Aguardando varredura da biblioteca indexar a pasta customizada...")
+    achou, current_cache = espera_cache_conter("TestGame_Task0099", timeout_s=25)
+    print("Jogos no cache apos varredura com downloadDir customizado: %s" % achou)
+    if not achou:
         print("FALHA: Jogo na pasta customizada de download nao foi detectado pela biblioteca!")
+        print("Cache obtido:", current_cache[:200])
         sys.exit(1)
     print("SUCESSO: Jogo na pasta customizada de download reconhecido pela biblioteca!")
     stop_app()
@@ -146,8 +190,8 @@ def main():
     print("Criado arquivo de sonda orfao:", orphan_probe)
 
     start_app()
-    probe_still_exists = adb("shell", "[ -f \"%s\" ] && echo yes || echo no" % orphan_probe).strip() == "yes"
-    if probe_still_exists:
+    sumiu = espera_probe_sumir(orphan_probe, timeout_s=15)
+    if not sumiu:
         print("FALHA: O arquivo de sonda nao foi limpo ou a sonda travou!")
         sys.exit(1)
     print("SUCESSO: Sonda de escrita limpou o orfao e validou acesso com sucesso!")
@@ -171,9 +215,7 @@ def main():
     print("Iniciando app para verificar adocao...")
     start_app()
 
-    migrated_xml = le_prefs_xml(PREFS_REL)
-    migrated_prefs = parse_prefs(migrated_xml)
-    adopted_download = migrated_prefs.get("downloadDir")
+    adopted_download = espera_pref_valor("downloadDir", timeout_s=15)
     print("Valor adotado em downloadDir:", adopted_download)
 
     if adopted_download != legacy_dir:

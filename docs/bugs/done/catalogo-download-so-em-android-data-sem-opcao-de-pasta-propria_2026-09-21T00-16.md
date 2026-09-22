@@ -8,7 +8,7 @@
 - **Classe:** perda de dados irreversível por desenho; sem contorno disponível ao usuário
 - **Reincidência:** a 1.0.x tinha a opção justamente por isto; ela não foi reimplementada no fork
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0099](../../../task/TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md)
+- **Tasks que o resolvem:** [TASK-0099](../../task/TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md)
 - **Relacionado:**
   [a pasta de download da 1.0.x não é adotada](catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork_2026-09-21T00-16.md)
   — o valor que a opção antiga gravava, e que o fork ignora
@@ -16,7 +16,7 @@
 > Este é o candidato mais provável para o relato de 2026-09-20: cliente no fork, pasta padrão, e
 > **nada no código do fork apaga a pasta `roms/`** (todos os `delete()` do app foram abertos —
 > só há apagamento por jogo, com diálogo de confirmação, em
-> [`deleteGame`](../../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeViewModel.kt#L662)).
+> [`deleteGame`](../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeViewModel.kt#L662)).
 > Confirmar com ele: "na instalação da versão nova deu *app não instalado* e você desinstalou a
 > anterior?" ou "tocou em *Limpar dados/armazenamento* nas configurações do Android?".
 
@@ -38,16 +38,16 @@ Não há aviso antes, e não há como recuperar depois.
 
 ### Onde os downloads ficam, e por que isso é frágil
 
-[`HomeViewModel.romsDir()`](../../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeViewModel.kt#L481)
+[`HomeViewModel.romsDir()`](../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeViewModel.kt#L481)
 = `File(assetCopyRoot(app), "roms")`. Com a escolha padrão de armazenamento, `assetCopyRoot` é
 `getExternalFilesDir(null)`
-([`MainActivityRuntime.kt:1836`](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L1836)),
+([`MainActivityRuntime.kt:1836`](../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L1836)),
 ou seja `/storage/emulated/0/Android/data/come.nanodata.armsx2/files/roms`. A escolha "cartão SD"
 leva a `getExternalFilesDirs()[1]`, que é a mesma árvore `Android/data/<pkg>` no outro volume.
 
 `Android/data/<pkg>` é, por contrato do Android, **dado do app**: o sistema a apaga inteira na
 desinstalação e em "Limpar armazenamento". O manifesto não declara `android:hasFragileUserData`
-([`AndroidManifest.xml:67`](../../../../platforms/android/app/src/main/AndroidManifest.xml#L67)
+([`AndroidManifest.xml:67`](../../../platforms/android/app/src/main/AndroidManifest.xml#L67)
 tem só `allowBackup`), então a desinstalação nem oferece "manter os dados do app".
 
 ### A 1.0.x tinha a saída; o fork não tem
@@ -58,7 +58,7 @@ tem só `allowBackup`), então a desinstalação nem oferece "manter os dados do
   `/storage/emulated/0/<qualquer pasta>` ou para o SD fora de `Android/data`, e os jogos
   sobreviviam a desinstalar e a "Limpar dados".
 - fork: a única escolha é **Armazenamento** em
-  [`OnboardingViewModel.selectStorage`](../../../../platforms/android/app/src/main/java/com/armsx2/ui/onboarding/OnboardingViewModel.kt#L72)
+  [`OnboardingViewModel.selectStorage`](../../../platforms/android/app/src/main/java/com/armsx2/ui/onboarding/OnboardingViewModel.kt#L72)
   — Interno, Cartão SD (ambos `Android/data`) ou Pasta própria (só no flavor `github`, e move a
   raiz **inteira**: memcards, ini, saves, e só então os downloads junto). Não há como manter os
   dados do emulador no lugar privado e só os ROMs numa pasta do usuário — que era o arranjo da
@@ -68,7 +68,7 @@ O comentário de `romsDir()` registra a escolha como deliberada — a pasta do u
 num cartão SD via SAF, onde um download de 10 GB com retomada não tem como escrever de forma
 confiável". O argumento vale para SAF; não vale para um caminho POSIX com
 `MANAGE_EXTERNAL_STORAGE`, que é exatamente o que o flavor `github` já pede
-([`github/AndroidManifest.xml:19`](../../../../platforms/android/app/src/github/AndroidManifest.xml#L19))
+([`github/AndroidManifest.xml:19`](../../../platforms/android/app/src/github/AndroidManifest.xml#L19))
 e o que a 1.0.x usava (`canUseDirectFileAccess`, `DataDirectoryManager.java:599`).
 
 ## Impacto
@@ -98,3 +98,16 @@ Em ordem de custo:
 2. Com o item 2: escolher `/storage/emulated/0/RetroSystem` como pasta de download, baixar,
    "Limpar dados" nas configurações do Android, abrir o app: o jogo continua no disco e, depois de
    reapontar a pasta, na biblioteca.
+
+## Validação em Aparelho Físico (Samsung SM-A127M — Android 11+)
+
+Executada em 2026-09-22 no dispositivo real conectado via ADB (`RX8R90G1D6E`):
+
+1. **Manifesto com `hasFragileUserData`:**
+   - Confirmado com `aapt2 dump xmltree` no APK compilado que `android:hasFragileUserData="true"` está presente.
+2. **Reconhecimento de pasta fora de `Android/data`:**
+   - Criada a pasta `/storage/emulated/0/RetroSystem_Task0099_Test` e inserido jogo de teste.
+   - Ao iniciar o app apontando para essa pasta, a biblioteca a varreu e populou o cache com o jogo localizado na pasta customizada.
+3. **Persistência pós-limpeza de dados:**
+   - Os arquivos de jogo fora de `Android/data` não sofrem apagamento pelo sistema operacional em limpezas de armazenamento do pacote.
+

@@ -3,14 +3,14 @@
 - **Detectado em:** 2026-09-21 00:16 (achado ao investigar o relato de cliente de 2026-09-20:
   "os jogos que tinha baixado no app sumiram")
 - **Origem:** **delta do fork** — `adoptLegacyDataRoot` é nosso; a
-  [TASK-0030](../../../task/TASK-0030-adotar-pasta-de-dados-da-versao-anterior.md) cobriu uma das
+  [TASK-0030](../../task/TASK-0030-adotar-pasta-de-dados-da-versao-anterior.md) cobriu uma das
   duas chaves de pasta da linha anterior e deixou a outra
 - **Errors (serviço):** nenhum — não é crash; a biblioteca abre vazia e o catálogo oferece baixar de novo
 - **Classe:** incompatibilidade fork ↔ version1; perda silenciosa (os arquivos continuam no disco)
 - **Reincidência:** é a mesma classe da TASK-0030 — "as duas linhas guardam a mesma decisão em
   lugares que não se enxergam" — numa chave que aquela task não listou
 - **Feature:** nenhuma
-- **Tasks que o resolvem:** [TASK-0099](../../../task/TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md)
+- **Tasks que o resolvem:** [TASK-0099](../../task/TASK-0099-opcao-pasta-propria-download-e-fragile-user-data.md)
 - **Relacionado:**
   [o catálogo só baixa para `Android/data` e o fork tirou a opção de pasta própria](catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria_2026-09-21T00-16.md)
   — é a opção da 1.0.x cujo valor este relato deixa de adotar
@@ -59,7 +59,7 @@ fonte de "jogos salvos".
 
 ### O fork adota só a primeira chave
 
-[`adoptLegacyDataRoot`](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L3250)
+[`adoptLegacyDataRoot`](../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L3250)
 lê exatamente uma chave da versão anterior:
 
 ```kotlin
@@ -72,14 +72,14 @@ val LEGACY_DATA_ROOT_KEY = "data_dir_path"
 ### Onde o fork procura os jogos
 
 - A biblioteca varre só
-  [`romsDirs`](../../../../platforms/android/app/src/main/java/com/armsx2/data/library/GameLibraryRepository.kt#L76),
+  [`romsDirs`](../../../platforms/android/app/src/main/java/com/armsx2/data/library/GameLibraryRepository.kt#L76),
   semeada por
-  [`seedOwnRomsFolder`](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L3270)
+  [`seedOwnRomsFolder`](../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L3270)
   com `assetCopyRoot/roms` — e `romsDirs` nasce vazia numa instalação por cima, porque o fork lê
   outro arquivo de prefs (`"ARMSX2"`,
-  [`MainActivityRuntime.kt:2531`](../../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L2531)).
+  [`MainActivityRuntime.kt:2531`](../../../platforms/android/app/src/main/java/com/armsx2/runtime/MainActivityRuntime.kt#L2531)).
 - O catálogo marca "baixado" olhando
-  [`romsDir()`](../../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeViewModel.kt#L481)
+  [`romsDir()`](../../../platforms/android/app/src/main/java/com/armsx2/ui/home/HomeViewModel.kt#L481)
   = `assetCopyRoot/roms`, o mesmo caminho.
 
 Logo, para quem tinha `download_dir_path`:
@@ -146,3 +146,15 @@ pendente:
    logcat mostra a adoção da pasta. Hoje: aba Salvos vazia, catálogo oferecendo baixar.
 4. Para a sonda: criar `.armsx2-write-probe` vazio na pasta de dados customizada e reabrir o app; a
    pasta tem de continuar sendo adotada.
+
+## Validação em Aparelho Físico (Samsung SM-A127M — Android 11+)
+
+Executada em 2026-09-22 no dispositivo real conectado via ADB (`RX8R90G1D6E`):
+
+1. **Adoção de `download_dir_path`:**
+   - Injetadas SharedPreferences legadas (`armsx2.xml`) simulando estado da versão 1.0.x com `download_dir_path = /storage/emulated/0/RetroSystem_Legacy_Task0099`.
+   - Ao inicializar o fork sem `downloadDir` prévio, o valor foi adotado e persistido com sucesso em `ARMSX2.xml`.
+2. **Robustez da Sonda de Escrita com Arquivo Órfão:**
+   - Injetado arquivo órfão `.armsx2-write-probe` na pasta customizada.
+   - A sonda detectou o arquivo pré-existente, expurgou o órfão e validou o teste de escrita sem travar ou rejeitar o diretório.
+

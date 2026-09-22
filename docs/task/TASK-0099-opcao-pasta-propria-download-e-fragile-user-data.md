@@ -4,7 +4,7 @@
 - **Criada em:** 2026-09-21
 - **Concluída em:** 2026-09-21
 - **Feature:** nenhuma
-- **Bugs que resolve:** [catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria](../bugs/open/armsx2-fork/catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria_2026-09-21T00-16.md), [catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork](../bugs/open/armsx2-fork/catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork_2026-09-21T00-16.md)
+- **Bugs que resolve:** [catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria](../bugs/done/catalogo-download-so-em-android-data-sem-opcao-de-pasta-propria_2026-09-21T00-16.md), [catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork](../bugs/done/catalogo-pasta-de-download-da-1-0-x-nao-e-adotada-pelo-fork_2026-09-21T00-16.md)
 - **Commit:** — (o vínculo é o prefixo `TASK-0099:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
@@ -65,6 +65,25 @@ Além disso:
    - `:app:testGithubDebugUnitTest` cobrindo resolução de pastas e sonda de escrita.
    - `python scripts/check_traceability.py`.
 2. **Validação no dispositivo real:**
-   - Conferência de `hasFragileUserData` no manifesto compilado.
-   - Configuração de pasta de download customizada em `RomFoldersScreen`.
-   - Teste de persistência e reconhecimento de jogo na pasta customizada.
+   - Conferência de `hasFragileUserData` no manifesto compilado via `aapt2`.
+   - Execução do script automatizado `docs/task/TASK-0099-validar-no-aparelho.py` no aparelho conectado.
+
+## Validação no Aparelho Físico (Samsung SM-A127M — Android 11+)
+
+Executada em 2026-09-22 no dispositivo real conectado via ADB (`RX8R90G1D6E`):
+
+1. **Manifesto Compilado:**
+   - Inspecionado APK (`app-github-debug.apk`) com `aapt2 dump xmltree`:
+   - Confirmado atributo `android:hasFragileUserData(0x0101058e)=0xffffffff` presente no nó `<application>`.
+2. **Pasta Customizada de Download fora de `Android/data`:**
+   - Criada pasta `/storage/emulated/0/RetroSystem_Task0099_Test` e inserido jogo de teste `TestGame_Task0099.chd`.
+   - Configurado `downloadDir` com o caminho customizado e disparada a inicialização do app.
+   - A biblioteca varreu a pasta customizada e indexou com sucesso o jogo no cache (`gamesCache`).
+3. **Resiliência da Sonda de Escrita a Arquivo Órfão:**
+   - Injetado arquivo órfão `/storage/emulated/0/RetroSystem_Task0099_Test/.armsx2-write-probe`.
+   - Inicializado o app: a sonda limpou o arquivo órfão com sucesso e validou as permissões de escrita sem travar.
+4. **Adoção Automática de Preferências Legadas:**
+   - Injetado arquivo de SharedPreferences da versão 1.0.x (`armsx2.xml`) com `download_dir_path = /storage/emulated/0/RetroSystem_Legacy_Task0099`.
+   - Removido `downloadDir` do fork para simular atualização a partir da versão antiga.
+   - Inicializado o app: o runtime detectou o valor legado e migrou automaticamente para `downloadDir` no `ARMSX2.xml`.
+
