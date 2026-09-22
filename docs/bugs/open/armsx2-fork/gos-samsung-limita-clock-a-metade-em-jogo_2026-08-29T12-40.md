@@ -24,7 +24,9 @@
   [TASK-0077](../../../task/TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) (o aviso ganha
   "não mostrar de novo", e o item de Configurações vira a porta de volta) e
   [TASK-0100](../../../task/TASK-0100-assistente-da-rota-nativa-do-game-booster.md) (quem tem Game
-  Booster é guiado pela chave da própria Samsung, sem app pago e sem `adb`) —
+  Booster é guiado pela chave da própria Samsung, sem app pago e sem `adb`) e
+  [TASK-0101](../../../task/TASK-0101-rota-longa-para-de-mandar-a-app-pago.md) (a rota longa deixa
+  de mandar o usuário a um app pago, e o comando ensinado passa a ser o medido) —
   **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
   desabilitar o GOS nem forçar a parada dele
 
@@ -173,9 +175,16 @@ com o app em background: o valor sobe.
   por esse caminho quando o modelo indica que ele existe, e trata o resultado como hipótese: quem
   confirma é a medição de clock do próprio app, porque **o GOS continua habilitado** nessa rota.
 - **O caminho que o app ensina hoje custa dinheiro.** O LADB é pago (≈US$ 3–4) e o
-  `tytydraco/LADB` não publica release, então "grátis compilando" não é instrução para cliente. Há
-  substituto grátis — aShell You (depuração sem fio no próprio aparelho, sem Shizuku) ou
-  Shizuku + aShell, os dois na Play — e a troca ainda não tem task.
+  `tytydraco/LADB` não publica release, então "grátis compilando" não é instrução para cliente. A
+  [TASK-0101](../../../task/TASK-0101-rota-longa-para-de-mandar-a-app-pago.md) troca a ferramenta
+  pelo aShell You (`in.hridayan.ashell`, GPL-3.0+, grátis, **fora da Play**) ou, se o modo "próprio
+  aparelho" dele não passar na medição, por Shizuku + aShell. A mesma task mede se o
+  `pm disable-user` sobrevive ao reinício — hoje o nosso guia afirma que sim e admite não ter
+  testado.
+- **A rota que dispensaria ferramenta nenhuma** é o app fazer o pareamento e rodar o comando:
+  [`backlog/pareamento-adb-dentro-do-app`](../../../backlog/pareamento-adb-dentro-do-app.md). Não
+  começa antes de se saber quantos usuários concluem as rotas baratas — e nenhuma biblioteca JVM faz
+  o pareamento do Android 11+, então é embarcar o binário do adb, como o LADB faz.
 
 ## Achados de lado, colhidos na mesma investigação
 
