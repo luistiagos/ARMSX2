@@ -7,7 +7,9 @@
 - **Errors (serviço):** nenhum — não é crash, não gera telemetria. Chega como reclamação de
   lentidão
 - **Classe:** fail (performance), causa externa
+- **Complexidade:** baixa (limitação de SO externo já mitigada via assistente e opt-out na interface; sem alteração no motor)
 - **Reincidência:** sistêmico — atinge todo aparelho Samsung com o GOS ativo
+
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** [TASK-0050](../../../task/TASK-0050-detectar-limite-de-clock-do-aparelho.md)
   (detecta e explica), [TASK-0051](../../../task/TASK-0051-acao-para-o-limite-do-aparelho.md) (leva o
@@ -20,7 +22,9 @@
   [TASK-0059](../../../task/TASK-0059-assistente-ensina-a-desabilitar-o-gos.md) (o assistente
   abre no início do app e ensina o `pm disable-user`, que é o que funciona) e
   [TASK-0077](../../../task/TASK-0077-aviso-do-gos-ganha-nao-mostrar-de-novo.md) (o aviso ganha
-  "não mostrar de novo", e o item de Configurações vira a porta de volta) —
+  "não mostrar de novo", e o item de Configurações vira a porta de volta) e
+  [TASK-0100](../../../task/TASK-0100-assistente-da-rota-nativa-do-game-booster.md) (quem tem Game
+  Booster é guiado pela chave da própria Samsung, sem app pago e sem `adb`) —
   **nenhuma delas corrige o defeito**, porque ele é do aparelho: o app não pode
   desabilitar o GOS nem forçar a parada dele
 
@@ -161,7 +165,17 @@ com o app em background: o valor sobe.
 - **Trilha de desempenho**, a única que ajuda quem não vai fazer nada disso:
   [`docs/backlog/desempenho-com-clock-cortado-a55.md`](../../../backlog/desempenho-com-clock-cortado-a55.md).
 - Reteste quando houver um aparelho Samsung de linha superior à mão: lá o Game Booster expõe o
-  seletor de desempenho, que pode ser um caminho que o A12 não tem.
+  seletor de desempenho, que pode ser um caminho que o A12 não tem. **A Samsung documenta o
+  caminho** — *Gaming Hub → ⋮ → Game Booster → Otimização de jogos → Desempenho* no One UI 7, e
+  *Game Booster → Labs → Alternate game performance management* do One UI 4.1 ao 6 — e documenta
+  também que **o Game Booster não existe no A02s, A03s e A14 5G**, que é a faixa do nosso A12. A
+  [TASK-0100](../../../task/TASK-0100-assistente-da-rota-nativa-do-game-booster.md) leva o usuário
+  por esse caminho quando o modelo indica que ele existe, e trata o resultado como hipótese: quem
+  confirma é a medição de clock do próprio app, porque **o GOS continua habilitado** nessa rota.
+- **O caminho que o app ensina hoje custa dinheiro.** O LADB é pago (≈US$ 3–4) e o
+  `tytydraco/LADB` não publica release, então "grátis compilando" não é instrução para cliente. Há
+  substituto grátis — aShell You (depuração sem fio no próprio aparelho, sem Shizuku) ou
+  Shizuku + aShell, os dois na Play — e a troca ainda não tem task.
 
 ## Achados de lado, colhidos na mesma investigação
 
