@@ -1,11 +1,11 @@
 # TASK-0102: no Android, o timer query do GL só é armado quando o OSD de GPU pede
 
-- **Status:** aberta
+- **Status:** concluída
 - **Criada em:** 2026-09-22
-- **Concluída em:** —
+- **Concluída em:** 2026-09-22
 - **Feature:** nenhuma
 - **Bugs que resolve:** [crash-nativo-no-timer-query-do-gl-em-mali-g57](../bugs/open/armsx2-fork/crash-nativo-no-timer-query-do-gl-em-mali-g57_2026-09-22T19-14.md)
-- **Commit:** —
+- **Commit:** — (o vínculo é o prefixo `TASK-0102:` no assunto)
 - **Revertida por:** —
 - **Publicado em:** —
 
@@ -64,13 +64,37 @@ qualquer investigação do driver, e por isso ela não precisa de aparelho A03 p
   `PerformanceMetrics::SetGPUTimingAvailable` ([`PerformanceMetrics.cpp:716`](../../pcsx2/PerformanceMetrics.cpp#L716))
   e zera `GSConfig.OsdShowGPU`; e o `PerfLog` já omite o campo quando
   `s_gpu_timing_available` é falso ([`PerformanceMetrics.cpp:434`](../../pcsx2/PerformanceMetrics.cpp#L434)).
+- **[ACRESCENTADO NA IMPLEMENTAÇÃO] Trocar a borda por nível no re-armar de
+  [`GS.cpp:1118`](../../pcsx2/GS/GS.cpp#L1118), só sob `__ANDROID__`.** Ver *"A premissa que estava
+  errada"* abaixo: sem isto o braço 2 da validação **não passa**. O ramo do desktop fica byte a
+  byte igual, dentro de um `#else`.
 
-**Ligar o OSD depois, com o jogo rodando, continua funcionando** — e isto foi conferido, não
-suposto: `GSUpdateConfig` atribui `GSConfig = new_config` na
-[linha 995](../../pcsx2/GS/GS.cpp#L995), **antes** do bloco da
-[linha 1118](../../pcsx2/GS/GS.cpp#L1118) que chama `SetGPUTimingEnabled(true)`. A porta lê o valor
-**novo** e deixa passar. No boot vale o mesmo: `GSopen` faz `GSConfig = config` antes de
-`OpenGSDevice`.
+### A premissa que estava errada
+
+A task afirmava que ligar o OSD com o jogo rodando continuava funcionando, porque `GSUpdateConfig`
+atribui `GSConfig = new_config` na [linha 995](../../pcsx2/GS/GS.cpp#L995) antes do bloco da
+[linha 1118](../../pcsx2/GS/GS.cpp#L1118). A atribuição é real, mas a conclusão não: **no Android a
+borda `false -> true` daquele bloco é inalcançável**, e a porta teria trancado o OSD de GPU para
+sempre. Dois mecanismos, cada um sozinho suficiente, já escreveram o valor novo em `GSConfig` antes
+de `GSUpdateConfig` rodar — e `old_config` é justamente o `std::move(GSConfig)` do topo da função,
+então carrega o valor novo também:
+
+1. `applyOsdSetting` ([`native-lib.cpp:4172`](../../platforms/android/app/src/main/cpp/native-lib.cpp#L4172))
+   atribui `GSConfig.OsdShowGPU` **na thread da CPU**, e só depois enfileira `GSUpdateConfig` na
+   thread do GS via `MTGS::ApplySettings` ([`MTGS.cpp:994`](../../pcsx2/MTGS.cpp#L994)). Todos os
+   setters de OSD do app (`osdShow*`, `osdShowAll`, `osdApplyFlags`) passam por ali.
+2. `ImGuiManager::RenderOverlays` ([`ImGuiOverlays.cpp:2092`](../../pcsx2/ImGui/ImGuiOverlays.cpp#L2092))
+   reescreve **todas** as flags de OSD em `GSConfig` uma vez por quadro, a partir do snapshot
+   `s_android_osd_vis`.
+
+Nunca importou porque o GPU timing era armado incondicionalmente ao abrir o device. Com a porta,
+aquela borda passa a ser a única coisa que poderia rearmá-lo — e ela não dispara. Por isso a
+implementação testa o **nível** (`if (GSConfig.OsdShowGPU)`) sob `__ANDROID__`. Custa nada:
+`SetGPUTimingEnabled` já retorna cedo quando o estado bate, e o bloco só roda em mudança de
+configuração.
+
+No boot a premissa original vale e foi conferida: `GSopen` faz `GSConfig = config`
+([`GS.cpp:469`](../../pcsx2/GS/GS.cpp#L469)) antes de `OpenGSDevice` (linha 474).
 
 **NÃO entra:**
 
@@ -80,8 +104,10 @@ suposto: `GSUpdateConfig` atribui `GSConfig = new_config` na
   do cliente hoje. Fica para task própria.
 - **Usar o `m_timestamp_query_failures`** (item 3), que hoje é contado
   ([`GSDeviceOGL.h:275`](../../pcsx2/GS/Renderers/OpenGL/GSDeviceOGL.h#L275)) e nunca lido.
-- **Vulkan e desktop.** Nenhuma linha fora de `GSDeviceOGL.cpp`, e nenhuma fora do
-  `#if defined(__ANDROID__)`. O Vulkan no Android continua medindo GPU como hoje.
+- **Vulkan e desktop.** Nenhuma linha fora do `#if defined(__ANDROID__)` — conferido por script,
+  nas duas mudanças. (A restrição original dizia também *"nenhuma linha fora de `GSDeviceOGL.cpp`"*;
+  ela caiu junto com a premissa acima. O que ela protegia — desktop e Vulkan — continua protegido.)
+  O Vulkan no Android continua medindo GPU como hoje.
 - **As *pipeline statistics*.** Já são compiladas fora no Android, e o chamador delas em
   [`GS.cpp:189`](../../pcsx2/GS/GS.cpp#L189) **já** tem a porta de `GSConfig.OsdShowGPUStats`.
 
@@ -117,6 +143,42 @@ validação local prova os dois braços da porta; a de produção prova o crash.
    ⚠️ **Essa prova é negativa e pode nunca chegar:** o cliente desinstalou o app em 22/09 15:37 UTC
    e pediu reembolso. Se ele não voltar, o que resta é a ausência de linha nova de **qualquer**
    aparelho — mais fraco, e é assim que deve ser registrado.
+
+## Resultado da validação (2026-09-22, `SM-A127M`, Mali-G52 r38p1)
+
+Uma sessão contínua do *Delta Force - Black Hawk Down* (`SLUS-21414`), `githubDebug`,
+`Renderer = 12` (OGL), cobre os braços 1 e 2. O aparelho **tem** `GL_EXT_disjoint_timer_query` (lido
+no `GL_EXTENSIONS` do log), então quem recusou foi a porta nova, não a recusa por extensão ausente.
+
+**Braço 1 — fechado (`OsdShowGPU = false`, o padrão).** O aviso sai **uma vez**, e sete `PerfLog`
+seguidos saem **sem** o campo `GPU`. Nenhum aviso de `glBeginQueryEXT` recusado — nenhum begin foi
+tentado:
+
+```
+[   22.7800] GL: GPU timing not enabled because the GPU OSD is off; turn on OSD -> GPU to measure GPU time.
+[   53.2948] PerfLog: 38.5 fps | EE 100% GS 28% VU 0% | frame 1167
+[  113.8321] PerfLog: 28.8 fps | EE 100% GS 18% VU 0% | frame 2948
+[  235.2232] PerfLog: 25.7 fps | EE 100% GS 17% VU 0% | frame 6122
+```
+
+**Braço 2 — aberto com o jogo rodando.** Menu de pausa → *Menu no jogo* → **Exibição na tela**,
+ciclada de `Custom` para `Full` (que é `osdApplyFlags(...)` → `applyOsdSetting`, o caminho real do
+app). O campo volta, e varia:
+
+```
+[  341.6284] PerfLog: 25.4 fps | EE 100% GS 20% VU 0% GPU 3% | frame 6903
+[  371.9170] PerfLog: 25.9 fps | EE 100% GS 19% VU 0% GPU 4% | frame 7686
+```
+
+Na tela, no mesmo instante: `GPU: 4.2% (3.12ms)`. **Este braço é a prova de que a troca de borda por
+nível era necessária** — pelo caminho antigo o `SetGPUTimingEnabled(true)` nunca teria sido chamado
+de novo, e o campo não voltaria nunca nesta sessão.
+
+**Braço 3 — desktop inalterado.** Script sobre o `git diff` percorrendo o aninhamento de `#if`:
+as 17 linhas acrescentadas em `GS.cpp` e as 25 em `GSDeviceOGL.cpp` estão **todas** dentro de
+`#if defined(__ANDROID__)`; o `if` do desktop virou contexto de diff, não linha alterada.
+
+**Braço 4 — produção:** pendente de publicação.
 
 ## Rollback
 

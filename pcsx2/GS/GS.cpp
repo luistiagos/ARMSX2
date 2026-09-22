@@ -1115,7 +1115,24 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 		}
 	}
 
+#if defined(__ANDROID__)
+	// LEVEL, not edge -- the false->true edge is unreachable on Android.
+	//
+	// Two separate mechanisms have already written the new value into GSConfig by the time this
+	// runs, so `old_config` (moved from GSConfig at the top of this function) carries it too and
+	// `!old_config.OsdShowGPU` is always false:
+	//   1. the app's OSD setters assign GSConfig.OsdShowGPU directly on the CPU thread before
+	//      queueing this function on the GS thread (native-lib.cpp, applyOsdSetting);
+	//   2. ImGuiManager::RenderOverlays re-asserts every OSD flag into GSConfig once per frame
+	//      from the Android visibility snapshot (ImGuiOverlays.cpp).
+	// It never mattered before, because GPU timing was armed unconditionally at device open. Now
+	// that TASK-0102 gates arming on this flag, the edge is the only thing that could turn timing
+	// back on mid-game -- and it never fires. Testing the level costs nothing: SetGPUTimingEnabled
+	// early-returns when the state already matches, and this block only runs on a settings change.
+	if (GSConfig.OsdShowGPU)
+#else
 	if (GSConfig.OsdShowGPU && !old_config.OsdShowGPU)
+#endif
 	{
 		const bool gpu_timing = g_gs_device->SetGPUTimingEnabled(true);
 		PerformanceMetrics::SetGPUTimingAvailable(gpu_timing);

@@ -1755,6 +1755,31 @@ bool GSDeviceOGL::SetGPUTimingEnabled(bool enabled)
 		return true;
 
 #if defined(__ANDROID__)
+	// Don't arm the timer query unless the user actually asked to see GPU time.
+	//
+	// GS.cpp calls SetGPUTimingEnabled(true) unconditionally when the device opens, so every
+	// Android GL session ran the query path -- including the overwhelming majority that never
+	// turn the GPU OSD on (GSConfig.OsdShowGPU defaults to false, and so does the app's
+	// `osdShowGpu`). On a Galaxy A03 (Mali-G57, driver dce5da26e42176b6) that path takes a
+	// SIGSEGV *inside* libGLES_mali.so, reached through glGetQueryObjectuivEXT in
+	// PopTimestampQuery: 13 aborts in 21 hours on one customer's device, none of them for a
+	// number anybody had asked to see. Whatever the driver's reason -- a dead query slot or
+	// memory pressure, neither measured here -- not calling it is the remedy for both.
+	//
+	// ANDROID ONLY, deliberately. Upstream had this same gate (5793dbc1ef) and removed it in
+	// 624717dfad because it broke the desktop status bar's GPU%; the desktop must not regress
+	// into that.
+	//
+	// Reading GSConfig here is correct at both call sites: GSopen assigns GSConfig = config
+	// before OpenGSDevice, and GSUpdateConfig assigns GSConfig = new_config before the
+	// OsdShowGPU false->true block that re-enters here. Turning the OSD on mid-game still works.
+	if (enabled && !GSConfig.OsdShowGPU)
+	{
+		Console.Warning("GL: GPU timing not enabled because the GPU OSD is off; turn on "
+						"OSD -> GPU to measure GPU time.");
+		return false;
+	}
+
 	// Say no instead of arming a mechanism that cannot work. The callers in GS.cpp already read
 	// this return value; answering `true` and then never producing a sample is what made the
 	// missing extension look like a GPU sitting idle.
