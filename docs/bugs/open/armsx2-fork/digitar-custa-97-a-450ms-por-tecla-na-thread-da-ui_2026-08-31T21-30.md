@@ -5,7 +5,9 @@
   `ui/home/HomeViewModel.kt::setQuery` + `ui/home/LibraryWaveBackground.kt`
 - **Errors (serviço):** nenhum — não lança e não trava; só demora
 - **Classe:** fail (desempenho)
+- **Complexidade:** alta (investigação profunda de gargalo no ART interpretador/JIT vs AOT em Compose com árvore de nós pesada)
 - **Reincidência:** primeira vez medido. A [TASK-0062](../../../task/TASK-0062-teclado-virtual-toque-fora-e-latencia.md)
+
   atacou o teclado e reduziu custo real, mas **não** este.
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** nenhuma fecha o relato. Parciais, todas medidas:

@@ -4,7 +4,9 @@
 - **Origem:** **delta do fork** — `writeGameSettingsIni` é nosso; o mecanismo de pin é do core
 - **Errors (serviço):** nenhum — não é crash
 - **Classe:** fail (ajuste do usuário não tem efeito, sem aviso)
+- **Complexidade:** media (lógica de gerenciamento de INIs de settings por jogo no Kotlin e reconciliação com GameDB)
 - **Reincidência:** não
+
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** [TASK-0089](../../../task/TASK-0089-ajuste-por-jogo-na-biblioteca-cria-a-camada-de-jogo.md)
   resolve a metade medida — o ajuste feito na biblioteca passa a criar a camada de jogo.

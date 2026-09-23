@@ -4,7 +4,9 @@
 - **Origem:** **delta do fork** — a chave não existe no upstream, é nossa
 - **Errors (serviço):** nenhum — não é crash, não gera telemetria
 - **Classe:** fail (corrupção de imagem)
+- **Complexidade:** baixa (análise e ajuste pontual de flags de compatibilidade e overlay por jogo)
 - **Reincidência:** não
+
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** nenhuma ainda; ver *Próximos passos*
 - **Relacionado:** [ajuste por jogo não chega à camada lida pelo core](ajuste-por-jogo-igual-ao-global-nao-vence-o-gamedb_2026-09-05T20-14.md)

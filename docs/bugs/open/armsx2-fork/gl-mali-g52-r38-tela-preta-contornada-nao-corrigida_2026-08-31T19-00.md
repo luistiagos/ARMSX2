@@ -6,7 +6,9 @@
   Nothing. A/B de campo confirmado em 2026-08-31.
 - **Errors (serviço):** nenhum — **não é crash, e é justamente por isso que não gera telemetria**
 - **Classe:** fail
+- **Complexidade:** alta (defeito de driver GPU proprietário Mali-G52 exigindo instrumentação no pipeline nativo C++ de swap/surface)
 - **Reincidência:** é da mesma família da tela preta do A07
+
   ([gs-tela-preta-silenciosa-sem-diagnostico-a07](../legado-version1/gs-tela-preta-silenciosa-sem-diagnostico-a07_2026-08-20T23-15.md)),
   em outro aparelho e outro backend
 - **Feature:** nenhuma

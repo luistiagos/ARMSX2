@@ -5,7 +5,9 @@
 - **Origem:** desconhecida — o traço disponível é `Input dispatching timed out`, sem stack da main
 - **Errors (serviço):** nenhum ainda; a telemetria não foi consultada para esta assinatura
 - **Classe:** fail (ANR)
+- **Complexidade:** alta (concorrência nativa e deadlock de swapchain gráfico entre UI thread e backend ANGLE)
 - **Reincidência:** primeira vez, **uma única ocorrência**
+
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** nenhuma ainda
 

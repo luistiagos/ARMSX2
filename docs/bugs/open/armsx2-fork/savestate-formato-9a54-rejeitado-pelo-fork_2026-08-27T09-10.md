@@ -4,7 +4,9 @@
 - **Origem:** `pcsx2/SaveState.cpp` (portão de versão) + `pcsx2/SaveStateLegacy.cpp`
 - **Errors (serviço):** nenhum — não é crash; é rejeição limpa, com mensagem
 - **Classe:** regressão de compatibilidade (dados do usuário)
+- **Complexidade:** media (parsing e compatibilização binária de cabeçalhos de savestate legado)
 - **Reincidência:** aparece na primeira publicação do fork; não existe na 1.0.23
+
 
 ## Sintoma
 

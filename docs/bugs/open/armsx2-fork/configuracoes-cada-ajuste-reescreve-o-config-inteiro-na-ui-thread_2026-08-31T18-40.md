@@ -6,7 +6,9 @@
   (secundário: `ui/settings/SettingsWidgets.kt::controllerFocusable`)
 - **Errors (serviço):** nenhum — não lança e não trava; só demora
 - **Classe:** fail (desempenho)
+- **Complexidade:** media (deslocamento de recomposição Compose e I/O de disco para coroutines assíncronas)
 - **Reincidência:** primeira vez registrada
+
 - **Feature:** nenhuma
 - **Tasks que o resolvem:**
   [TASK-0071](../../../task/TASK-0071-passo-do-direcional-nao-recompoe-a-pagina.md) — **item 2 apenas**,

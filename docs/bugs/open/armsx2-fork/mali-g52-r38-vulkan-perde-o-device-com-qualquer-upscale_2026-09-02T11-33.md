@@ -6,7 +6,9 @@
 - **Errors (serviço):** é crash — **gera** telemetria, ao contrário dos outros três defeitos deste
   aparelho
 - **Classe:** crash
+- **Complexidade:** media (limitação de driver/Vulkan contornada com interceptação defensiva e fallback automático para renderer de software)
 - **Reincidência:** 3 ocorrências, 2 escalas diferentes
+
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** nenhuma — ver "Por que não há conserto do nosso lado"
 

@@ -5,7 +5,9 @@
   do que o PS2 exige. Não é delta do fork.
 - **Errors (serviço):** nenhum — não é crash, não gera telemetria
 - **Classe:** fail (performance)
+- **Complexidade:** baixa (teste de benchmark e relaxamento da regra de AutoFlush no GameDB do overlay mobile)
 - **Reincidência:** específico de título; o padrão vale para qualquer jogo com `autoFlush` no GameDB
+
   em GPU tiler fraca
 - **Feature:** nenhuma
 - **Tasks que o resolvem:** [TASK-0095](../../../task/TASK-0095-autoflush-do-god-of-war-em-gpu-fraca.md)

@@ -182,3 +182,7 @@ build.properties
 # puxada para decidir se o build instalado serve de "antes". Sao artefatos de medicao:
 # os numeros entram na secao Resultado da task, os arquivos nao entram no repositorio.
 docs/task/_TASK-0090-medicoes/
+
+# Configuracoes locais do Claude Code
+.claude/
+
