@@ -89,6 +89,88 @@ não herdado.
 - **Instalar o APK pelo app.** Ver item 3: a permissão é barrada de propósito pelo guard do build.
 - Traduzir para os outros 17 idiomas; degradam para o inglês, como hoje.
 
+## Medições (2026-09-22, `SM-A127M`, Android 13 / One UI, pt-BR)
+
+Feitas **antes** de qualquer string mudar, como manda a validação. O que não foi exercido está
+dito como não exercido.
+
+### Item 2 do escopo — o `pm disable-user` sobrevive ao reboot. **Sobrevive.**
+
+Estado antes: `uptime` de 1.049.257 s (12,1 dias) e o pacote já em `enabled=3`
+(`disabled-user`), `installed=true` — ou seja, o aparelho **nunca tinha reiniciado** desde que o
+comando foi dado. Era exatamente o buraco que o guia admitia.
+
+| passo | comando | resposta medida |
+|---|---|---|
+| aplica | `pm disable-user --user 0 com.samsung.android.game.gos` | `Package com.samsung.android.game.gos new state: disabled-user` |
+| reinicia | `adb reboot`, espera `sys.boot_completed=1` | uptime 159 s |
+| confere | `pm list packages -d \| grep gos` | `package:com.samsung.android.game.gos` |
+| confere | `dumpsys package … \| grep enabled=` | `enabled=3`, `installed=true` |
+
+**Consequência:** o `FIX_COMMAND` **não muda**. O droidwin não vale para este aparelho, o
+`pm uninstall -k --user 0` não é necessário, e as telas 9 e 10 continuam válidas — mas agora
+medidas, não herdadas:
+
+- a tela 9 procura `new state: disabled-user`, que é **literalmente** a resposta do aparelho;
+- o desfazer da tela 10 foi exercido: `pm enable com.samsung.android.game.gos` responde
+  `Package com.samsung.android.game.gos new state: enabled` e leva o pacote a `enabled=1`. O
+  aparelho foi devolvido a `enabled=3` logo em seguida.
+
+Corroboração independente, já depois do reboot e com um jogo em primeiro plano: `scaling_cur_freq`
+da cpu0 em **2002000** e o overlay do app marcando `Speed: 99% (T: 100%)` — o teto de 1053 MHz do
+bug não voltou.
+
+### Item 1 do escopo — a ferramenta. **Parcial: 1a confirmado no essencial, 1b não exercido.**
+
+Medido sobre o **aShell You `in.hridayan.ashell` v7.4.0 (versionCode 62)**, baixado de
+`https://f-droid.org/repo/in.hridayan.ashell_62.apk` (11.490.894 bytes, `minSdk 28`,
+`targetSdk 36`) e instalado no aparelho.
+
+**A ambiguidade da ficha do F-Droid está resolvida: o modo "próprio aparelho" é de primeira
+classe.** Ao tocar em `Parear`, o app pergunta *"Qual dispositivo você gostaria de parear?"* e a
+**primeira** opção é **"Emparelhar este dispositivo"**, marcada como `Auto`. A segunda é *"Parear
+outro dispositivo"*. Não é um uso torto de um recurso feito para outra coisa.
+
+**Sem Shizuku e sem root.** O onboarding oferece os dois e diz, na própria tela, *"Conceder estas
+permissões é opcional!"*. Só o modo `ADB Local` os exige (*"usando Shizuku ou root"*); o modo
+`ADB via Depuração por Wi-Fi` não. O caminho inteiro abaixo foi percorrido com as duas recusadas.
+
+**O app já vem em português** — *"ADB na ponta dos seus dedos"*, `Parear`, `Instruções`. Não
+precisamos ensinar rótulo em inglês ao nosso cliente.
+
+**O mecanismo da notificação, corrigido.** A tabela do Contexto dizia que ele *lê* o código pela
+notificação. Não é isso, e a diferença importa para o texto: o app **posta uma notificação dele
+mesmo**, e é **nela** que o usuário digita o código. O manifesto prova: **não há
+`NotificationListenerService`**; há `POST_NOTIFICATIONS`, `NEARBY_WIFI_DEVICES`,
+`CHANGE_WIFI_MULTICAST_STATE` e os serviços `…wifi_adb_shell.service.SelfPairingService` e
+`AdbConnectionService`. A própria tela do app diz: *"Para completar o processo de emparelhamento,
+você precisará interagir com uma notificação da aShell You."*
+
+**E é um toque, como a task apostou.** A permissão chega **negada**
+(`POST_NOTIFICATIONS: granted=false`, `importance=NONE`), e é isto que faria o usuário travar em
+silêncio. Mas o app tem um botão `Configurações de notificação` que cai **direto** na tela de
+notificações dele (`Settings$AppNotificationSettingsActivity`), onde um único toque em
+*"Permitir notificações"* levou a `granted=true`. Nada de tela dividida.
+
+**O que NÃO foi exercido, e continua em aberto:** o pareamento não chegou a se completar e o
+`pm disable-user` não foi executado dentro do aShell You (item 1b). A medição foi interrompida
+porque o aparelho passou a ser usado por uma pessoa no meio dela — o ARMSX2 veio para o primeiro
+plano com um jogo carregando. **Enquanto 1b não for exercido, nenhuma string muda.**
+
+### Rótulos do aparelho — dois que as nossas strings erram hoje
+
+Medidos na UI em pt-BR, não herdados:
+
+| onde | rótulo real no `SM-A127M` | o que o nosso texto manda procurar |
+|---|---|---|
+| Opções do desenvolvedor | **"Depuração por Wi-Fi"** | `step4`: *"Depuração sem fio"* ❌ |
+| dentro dela | **"Parear o dispositivo com um código de pareamento"** | `step5`: *"Parear dispositivo com código de pareamento"* ❌ |
+
+O passo 5 acerta no resto: a linha tem o **nome à esquerda**, que abre o menu, e a **chavinha à
+direita**, que só liga — e o próprio aShell You avisa disso (*"a parte esquerda da opção de
+depuração por Wi-Fi é clicável"*). A tela também oferece *"Parear o dispositivo com um código QR"*,
+que não usamos.
+
 ## Como validar
 
 No `SM-A127M`, com o APK instalado de fato, e **seguindo só as telas do app** — quem valida finge
