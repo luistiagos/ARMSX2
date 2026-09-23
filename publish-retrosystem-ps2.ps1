@@ -229,11 +229,11 @@ function Invoke-VersionBump {
         throw "Nao encontrei versionCode/versionName em $GRADLE_FILE"
     }
 
-    $codeNums = [regex]::Matches($codeLine, '\d+')
-    if ($codeNums.Count -ne 1) {
-        throw "A linha do versionCode tem $($codeNums.Count) numeros; nao da para incrementar com seguranca:`n  $codeLine"
+    $codeMatch = [regex]::Match($codeLine, '=\s*(\d+)\s*$')
+    if (-not $codeMatch.Success) {
+        throw "Nao encontrei o valor numerico do versionCode:`n  $codeLine"
     }
-    $oldCode = [int]$codeNums[0].Value
+    $oldCode = [int]$codeMatch.Groups[1].Value
     $newCode = $oldCode + 1
 
     # Em .properties o valor nao tem aspas: `armsx2.versionName=1.0.24`.
